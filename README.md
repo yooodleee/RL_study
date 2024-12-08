@@ -1,3 +1,5 @@
+![image](https://github.com/user-attachments/assets/c7ebfb86-36e7-4015-8411-112de51b79da)
+
 # paper_study
 
 
@@ -25,6 +27,14 @@ AI의 하위 분야인 딥러닝(deep learning), 머신러닝(machine learning),
 
 
 2. 머신러닝(machine learning)
+
+
+   
+   통계적 기법과 간단한 알고리즘을 통해 데이터로부터 규칙적인 학습을 수행합니다.대표적인 모델로는 SVM, Random Forest, k-NN이 있습니다.
+   딥러닝에 비해 사용되는 데이터는 비교적 적으나, 지도/비지도/강화학습 분야에서 모두 활용되고 있습니다.
+
+
+3. 강화학습(reinforcement learning)
 
 
    
