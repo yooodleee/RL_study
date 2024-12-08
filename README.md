@@ -1,6 +1,5 @@
-![image](https://github.com/user-attachments/assets/c7ebfb86-36e7-4015-8411-112de51b79da)
-
 # paper_study
+![image](https://github.com/user-attachments/assets/b7fdc180-9b47-4550-8e57-98d7591bd8a6)
 
 
 ---
