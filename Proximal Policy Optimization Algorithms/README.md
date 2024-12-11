@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/49c45c12-6070-4971-bb09-803a4d63d10c)# PROXIMAL POLICY OPTIMIZATION ALGORITHMS
+# PROXIMAL POLICY OPTIMIZATION ALGORITHMS
 
 ---
 
