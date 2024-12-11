@@ -23,10 +23,10 @@ This paper proposes a novel object with clipped probability ratios, which forms 
 This experiments compare the performance of various different versions of the surrogate objective, and find that the version with the clipped probability ratios performs best. On continuous control tasks, it performs better than the algorithms researchers compare against. On Atari, it performs significantly better (in terms of sample complexity) than A2C and similarly to ACER though it is much simpler.
 
 
-##2 Background: Policy Optimization
+## 2 Background: Policy Optimization
 
 
-###2.1 Policy Gradient Methods
+### 2.1 Policy Gradient Methods
 
 
 policy gradient methods work by computing an estimator of the policy gradient and plugging it into a stochastic gradient ascent algorithm. The most commonly used gradient estimator has the form:
@@ -49,7 +49,7 @@ trajectory, doing so is not well-justified, and empirically it often leads to de
 updates (results are not shown but were similar or worse than the "no clipping or penalty" setting).
 
 
-###Trust Region Methods
+### Trust Region Methods
 
 
 In TRPO, an objective function (the "surrogate" objective) is maximized subject to a constraint on the
@@ -69,7 +69,7 @@ The theory justifying TRPO actually suggests using a penalty instead of a constr
 for some coefficient β. This follows from the fact that a certain surrogate objective (which computes the max KL over state instead of the mean) forms a lower bound (i.e., a pessimistic bound) on the performance of the policy π. TRPO uses a hard constraint rather than a penalty because it is hard to choose a single value of β that performs well across different problems-or even within a single problem, where the the characteristics change over the course of learning. Hence, to achieve our goal of a first-order algorithm that emulates the monotonic improvement of TRPO, experiments show that is not sufficient to simply choose a fixed penalty coefficient β and optimize the penalized objective Equation (5) with SGD; additional modifications are required.
 
 
-##3 Clipped Surrogate Objective
+## 3 Clipped Surrogate Objective
 
 
 Let rt(θ) denote the probability ratio rt(θ) = πθ(at | st) / πθold(at | st), so r(θold) = 1. TRPO maximizes a "surrogate" objective:
@@ -99,6 +99,6 @@ Figure 2 provides another source of intuition about the surrogate objective LCLI
 Figure 2: Surrogate objectives, as we interpolate between the initial policy parameter θold, and the updated policy parameter, which we compute after one iteration of PPO. The updated policy has a KL divergence of about 0.02 from the initial policy, and this is the point at which LCLIP is maximal. This plot corresponds to the first policy update on the Hopper-v1 problem, using hyperparameters provided.
 
 
-##4 Adaptive KL Penalty Coefficient
+## 4 Adaptive KL Penalty Coefficient
 
 
