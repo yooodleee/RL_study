@@ -1,92 +1,63 @@
 # PROXIMAL POLICY OPTIMIZATION ALGORITHMS
 
-------
-
-## Proximal Policy Optimization Algorithms 논문 분석
+---
 
 
-**Proximal Policy Optimization Algorithms**는 강화 학습(Reinforcement Learning, RL)에서의 정책 최적화 방법을 개선하기 위한 새로운 알고리즘인 
-**Proximal Policy Optimization (PPO)**을 제안한다. **PPO**는 **Trust Region Policy Optimization (TRPO)**와 같은 기존 알고리즘들의 복잡성과 계산 비용을 개선하면서도
-안정적이고 효율적인 성능을 보장하는 방법을 목표로 한다.
+## 1 Introduction
 
 
-1. **논문의 주요 목표**
+In recent years, several different approaches have been propsed for reinforcement learning with 
+neural network function approximators. The leading contenders are deep Q-learning, "vanilla" 
+policy gradient methods, and trust region / natural policy gradient methods. However, there is room
+for improvement in developing a method that is scalable (to large models and parallel implementations),
+data efficient, and robust (i.e., successful on a variety of problems without hyperparameter tuning).
+Q-learning (with function approximation) fails on many simple problems and is poorly understood, 
+vanilla policy gradient methods have poor data effiency and robustness; and trust region policy optimization
+(TRPO) is relatively complicated, and is not compatible with architectures that include noise (such as dropout) or parameter sharing (between the policy and value function, or with auxiliary tasks).
 
 
-   PPO의 주요 목표는 강화 학습에서의 정책 최적화 문제를 해결하는 것이다. 기존의 정책 최적화 알고리즘들은 두 가지 주요 문제를 안고 있다.
-   + Sample efficiency: 환경과의 상호작용을 통해 얻은 데이터를 효율적으로 사용하는 문제
-   + Stability: 알고리즘이 학습 도중에 불안정해지는 문제
+This paper seeks to improve the current state of affairs by introducing an algorithm that attains the data efficency and reliable performance of TRPO, while using only first-order optimization.
+This paper proposes a novel object with clipped probability ratios, which forms a pessimistic estimate (i.e., lower bound) of the performance of the policy.To optimize policies, you must alternate between sampling data from the policy and performing several epochs of optimization on the sampled data.
 
 
-   이러한 문제를 해결하기 위해 PPO는 두 가지 주요 요소에 초점을 맞춘다.
-   + Clipped Objective: 정책 업데이트 시 큰 변화를 제한하여 학습이 급격하게 커지거나 작아지는 것을 방지한다.
-   + Surrogate Objective: 안정적인 정책 업데이트를 위해 기존 정책과 새 정책 사이의 차이를 제한하는 방법을 도입한다.
+This experiments compare the performance of various different versions of the surrogate objective, and find that the version with the clipped probability ratios performs best. On continuous control tasks, it performs better than the algorithms researchers compare against. On Atari, it performs significantly better (in terms of sample complexity) than A2C and similarly to ACER though it is much simpler.
 
 
-2. **주요 아이디어**
+## Background: Policy Optimization
 
 
-   PPO는 **TRPO**의 아이디어를 간소화하여 효율적인 정책 업데이트를 수행할 수 있도록 설계되었다. **TRPO**는 강력하지만, 계산이 복잡하고 효율적이지 않다는 단점이 있다.
-   PPO는 **TRPO**의 아이디어를 간단한 방식으로 구현하면서도 비슷한 성능을 얻을 수 있도록 개선했다.PPO의 두 가지 핵심 아이디어는 다음과 같다.
+### Policy Gradient Methods
 
 
-   + **Clipping the Objective Function**
+policy gradient methods work by computing an estimator of the policy gradient and plugging it into a stochastic gradient ascent algorithm. The most commonly used gradient estimator has the form:
 
 
-     PPO는 **Clipped Surrogate Objective** 함수를 사용하여 정책을 업데이트한다. 이는 기존 정책과 새 정책 사이의 차이가 너무 크지 않도록 제한하는 방식이다.
-     구체적으로, PPO는 다음과 같은 방식으로 목표 함수가 변경된다.
+![image](https://github.com/user-attachments/assets/e9077a34-62ea-49a8-a9bf-10d5eb51c53b)
+
+where πθ is a stochastic policy and A^t is an estimator of the advantage function at timestep t.
+Here, the expectation Eˆt indicates the empirical average over a finite batch of samples, in an 
+algorithm that algernates between sampling and optimization. Implementations that use automatic
+differentiation software work by constructing an objective function whose gradient is the policy
+gradient estimator; the estimator g^ is obtained by differentiating the objective:
 
 
-     여기서:
-     + rt(θ)는 현재 정책과 이전 정책의 확률 비율이다(new_policy/old_policy)
-     + At는 **어드밴티지 추정** 값이다.
-     + ε은 **클리핑 범위**로, 이 값이 작을수록 큰 업데이트를 제한한다.
+![image](https://github.com/user-attachments/assets/abacfe8c-c2f8-4540-9f2c-b4603d10aefd)
 
 
-     이 방식은 정책이 너무 큰 변화를 겪지 않도록 제한하면서도 안정적인 학습을 가능하게 한다.
+While it is appealing to perform multiple steps of optimization on this loss LPG using the same 
+trajectory, doing so is not well-justified, and empirically it often leads to destructively large policy
+updates (results are not shown but were similar or worse than the "no clipping or penalty" setting).
 
 
-   + **Trust Region Updates**
-  
-
-     PPO는 TRPO와 유사하게 **정책의 변화 범위(trust retion)**를 제한하여 정책 업데이트가 과도하지 않도록 한다. 하지만 ppo는 TRPO처럼 **복잡한 이차 최적화**를 요구하지 않고,
-     간단한 **1-step** 업데이트로 이 목적을 달성한다. 이를 통해 ppo는 TRPO보다 계산적으로 훨씬 효율적이며, 복잡한 알고리즘을 피하면서도 비슷한 성능을 얻을 수 있다.
+###Trust Region Methods
 
 
-3. **PPO의 알고리즘**
+In TRPO, an objective function (the "surrogate" objective) is maximized subject to a constraint on the
+size of the policy update. Specifically,
 
 
-   PPO는 기본적으로 다음과 같은 절차로 작동한다:
+![image](https://github.com/user-attachments/assets/f648a023-8554-49ae-92f8-5ca1ba3e7bfa)
 
 
-   1. **현재 정책**에 따라 환경에서 데이터를 수집한다.
-   2. **어드밴티지 추정(Advantage Estimation)**을 통해 정책 업데이트를 위한 목표 값을 계산한다.
-   3. **Objective Function**을 통해 정책을 업데이트하는데, 이때 위에서 설명한 클리핑된 목표 함수를 사용하여 과도한 업데이트를 방지한다.
-   4. **PPO의 클리핑**을 통해 새로운 정책이 너무 변화하지 않도록 제한한다.
-   5. 이 과정을 여러 번 반복하여 최적 정책을 학습한다.
+Here, θold is the vector of policy parameters before the update. This problem can efficiently be approximately solved using the conjugate gradient algorithm, after making a linear approximation to the objective and a quadratic approximation to the constraint.
 
-
-
-4. **PPO의 장점**
-
-
-   ppo는 다음과 같은 장점을 가지고 있다:
-
-
-   + **간단하고 효율적이다**: 복잡한 수학적 기법 없이도 좋은 성능을 보이며, 구현이 상대적으로 간단하다.
-   + **안정성**: 정책 업데이트가 너무 급격하지 않도록 하여 안정적인 학습을 보장한다.
-   + **높은 샘플 효율성**: 트라이얼(trial)과 에러 기반 학습에서 적은 수의 샘플을 효과적으로 사용한다.
-
-
-5. **실험 결과**
-
-
-   ppo는 여러 강화 학습 환경에서 좋은 성능을 보였고, 다양한 벤치마크에서 경쟁력있는 결과를 얻었다. 특히, ppo는 안정성과 효율성을 동시에 만족하는 방식으로
-   기존의 알고리즘들에 비해 우수한 성능을 입증했다.
-
-
-6. **결론**
-
-
-   ppo는 기존의 복잡한 정책 최적화 알고리즘들에 비해 간단하면서도 안정적이고 효율적인 방법을 제시한다. 이 논문은 ppo가 다양한 RL 문제에서 우수한 성능을 보이며,
-   실제로 많이 사용되는 알고리즘이 되었음을 강조한다. ppo는 오늘날 강화 학습의 표준 알고리즘들 중 하나로 자리 잡았으며, 많은 연구와 실험에서 그 유효성을 입증했다.
