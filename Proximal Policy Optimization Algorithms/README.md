@@ -102,3 +102,54 @@ Figure 2: Surrogate objectives, as we interpolate between the initial policy par
 ## 4 Adaptive KL Penalty Coefficient
 
 
+Another approach, which can used as an alternative to the clipped surrogate objective, or in addition to it, is to use a penalty on KL divergence, and to adapt the penalty coefficient so that we acheive some target valeu of the KL divergence dtarg each policy update. In this experiments, the KL penalty performed worse than the clipped surrogate objective, however, researchers have included it here because it's an important baseline.
+
+
+In the simplest instantiation of this algorithm, we perform the following steps in each policy update:
+
+
+* Using severl epochs of minibatch SGD, optimize the KL-penalized objective :
+![image](https://github.com/user-attachments/assets/ab22c3fd-3ec1-4718-b3aa-65d2544cc159)
+
+
+* Computed d = = Eˆt[KL[πθold(· | st), πθ(· | st)]]
+* If d < dtarg/1.5, β <- β/2
+* If d > dtarg/1.5, β <- β*2
+
+
+The updated β is used for the next policy update. With this scheme, we occasionally see policy updates where the KL divergence is significantly different from dtarg, however, these are rare, and β quickly adjust. The parameters 1.5 and 2 above are chosen heuristically, but the algorithm is not very sensitive to them. The initial value of β is a another hyperparmeter but is not important in practice because the algorithm quickly adjusts it.
+
+
+## 5 Algorithm
+
+
+The surrogate losses from the previous sections can be computed and differentiated with a minor change to a typical policy gradient implementation. For implementations that use automatic differentation, one simply constructs the loss LCLIP or LKLPEN instead of LPG, and one performs multiple steps of stochastic gradient ascent on this objective.
+
+
+Most techniques for computing variance-reduced advantage-function estimators make use a learned state-value function V(s); for example, generalized advantage estimation, or the finite-horizon estimators in. If using a neural network architecture that shares parameters between the policy and value function, you must use a loss function that combines the policy surrogate and a value function error term. This objective can further be augmented by adding an entropy bouns to ensure sufficient exploration, as suggested in past work. Combining these terms, researchers obtain the following objective, which is (approximately) maximized each iteration:
+
+
+![image](https://github.com/user-attachments/assets/73b64d6f-2849-41ff-a98c-090832a0b4be)
+
+
+where c1, c2 are coefficient, and S denotes an entropy bouns, and LVF is a squared-error loss (V(st)-Vtarg)^2.
+One style of policy gradient implementation, popularized in [Mni+16] and well-suited for use with recurrent neural networks, runs the policy for T timesteps (where T is much less than the episode length), and uses the collected samples for an update. This style requires an advantage estimator that does not look timestep T. The estimator used by [Mni+16] is:
+![image](https://github.com/user-attachments/assets/e1d1469e-c0d9-4171-8a85-2c05ac8a9f80)
+
+
+where t specifies the time index in [0, T], within a given length-T trajectorty segment. Generalizing this choice, we can use a truncated version of generalized advantage estimation, which reduces to Equation (10) when λ = 1:
+![image](https://github.com/user-attachments/assets/a19c25df-5b76-4c39-b509-c0992f32e6df)
+
+
+A proximal policy optimization (PPO) algorithm that uses fixed-length trajectort segements is shown below. Each iteration, each of N (parallel) actors collect T timesteps of data. Then we construct the surrogate loss on these NT timesteps of data, and optimize it with minibatch SGD (or usually for better performance, Adam), for K epochs.
+
+
+![image](https://github.com/user-attachments/assets/056bb309-a1de-4190-885e-25e6d2275d57)
+
+
+## 6 Experiments
+
+## 6.1 Comparison of Surrogate Objective
+
+
+First, we compare several 
