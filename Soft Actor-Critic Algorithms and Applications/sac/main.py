@@ -4,12 +4,13 @@ import gym
 import numpy as np
 import itertools
 import torch
-from .sac import SAC
+import mujoco_py
+from sac import SAC
 from torch.utils.tensorboard import summary
 from replay_memory import ReplayMemory
 
 parser=argparse.ArgumentParser(description="PyTorch Soft Actor-Critic Args")
-parser.add_argument("--env-name", default="HalfCheetah-v2", help="Mujoco Gym environment (default: HalfCheetah-v2)")
+parser.add_argument("--env-name", default="HalfCheetah-v4", help="Mujoco Gym environment (default: HalfCheetah-v4)")
 parser.add_argument("--policy", default="Gaussian", help="Policy Type: Gaussian | Deterministic (default: Gaussian)")
 parser.add_argument("--eval", type=bool, default=True, help="Evaluates a policy every 10 episode (default: True)")
 parser.add_argument("--gamma", type=float, default=0.99, metavar="G", help="discount factor for reward (default: 0.99)")
