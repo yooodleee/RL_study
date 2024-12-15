@@ -89,3 +89,6 @@ env = gym.make('HalfCheetah-v4')
 ```
 
 Upgrading to `v4` will help ensure better compatibility with the latest versions of `gym` and other related dependencies. If you encounter any issues with the new version, be sure to check the gym documentation for any changes in the environment's setup or behavior.
+
+---
+
