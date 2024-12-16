@@ -93,7 +93,7 @@ These results suggest that SAC is a promising candidate for learning in real-wor
 
 ---
 
-## **8. Hyperparameters
+## **8. Hyperparameters**
 SAC Hyperparameters
 
 1. `optimizer`: Adam
