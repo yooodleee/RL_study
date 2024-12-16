@@ -155,5 +155,166 @@ class RunnerThread(threading.Thread):
     
 def env_runner(
     env,
-    policy
-)
+    policy,
+    num_local_steps,
+    summary_writer,
+    render,
+    predictor,
+    envWrap,
+    noReward,
+):
+    """
+    The logic of the thread runner. In brief, it constantly keeps on running
+    the policy, and as long as the rollout exceeds a certain length, the thread
+    runner appends the policy to the queue.
+    """
+    last_state = env.reset()
+    last_features = policy.get_initial_features()   # reset lasm memory
+    length = 0
+    rewards = 0
+    values = 0
+    if predictor is not None:
+        ep_bonus = 0
+        life_bonus = 0
+    
+    while True:
+        terminal_end = False
+        rollout = PartialRollout(predictor is not None)
+
+        for _ in range(num_local_steps):
+            # run policy
+            fetched = policy.act(last_state, *last_features)
+            action, value_, features = fetched[0], fetched[1], fetched[2:]
+
+            # run environment: get action_index from sampled one-hot 'action'
+            stepAct = action.argmax()
+            state, reward, terminal, info = env.step(stepAct)
+            if noReward:
+                reward = 0.
+            if render:
+                env.render()
+            
+            curr_tuple = [last_state, action, reward, value_, terminal, last_features]
+            if predictor is not None:
+                bonus = predictor.pred_bonus(last_state, state, action)
+                curr_tuple += [bonus, state]
+                life_bonus += bonus
+                ep_bonus += bonus
+            
+            # collect the experience
+            rollout.add(*curr_tuple)
+            rewards += reward
+            length += 1
+            values += value_[0]
+
+            last_state = state
+            last_features = features
+
+            timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+            if timestep_limit is None: timestep_limit = env.spec.timestep_limit
+            if terminal or length >= timestep_limit:
+                # prints summary of each life if envWrap == Ture else each game
+                if predictor is not None:
+                    print("Episode finished. Sum of shaped rewards: %.2f. Length: %d. Bonus: %.4f." % (rewards, length, life_bonus))
+                    life_bonus = 0
+                else:
+                    print("Bonus finished. Sum of shaped rewards: %.2f. Length: %d." % (rewards, length))
+                if 'distance' in info: print('Mario Distance Covered:', info['distance'])
+                length = 0
+                rewards = 0
+                terminal_end = True
+                last_features = policy.get_initial_features()   # reset lstm memory
+                # TODO: don't reset when gym timestep_limit increases, bootstrap -- doesn't matter for atari?
+                # reset only if it hasn't already reseted
+                if length >= timestep_limit or not env.metadata.get('semantics.autoreset'):
+                    last_state = env.reset()
+            
+            if info:
+                # summarize full game including all lives (even if envWrap=True)
+                summary = tf.summary()
+                for k, v in info.items():
+                    summary.value.add(tag=k, simple_value=float(v))
+                if terminal:
+                    summary.value.add(tag='global/episode_value', simple_value=float(values))
+                    values = 0
+                    if predictor is not None:
+                        summary.value.add(tag='global/episode_bonus', simple_value=float(ep_bonus))
+                        ep_bonus = 0
+                summary_writer.add_summary(summary, policy.global_step.eval())
+                summary_writer.flush()
+            
+            if terminal_end:
+                break
+
+        if not terminal_end:
+            rollout.r = policy.value(last_state, *last_features)
+        
+        # once we have enough experience, yield it, and have the TreadRunner place it on a queue
+        yield rollout
+
+
+class A3C(object):
+    def __init__(
+        self,
+        env,
+        task,
+        visualise,
+        unsupType,
+        envWrap=False,
+        designHead='universe',
+        noReward=False,
+    ):
+        """
+        An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
+        Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
+        But overall, we'll define the model, specify its inputs, and describe how the policy gradients step
+        should be computed.
+        """
+        self.task = task
+        self.unsup = unsupType is not None
+        self.envWrap = envWrap
+        self.env = env
+
+        predictor = None
+        numaction = env.action_space.n
+        worker_device = "/job:worker/task:{}/cpu:0".format(task)
+
+        with tf.device(tf.train.replace_device_setter(1, worker_device=worker_device)):
+            with tf.variable_creator_scope("global"):
+                self.network = LSTMPolicy(env.observation_space.shape, numaction, designHead)
+                self.global_step = tf.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32), trainalbe=False)
+
+                if self.unsup:
+                    with tf.variable_creator_scope("predictor"):
+                        if 'state' in unsupType:
+                            self.ap_network = StatePredictor(env.observation_space.shape, numaction, designHead, unsupType)
+                        else:
+                            self.ap_network = StateActionPredictor(env.observation_space.shape, numaction, designHead)
+        
+        with tf.device(worker_device):
+            with tf.variable_creator_scope("local"):
+                self.local_network = pi = LSTMPolicy(env.observation_space.shape, numaction, designHead)
+                pi.global_step = self.global_step
+                if self.unsup:
+                    with tf.variable_creator_scope("predictor"):
+                        if 'state' in unsupType:
+                            self.local_ap_network = predictor = StatePredictor(env.observation_space.shape, numaction, designHead, unsupType)
+                        else:
+                            self.local_ap_network = predictor = StateActionPredictor(env.observation_space.shape, numaction, designHead)
+
+            # computing a3c loss: https://arxiv.org/abs/1506.02438
+            self.ac = tf.placeholder(tf.float32, [None, numaction], name="ac")
+            self.adv = tf.placeholer(tf.float32, [None], name="adv")
+            self.r = tf.placeholder(tf.float32, [None], name="r")
+            log_prob_tf = tf.nn.log_softmax(pi.logits)
+            prob_tf = tf.nn.softmax(pi.logits)
+            # 1) the "policy gradients" loss: its derivative is preciesly the policy gradient
+            # notice that self.ac is a placeholder that is provided externally.
+            # adv will contain the advantages, as calculated in process_rollout
+            pi_loss = -tf.reduce_mean(tf.reduce_sum(log_prob_tf * self.ac, 1) * self.adv)   # Eq (19)
+            # 2) loss of value function: 12_loss = (x-y)^2/2
+            vf_loss = 0.5 * tf.reduce_mean(tf.square(pi.vf - self.r))   # Eq (28)
+            # 3) entropy to ensure randomness
+            entropy = -tf.reduce_mean(tf.reduce_sum(prob_tf * log_prob_tf, 1))
+            # final a3c loss: lr of critic is half of actor
+            self.loss = pi_loss + 0.5 * vf_loss - entropy * Constants['ENTROPY_BETA']
