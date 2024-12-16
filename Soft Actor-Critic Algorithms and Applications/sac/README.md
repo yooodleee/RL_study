@@ -96,15 +96,15 @@ These results suggest that SAC is a promising candidate for learning in real-wor
 ## **8. Hyperparameters**
 SAC Hyperparameters
 
-1. `optimizer`: Adam
-2. `learning rate`: 3.10^-4
-3. `discount factor(𝛾)`: 0.99
-4. `replacy buffer size`: 10^6
-5. `number of hidden layers (all networks)`: 2
-6. `number of hidden units per layer`: 256
-7. `number of samples per minibatch`: 256
-8. `entropy target`: -dim (A) (e.g., -6 for HalfCheetah-v1)
-9. `nonlinearity`: ReLU
-10. `target smoothing coefficient (𝜏)`: 0.005
-11. `target update interval`: 1
-12. `gradient steps`: 1
+1.  `optimizer`: Adam
+2.  `learning rate`: 3.10^-4
+3.  `discount factor(𝛾)`: 0.99
+4.  `replacy buffer size`: 10^6
+5.  `number of hidden layers (all networks)`: 2
+6.  `number of hidden units per layer`: 256
+7.  `number of samples per minibatch`: 256
+8.  `entropy target`: -dim (A) (e.g., -6 for HalfCheetah-v1)
+9.  `nonlinearity`: ReLU
+10.  `target smoothing coefficient (𝜏)`: 0.005
+11.  `target update interval`: 1
+12.  `gradient steps`: 1
