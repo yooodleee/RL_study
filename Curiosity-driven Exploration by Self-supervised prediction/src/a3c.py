@@ -318,3 +318,151 @@ class A3C(object):
             entropy = -tf.reduce_mean(tf.reduce_sum(prob_tf * log_prob_tf, 1))
             # final a3c loss: lr of critic is half of actor
             self.loss = pi_loss + 0.5 * vf_loss - entropy * Constants['ENTROPY_BETA']
+
+            # compute gradients
+            grads = tf.gradients(self.loss * 20.0, pi.var_list) # batchsize=20. Factored out to make hyperparameters not depend on it.
+
+            # computing predictor loss
+            if self.unsup:
+                if 'state' in unsupType:
+                    self.predloss = Constants['PREDICTION_LR_SCALE'] * predictor.forwardloss
+                else:
+                    self.predloss = Constants['PREDICTION_LR_SCALE'] * (predictor.invloss * (1-Constants['FORWARD_LOSS_WT']) + 
+                                                                        predictor.forwardloss * Constants['FORWARD_LOSS_WT'])
+                predgrads = tf.gradients(self.predloss * 20.0, predictor.var_list)  # batchsize=20. Fatored out to make hyperparameters not depend on it.
+
+                # do not backprop to policy
+                if Constants['POLICY_NO_BACKPROP_STEPS'] > 0:
+                    grads = [tf.scalar_mul(tf.to_float(tf.greater(self.global_step, Constants['POLICY_NO_BACKPROP_STEPS'])), grads_i) for grads_i in grads]
+            
+            self.runner = RunnerThread(env, pi, Constants['ROLLOUT_MAXLEN'], visualise, predictor, envWrap, noReward)
+
+            # storing summaries
+            bs = tf.to_float(tf.shape(pi.x)[0])
+            if use_tf12_api:
+                tf.summary.scalar("model/policy_loss", pi_loss)
+                tf.summary.scalar("model/value_loss", vf_loss)
+                tf.summary.scalar("model/entropy", entropy)
+                tf.summary.scalar("model/state", pi.x)  # max_outputs=10
+                tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
+                tf.summary.scalar("model/var_globacl_norm", tf.global_norm(pi.var_list))
+                if self.unsup:
+                    tf.summary.scalar("model/predloss", self.predloss)
+                    if 'action' in unsupType:
+                        tf.summary.scalar("model/inv_loss", predictor.invloss)
+                        tf.summary.scalar("model/forward_loss", predgrads.forwardloss)
+                    tf.summary.scalar("model/predgrad_global_norm", tf.global_norm(predgrads))
+                    tf.summary.scalar("model/predvar_global_norm", tf.global_norm(predictor.var_list))
+                self.summary_op = tf.summary.merge_all()
+            else:
+                tf.scalar_summary("model/policy_loss", pi_loss)
+                tf.scalar_summary("model/value_liss", vf_loss)
+                tf.scalar_summary("model/entropy", entropy)
+                tf.image_summary("model/state", pi.x)
+                tf.scalar_summary("model/grad_global_norm", tf.global_norm(grads))
+                tf.scalar_summary("model/var_global_norm", tf.global_norm(pi.var_list))
+                if self.unsup:
+                    tf.scalar_summary("model/predloss", self.predloss)
+                    if 'action' in unsupType:
+                        tf.scalar_summary("model/inv_loss", predictor.invloss)
+                        tf.scalar_summary("model/forward_loss", predictor.forwardloss)
+                    tf.scalar_summary("model/predvar_global_norm", tf.global_norm(predgrads))
+                    tf.scalar_summary("model/predvar_global_norm", tf.global_norm(predictor.var_list))
+                self.summary_op = tf.merge_all_summaries()
+            
+            # clip gradients
+            grads, _=tf.clip_by_global_norm(grads, Constants['GRAD_NORM_CLIP'])
+            grads_and_vars = list(zip(grads, self.network.var_list))
+            if self.unsup:
+                pregrads, _= tf.clip_by_global_norm(predgrads, Constants['GRAD_NORM_CLIP'])
+                pred_grads_and_vars = list(zip(predgrads, self.ap_network.var_list))
+                grads_and_vars = grads_and_vars + pred_grads_and_vars
+            
+            # update global step by batch size
+            inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])
+
+            # each worker has a different set of adam optimizer parameters
+            # TODO: make optimizer global shared, if needed
+            print("Optimizer: ADAM with lr: %f" % (Constants['LEARNING_RATE']))
+            print("Input observation shape: ", env.observation_space.shape)
+            opt = tf.train.AdamOptimizier(Constants['LEARNING_RATE'])
+            self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
+
+            # copy weights from the parameter server to the local model
+            sync_var_list = [v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)]
+            if self.unsup:
+                sync_var_list += [v1.assign(v2) for v1, v2 in zip(predictor.var_lst, self.ap_network.var_list)]
+            self.sync = tf.group(*sync_var_list)
+
+            # initialize extras
+            self.summary_writer = None
+            self.local_steps = 0
+    
+    def start(self, sess, summary_writer)-> None:
+        self.runner.start_runner(sess, summary_writer)
+        self.summary_writer = summary_writer
+
+    def pull_batch_from_queue(self):
+        """
+        Take a rollout from the queue of the thread runner.
+        """
+        # get top rollout from queue (FIFO)
+        rollout = self.runner.queue.get(timeout=600.0)
+        while not rollout.terminal:
+            try:
+                # Now, get remaining *available* rollouts from queue and append them into
+                # the same one above. If queue.Queue(5): len=5 and everything is
+                # superfast (not usually the case), then all 5 will be returned and
+                # exception is raised. In such a case, effective batch_size would become
+                # Constants['ROLLOUT_MAXLEN'] * queue_maxlen(5). But it is almost never the
+                # case, i.e., collecting a rollout of length=ROLLOUT_MAXLEN takes more time
+                # than get(). So, there are no more available rollouts in queue usually and
+                # exception gets always raised. Hence, one should keep queue_maxlen = 1 ideally.
+                # Also note that the next rollout generation gets invoked automatically because
+                # its a thread which is always running using 'yield' at end of generation process.
+                # To conclude, effective batch_size = Constants['ROLLOUT_MAXLEN']
+                rollout.extend(self.runner.queue.get_nowait())
+            except queue.Empty:
+                break
+        
+        return rollout
+    
+    def process(self, sess):
+        """
+        Process grabs a rollout that's been produced by the thread runner,
+        and updates the parameters. The update is then sent to the parameter
+        server.
+        """
+        sess.run(self.sync) # copy weights from shared to local
+        rollout = self.pull_batch_from_queue()
+        batch = process_rollout(rollout, gamma=Constants['GAMMA'], lambda_=Constants['LAMBDA'], clip=self.envWrap)
+
+        should_compute_summary = self.task == 0 and self.local_steps % 11 == 0
+
+        if should_compute_summary:
+            fetches = [self.summary_op, self.train_op, self.global_step]
+        else:
+            fetches = [self.train_op, self.global_step]
+        
+        feed_dict = {
+            self.local_network.x: batch.si,
+            self.ac: batch.a,
+            self.r: batch.r,
+            self.adv: batch.adv,
+            self.local_network.state_in[0]: batch.features[0],
+            self.local_network.state_in[1]: batch.features[1],
+        }
+        if self.unsup:
+            feed_dict[self.local_network.x] = batch.si[:-1]
+            feed_dict[self.local_ap_network.s1] = batch.si[:-1]
+            feed_dict[self.local_ap_network.s2] = batch.si[1:]
+            feed_dict[self.local_ap_network.sample] = batch.a
+        
+        fetched = sess.run(fetches, feed_dict=feed_dict)
+        if batch.terminal:
+            print("Global Step Counter: %d"%fetched[-1])
+        
+        if should_compute_summary:
+            self.summary_writer.add_summary(tf.Summary.FromString(fetched[0]), fetched[-1])
+            self.summary_writer.flush()
+        self.local_steps += 1
