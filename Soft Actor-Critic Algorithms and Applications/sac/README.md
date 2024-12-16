@@ -75,20 +75,36 @@ If you still encounter issues after completing the steps above:
 
 ---
 
-Yes, the warning message indicates that you're using an outdated version of the `HalfCheetah-v2` environment, and it suggests upgrading to the newer version (`v4`). 
+## **7. About Papers**
+Model-free deep reinforcement learning(RL) algorithms have been successfully applied to a range of challenging sequential decision making and control tasks.
+However, these methods typically suffer from two major challenges:
 
-The message is simply informing you that `HalfCheetah-v2` is no longer the latest supported version, and upgrading to `HalfCheetah-v4` would ensure that you're working with a more current and maintained environment.
+1. High sample complexity
+2. Brittleness to hyperparameters.
 
-To resolve this, you can modify your code to use `HalfCheetah-v4` instead of `HalfCheetah-v2`. Here's how you can do that:
+Both ot these challenges limit the applicability of such methods to real-world domains.
 
-```python
-import gym
+Soft Acotr-Critic (SAC), recently introduced off-policy actor-critic algorithm based on the maximum entropy RL framework. 
+In this framework, the actor aims to simultaneously maximize expected return and entropy; that is, to suceed at the task while acting as randomly as possible.
 
-# Change this line
-env = gym.make('HalfCheetah-v4')
-```
-
-Upgrading to `v4` will help ensure better compatibility with the latest versions of `gym` and other related dependencies. If you encounter any issues with the new version, be sure to check the gym documentation for any changes in the environment's setup or behavior.
+SAC achieves state-of-the-art performance, ourtperforming prior on-policy and off-policy methods in sample-efficiency and asymptotic performance.
+Furthermore, in contrast to other off-policy algorithms, achieving similar performance across different random seeds.
+These results suggest that SAC is a promising candidate for learning in real-world robotics tasks.
 
 ---
 
+## **8. Hyperparameters
+SAC Hyperparameters
+
+1. optimizer: Adam
+2. learning rate: 3.10^-4
+3. discount factor(𝛾): 0.99
+4. replacy buffer size: 10^6
+5. number of hidden layers (all networks): 2
+6. number of hidden units per layer: 256
+7. number of samples per minibatch: 256
+8. entropy target: -dim (A) (e.g., -6 for HalfCheetah-v1)
+9. nonlinearity: ReLU
+10. target smoothing coefficient (𝜏): 0.005
+11. target update interval: 1
+12. gradient steps: 1
