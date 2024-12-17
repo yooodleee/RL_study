@@ -7,7 +7,7 @@ import queue as queue
 import scipy.signal
 import threading
 import distutils.version
-from constants import Constants
+from constants import constants
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
 def disconut(x, gamma):
@@ -38,7 +38,7 @@ def process_rollout(rollout, gamma, lambda_=1.0, clip=False):
     if rollout.unsup:
         rewards_plus_v += np.asarray(rollout.bounses + [0])
     if clip:
-        rewards_plus_v[:-1] = np.clip(rewards_plus_v[:-1], -Constants['REWARD_CLIP'], Constants['REWARD_CLIP'])
+        rewards_plus_v[:-1] = np.clip(rewards_plus_v[:-1], -constants['REWARD_CLIP'], constants['REWARD_CLIP'])
     batch_r = disconut(rewards_plus_v, gamma)[:-1]  # value network target
 
     # collecting target for policy network
@@ -46,7 +46,7 @@ def process_rollout(rollout, gamma, lambda_=1.0, clip=False):
     if rollout.unsup:
         rewards += np.asarray(rollout.bounses)
     if clip:
-        rewards = np.clip(rewards, -Constants['REWARD_CLIP'], Constants['REWARD_CLIP'])
+        rewards = np.clip(rewards, -constants['REWARD_CLIP'], constants['REWARD_CLIP'])
     vpred_t = np.asarray(rollout.values + [rollout.r])
     # "Generalized Advantage Estimation": https://arixv.org/abs/1506.02438
     # Eq (10): delta_t = Rt + gamma*V_{t+1} - V_t
@@ -317,7 +317,7 @@ class A3C(object):
             # 3) entropy to ensure randomness
             entropy = -tf.reduce_mean(tf.reduce_sum(prob_tf * log_prob_tf, 1))
             # final a3c loss: lr of critic is half of actor
-            self.loss = pi_loss + 0.5 * vf_loss - entropy * Constants['ENTROPY_BETA']
+            self.loss = pi_loss + 0.5 * vf_loss - entropy * constants['ENTROPY_BETA']
 
             # compute gradients
             grads = tf.gradients(self.loss * 20.0, pi.var_list) # batchsize=20. Factored out to make hyperparameters not depend on it.
@@ -325,17 +325,17 @@ class A3C(object):
             # computing predictor loss
             if self.unsup:
                 if 'state' in unsupType:
-                    self.predloss = Constants['PREDICTION_LR_SCALE'] * predictor.forwardloss
+                    self.predloss = constants['PREDICTION_LR_SCALE'] * predictor.forwardloss
                 else:
-                    self.predloss = Constants['PREDICTION_LR_SCALE'] * (predictor.invloss * (1-Constants['FORWARD_LOSS_WT']) + 
-                                                                        predictor.forwardloss * Constants['FORWARD_LOSS_WT'])
+                    self.predloss = constants['PREDICTION_LR_SCALE'] * (predictor.invloss * (1-constants['FORWARD_LOSS_WT']) + 
+                                                                        predictor.forwardloss * constants['FORWARD_LOSS_WT'])
                 predgrads = tf.gradients(self.predloss * 20.0, predictor.var_list)  # batchsize=20. Fatored out to make hyperparameters not depend on it.
 
                 # do not backprop to policy
-                if Constants['POLICY_NO_BACKPROP_STEPS'] > 0:
-                    grads = [tf.scalar_mul(tf.to_float(tf.greater(self.global_step, Constants['POLICY_NO_BACKPROP_STEPS'])), grads_i) for grads_i in grads]
+                if constants['POLICY_NO_BACKPROP_STEPS'] > 0:
+                    grads = [tf.scalar_mul(tf.to_float(tf.greater(self.global_step, constants['POLICY_NO_BACKPROP_STEPS'])), grads_i) for grads_i in grads]
             
-            self.runner = RunnerThread(env, pi, Constants['ROLLOUT_MAXLEN'], visualise, predictor, envWrap, noReward)
+            self.runner = RunnerThread(env, pi, constants['ROLLOUT_MAXLEN'], visualise, predictor, envWrap, noReward)
 
             # storing summaries
             bs = tf.to_float(tf.shape(pi.x)[0])
@@ -371,10 +371,10 @@ class A3C(object):
                 self.summary_op = tf.merge_all_summaries()
             
             # clip gradients
-            grads, _=tf.clip_by_global_norm(grads, Constants['GRAD_NORM_CLIP'])
+            grads, _=tf.clip_by_global_norm(grads, constants['GRAD_NORM_CLIP'])
             grads_and_vars = list(zip(grads, self.network.var_list))
             if self.unsup:
-                pregrads, _= tf.clip_by_global_norm(predgrads, Constants['GRAD_NORM_CLIP'])
+                pregrads, _= tf.clip_by_global_norm(predgrads, constants['GRAD_NORM_CLIP'])
                 pred_grads_and_vars = list(zip(predgrads, self.ap_network.var_list))
                 grads_and_vars = grads_and_vars + pred_grads_and_vars
             
@@ -383,9 +383,9 @@ class A3C(object):
 
             # each worker has a different set of adam optimizer parameters
             # TODO: make optimizer global shared, if needed
-            print("Optimizer: ADAM with lr: %f" % (Constants['LEARNING_RATE']))
+            print("Optimizer: ADAM with lr: %f" % (constants['LEARNING_RATE']))
             print("Input observation shape: ", env.observation_space.shape)
-            opt = tf.train.AdamOptimizier(Constants['LEARNING_RATE'])
+            opt = tf.train.AdamOptimizier(constants['LEARNING_RATE'])
             self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
 
             # copy weights from the parameter server to the local model
@@ -414,13 +414,13 @@ class A3C(object):
                 # the same one above. If queue.Queue(5): len=5 and everything is
                 # superfast (not usually the case), then all 5 will be returned and
                 # exception is raised. In such a case, effective batch_size would become
-                # Constants['ROLLOUT_MAXLEN'] * queue_maxlen(5). But it is almost never the
+                # constants['ROLLOUT_MAXLEN'] * queue_maxlen(5). But it is almost never the
                 # case, i.e., collecting a rollout of length=ROLLOUT_MAXLEN takes more time
                 # than get(). So, there are no more available rollouts in queue usually and
                 # exception gets always raised. Hence, one should keep queue_maxlen = 1 ideally.
                 # Also note that the next rollout generation gets invoked automatically because
                 # its a thread which is always running using 'yield' at end of generation process.
-                # To conclude, effective batch_size = Constants['ROLLOUT_MAXLEN']
+                # To conclude, effective batch_size = constants['ROLLOUT_MAXLEN']
                 rollout.extend(self.runner.queue.get_nowait())
             except queue.Empty:
                 break
@@ -435,7 +435,7 @@ class A3C(object):
         """
         sess.run(self.sync) # copy weights from shared to local
         rollout = self.pull_batch_from_queue()
-        batch = process_rollout(rollout, gamma=Constants['GAMMA'], lambda_=Constants['LAMBDA'], clip=self.envWrap)
+        batch = process_rollout(rollout, gamma=constants['GAMMA'], lambda_=constants['LAMBDA'], clip=self.envWrap)
 
         should_compute_summary = self.task == 0 and self.local_steps % 11 == 0
 
