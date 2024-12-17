@@ -163,7 +163,7 @@ def create_flash_env(env_id, client_id, remotes, **_):
         keys = ['left', 'right', 'up', 'left up', 'right up', 'down', 'up x']
     logger.info('create_flash_env(%s): keys=%s', env_id, keys)
 
-    env = DiscreteToFixKeysVNCActions(env, keys)
+    env = DiscreteToFixedKeysVNCActions(env, keys)
     env = EpisodeID(env)
     env = DiagnosticsInfo(env)
     env = Unvectorize(env)
@@ -323,4 +323,94 @@ class AtariRescale42x42(vectorized.ObservationWrapper):
         return [_process_frame42(observation) for observation in observation_n]
 
 
-class Fixed
+class FixedKeyState(object):
+    def __init__(self, keys):
+        self._keys = [keycode(key) for key in keys]
+        self._down_keysyms = set()
+    
+    def apply_vnc_actions(self, vnc_actions):
+        for event in vnc_actions:
+            if isinstance(event, vnc_spaces.KeyEvent):
+                if event.down:
+                    self._down_keysyms.add(event.key)
+                else:
+                    self._down_keysyms.discard(event.key)
+    
+    def to_index(self):
+        action_n = 0
+        for key in self._down_keysyms:
+            if key in self._keys:
+                # If multiple keys are pressed, just use the first one
+                action_n = self._keys.index(key) + 1
+                break        
+        return action_n
+
+
+class DiscreteToFixedKeysVNCActions(vectorized.ActionWrapper):
+    """
+    Define a fixed action space. Action 0 is all keys up. Each element of keys can be a single key or a space-seperated list of keys
+
+    For example,
+        e=DiscreteTOFixedkeysVNCActions(e, ['left', 'right'])
+    will have 3 actions: [none, left, right]
+
+    You can define a state with more than one key down by separating with spaces. For example,
+        e=DiscreteToFixedKeysVNCActions(e, ['left', 'right', 'space', 'left space', 'right space'])
+    will have 6 actions: [none, left, right, space, left space, right space]
+    """
+    def __init__(self, env, keys):
+        super(DiscreteToFixedKeysVNCActions, self).__init__(env)
+
+        self._keys = keys
+        self._generate_actions()
+        self.action_space = spaces.Discrete(len(self._actions))
+    
+    def _generate_actions(self):
+        self._actions = []
+        uniq_keys = set()
+        for key in self._keys:
+            for cur_key in key.split(' '):
+                uniq_keys.add(cur_key)
+        
+        for key in [''] + self._keys:
+            split_keys = key.split(' ')
+            cur_action = []
+            for cur_key in uniq_keys:
+                cur_action.append(vnc_spaces.KeyEvent.by_name(cur_key, down=(cur_key in split_keys)))
+            self._actions.append(cur_action)
+        self.key_state = FixedKeyState(uniq_keys)
+    
+    def _action(self, action_n):
+        # Each action might be a length-1 np.array. Cast to int to
+        # avoid warnings.
+        return [self._actions[int(action)] for action in action_n]
+
+
+class CropScreen(vectorized.ObservationWrapper):
+    """Crops out a [height]x[width] area starting from (top,left) """
+    def __init__(self, env, height, width, top=0, left=0):
+        super(CropScreen, self).__init__(env)
+        self.height = height
+        self.width = width
+        self.top = top
+        self.left = left
+        self.observation_space = Box(0, 255, shape=(height, width, 3))
+    
+    def _observation(self, observation_n):
+        return [ob[self.top:self.top+self.height, self.left:self.left+self.width, :] if ob is not None else None for ob in observation_n]
+
+def _process_frame_flash(frame):
+    frame = np.array(Image.fromarray(frame).resize((200, 128), resample=Image.BILINEAR))
+    frame = frame.mean(2).astype(np.float32)
+    frame += (1.0 / 255.0)
+    frame = np.reshape(frame, [128, 200, 1])
+    return frame
+
+
+class FlashRescale(vectorized.ObservationWrapper):
+    def __init__(self, env=None):
+        super(FlashRescale, self).__init__(env)
+        self.observation_space = Box(0.0, 1.0, [128, 200, 1])
+    
+    def _observation(self, observation_n):
+        return [_process_frame_flash(observation) for observation in observation_n]
