@@ -80,4 +80,94 @@ def deconv2d(
         # deconv2d = tf.reshape(tf.nn.bias_add(deconv2d, b), deconv2d.get_shape())
         return deconv2d
     
-def linear()
+def linear(x, size, name, initializer=None, bias_init=0):
+    w = tf.compat.v1.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
+    b = tf.compat.v1.get_variable(name + "/b", [size], initializer=tf.constant_initializer(bias_init))
+    return tf.matmul(w, x) + b
+
+def categorical_sample(logits, d):
+    value = tf.squeeze(tf.compat.v1.multinomial(logits - tf.reduce_max(logits, [1], keepdims=True), 1), [1])
+    return tf.one_hot(value, d)
+
+def inverseUniverseHead(x, final_shape, nConvs=4):
+    """
+        universe agent example
+        input: [None, 288]; output: [None, 42, 42, 1]:
+    """
+    print('Using inverse-universe head design')
+    bs = tf.shape(x)[0]
+    deconv_shape1 = [final_shape[1]]
+    deconv_shape2 = [final_shape[2]]
+    for i in range(nConvs):
+        deconv_shape1.append((deconv_shape1[-1]-1)/2 + 1)
+        deconv_shape2.append((deconv_shape2[-1]-1)/2 + 1)
+    inshapeprod = np.prod(x.get_shape().as_list()[1:]) / 32.0
+    assert(inshapeprod == deconv_shape1[-1] * deconv_shape2[-1])
+    # print('deconv_shape1: ', deconv_shape1)
+    # print('deconv_shape2: ', deconv_shape2)
+
+    x = tf.reshape(x, [-1, deconv_shape1[-1], deconv_shape2[-1], 32])
+    deconv_shape1 = deconv_shape1[:-1]
+    deconv_shape2 = deconv_shape2[:-1]
+    for i in range(nConvs - 1):
+        x = tf.nn.elu(deconv2d(x, [bs, deconv_shape1[-1], deconv_shape2[-1], 32],
+                            "dl{}".format(i + 1), [3, 3], [2, 2], prevNumFeat=32))
+        deconv_shape1 = deconv_shape1[:-1]
+        deconv_shape2 = deconv_shape2[:-1]
+    x = deconv2d(x, [bs] + final_shape[1:], "dl4", [3, 3], [2, 2], prevNumFeat=32)
+    return x
+
+
+def universeHead(x, nConvs=4):
+    """
+        uinverse agent example
+        input" [None, 42, 42, 1]; output: [None, 288];
+    """
+    print('Using universe head design')
+    for i in range(nConvs):
+        x = tf.nn.elu(conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2]))
+        # print('Loop{} '.format(i+1), tf.shape(x))
+        # print('Loop{} '.format(i+1), x.get_shape())
+    x = flatten(x)
+    return x
+
+def nipHead(x):
+    """
+        DQN NIPS 2013 and A3C paper
+        input: [None, 84, 84, 4]; output: [None, 2592] -> [None, 256];
+    """
+    print('Using nips head design')
+    x = tf.nn.relu(conv2d(x, 16, "l1", [8, 8], [4, 4], pad="VALID"))
+    x = tf.nn.relu(conv2d(x, 32, "l2", [4, 4], [2, 2], pad="VALID"))
+    x = flatten(x)
+    x = tf.nn.relu(linear(x, 256, "fc", normalized_columns_initializer(0.01)))
+    return x
+
+def natureHead(x):
+    """
+        DQN Nature 2015 paper
+        input: [None, 84, 84, 4]; output: [None, 3136] -> [None, 512];
+    """
+    print('Using nature head design')
+    x = tf.nn.relu(conv2d(x, 32, "l1", [8, 8], [4, 4], pad="VALID"))
+    x = tf.nn.relu(conv2d(x, 64, "l2", [4, 4], [2, 2], pad="VALID"))
+    x = tf.nn.relu(conv2d(x, 64, "l3", [3, 3], [1, 1], pad="VALID"))
+    x = flatten(x)
+    x = tf.nn.relu(linear(x, 512, "fc", normalized_columns_initializer(0.01)))
+    return x
+
+
+def doomHead(x):
+    """
+        Learning by Prediction ICLR 2017 paper
+        (their final output was 64 changed to 256 here)
+        input: [None, 120, 160, 1]; output: [None, 1280] -> [None, 256];
+    """
+    print('Using doom head design')
+    x = tf.nn.elu(conv2d(x, 8, "l1", [5, 5], [4, 4]))
+    x = tf.nn.elu(conv2d(x, 16, "l2", [3, 3], [2, 2]))
+    x = tf.nn.elu(conv2d(x, 32, "l3", [3, 3], [2, 2]))
+    x = tf.nn.elu(conv2d(x, 64, "l4", [3, 3], [2, 2]))
+    x = flatten(x)
+    x = tf.nn.elu(linear(x, 256, "fc", normalized_columns_initializer(0.01)))
+    return x
