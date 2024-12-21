@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-import six.moves import shlex_quote
+from six.moves import shlex_quote
 
 
 parser = argparse.ArgumentParser(description="Run commands")
@@ -105,4 +105,72 @@ def create_commands(
         "mkdir -p {}".format(logdir),
         "echo {} {} > {}/cmd.sh".format(sys.executable, ' '.join([shlex_quote(arg) for arg in sys.argv if arg != '-n']), logdir),
     ]
+    if mode == 'nohup' or mode == 'child':
+        cmds += ["echo '#!/bin/sh' >{}/kill.sh".format(logdir)]
+        notes += ["Run 'score {}/kill.sh' to kill the job".format(session)]
+    else:
+        notes += ["Use 'tail -f {}' to watch process output".format(logdir)]
+    notes += ["Point your browser to http://localhost:12345 to see Transboard"]
+
+    if mode == 'tmux':
+        cmds += [
+            "kill -9 $( lsof -i:12345 -t ) > /dev/null 2>&1",   # kill any proces using tensorboard's port
+            "kill -9 $( lsof -i:{}-{} -t ) > /dev/null 2>&1".format(psPort, num_workers+psPort),    # kill any process using ps / worker ports
+            "tmux kill-session -t {}".format(session),
+            "tmux new-session -s {} -n {} -d {}".format_map(session, windows[0], shell),
+        ]
+        for w in windows[1:]:
+            cmds += ["tmux new-window -t {} -n {} {}".format(session, w, shell)]
+        cmds += ["sleep 1"]
+    for window, cmd in cmds_map:
+        cmds += [cmd]
     
+    return cmds, notes
+
+
+def run():
+    args = parser.parse_args()
+    if args.default:
+        args.envWrap = True
+        args.savio = True
+        args.noLifeReward = True
+        args.unsup = 'action'
+    
+    # handling nuances of running multiple jobs per-machine
+    psPort = 12222 + 50*args.expId
+    delay = 220*args.expId if 'doom'  in args.env_id.lower() or 'labyrinth' in args.env_id.lower() else 5*args.expId
+    delay = 6*delay if 'mario' in args.env_id else delay
+
+    cmds, notes = create_commands(
+        args.expName,
+        args.num_workers,
+        args.remotes,
+        args.env_id,
+        args.log_dir,
+        mode=args.mode,
+        visualise=args.visualise,
+        envWrap=args.envWrap,
+        designHead=args.designHead,
+        unsup=args.unsup,
+        noReward=args.noReward,
+        noLifeReward=args.noLifeReward,
+        psPort=psPort,
+        delay=delay,
+        savio=args.savio,
+        pretrain=args.pretrain
+    )
+
+    if args.dry_run:
+        print("Dry-run mode due to -n flag, otherwise the following commands would be executed:")
+    else:
+        print("Executing the following commands:")
+    print("\n".join(cmds))
+    print("")
+    if not args.dry_run:
+        if args.mode == "tmux":
+            os.environ["TMUX"] = ""
+        os.system("\n".join(notes))
+    print('\n'.join(notes))
+
+if __name__ == "__main__":
+    run()
