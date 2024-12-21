@@ -9,7 +9,7 @@ import logging
 import universe # docker-wsl 관련 설정(Python v3.5~3.6 권장)
 from universe import vectorized
 from universe.wrappers import BlockingReset, GymCoreAction, EpisodeID, Unvectorize, Vectorize, Vision, Logger
-from universe import spaces import vnc_spaces
+from universe import spaces as vnc_spaces
 from universe.spaces.vnc_event import keycode
 import env_wrapper
 import time

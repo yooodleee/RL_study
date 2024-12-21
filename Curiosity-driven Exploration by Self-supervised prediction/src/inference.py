@@ -9,7 +9,7 @@ import os
 import sys
 import gym
 from envs import create_env
-from worker import FastSaver
+from worker import FastServer
 from model import LSTMPolicy
 import utils
 import distutils.version
@@ -59,21 +59,21 @@ def inference(args):
 
     with tf.device("/cpu:0"):
         # define policy network
-        with tf.varialbe_scope("global"):
+        with tf.compat.v1.variable_scope("global"):
             policy = LSTMPolicy(env.observation_space.shape, numaction, args.designHead)
-            policy.global_step = tf.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32), trainable=False)
+            policy.global_step = tf.compat.v1.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32), trainable=False)
         
         # Variable names that start with "local" are not saved in checkpoints.
         if use_tf12_api:
-            variables_to_restore = [v for v in tf.global_variables() if not v.name.startswith("local")]
-            init_all_op = tf.global_variables_initializer()
+            variables_to_restore = [v for v in tf.compat.v1.global_variables() if not v.name.startswith("local")]
+            init_all_op = tf.compat.v1.global_variables_initializer()
         else:
             variables_to_restore = [v for v in tf.all_variables() if not v.name.startswith("local")]
-            init_all_op = tf.initialize_all_variables()
-        saver = FastSaver(variables_to_restore)
+            init_all_op = tf.compat.v1.initialize_all_variables()
+        saver = FastServer(variables_to_restore)
 
         # print trainable variables
-        var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
+        var_list = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, tf.compat.v1.get_variable_scope().name)
         logger.info("Trainable vars:")
         for v in var_list:
             logger.info('   %s %s', v.name, v.get_shape())
@@ -81,17 +81,17 @@ def inference(args):
         # summary of rewards
         action_writers = []
         if use_tf12_api:
-            summary_writer = tf.summary.FileWriter(outdir)
+            summary_writer = tf.compat.v1.summary.FileWriter(outdir)
             for ac_id in range(numaction):
-                action_writers.append(tf.summary.FileWriter(os.path.join(outdir, 'action_{}'.format(ac_id))))
+                action_writers.append(tf.compat.v1.summary.FileWriter(os.path.join(outdir, 'action_{}'.format(ac_id))))
         else:
-            summary_writer = tf.train.SummaryWriter(outdir)
+            summary_writer = tf.compat.v1.train.SummaryWriter(outdir)
             for ac_id in range(numaction):
-                action_writers.append(tf.train.SummaryWriter(os.path.join(outdir, 'action_{}'.format(ac_id))))
+                action_writers.append(tf.compat.v1.train.SummaryWriter(os.path.join(outdir, 'action_{}'.format(ac_id))))
         logger.info("Inference events directory: %s", outdir)
 
-        config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
-        with tf.Session(config=config) as sess:
+        config = tf.compat.v1.ConfigProto(allow_soft_placement=True, log_device_placement=False)
+        with tf.compat.v1.Session(config=config) as sess:
             logger.info("Initializing all parameters.")
             logger.run(init_all_op)
             logger.info("Restoring trainable global parameters.")
@@ -151,7 +151,7 @@ def inference(args):
                         Image.fromarray((255*last_state[..., -1]).astype('unit8')).save(outdir + '/recordedSignal/ep_%02d/%06d.jpg'%(i,signalCount))
                     
                     # store summary
-                    summary = tf.Summary()
+                    summary = tf.compat.v1.Summary()
                     summary.value.add(tag='ep_{}/reward'.format(i), simple_value=reward)
                     summary.value.add(tag='ep_{}/netreward'.format(i), simple_value=rewards)
                     summary.value.add(tag='ep_{}/value'.format(i), simple_value=float(value_[0]))
@@ -159,7 +159,7 @@ def inference(args):
                         summary.value.add(tag='ep_{}/lives'.format(i), simple_value=env.unwrapped.ale.lives())
                     summary_writer.add_summary(summary, length)
                     summary_writer.flush()
-                    summary = tf.Summary()
+                    summary = tf.compat.v1.Summary()
                     for ac_id in range(numaction):
                         summary.value.add(tag='action_prob', simple_value=float(prob_action[ac_id]))
                         action_writers[ac_id].add_summary(summary, length)
@@ -215,4 +215,4 @@ def main(_):
     inference(args)
 
 if __name__ == "__main__":
-    tf.app.run()
+    tf.compat.v1.app.run()

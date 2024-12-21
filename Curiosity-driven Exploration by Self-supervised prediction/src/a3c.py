@@ -8,7 +8,7 @@ import scipy.signal
 import threading
 import distutils.version
 from constants import constants
-use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
+use_tf12_api = distutils.version.LooseVersion(tf.compat.v1.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
 def disconut(x, gamma):
     """
@@ -282,7 +282,7 @@ class A3C(object):
         with tf.device(tf.train.replace_device_setter(1, worker_device=worker_device)):
             with tf.variable_creator_scope("global"):
                 self.network = LSTMPolicy(env.observation_space.shape, numaction, designHead)
-                self.global_step = tf.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32), trainalbe=False)
+                self.global_step = tf.compat.v1.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32), trainalbe=False)
 
                 if self.unsup:
                     with tf.variable_creator_scope("predictor"):
@@ -303,9 +303,9 @@ class A3C(object):
                             self.local_ap_network = predictor = StateActionPredictor(env.observation_space.shape, numaction, designHead)
 
             # computing a3c loss: https://arxiv.org/abs/1506.02438
-            self.ac = tf.placeholder(tf.float32, [None, numaction], name="ac")
-            self.adv = tf.placeholer(tf.float32, [None], name="adv")
-            self.r = tf.placeholder(tf.float32, [None], name="r")
+            self.ac = tf.compat.v1.placeholder(tf.float32, [None, numaction], name="ac")
+            self.adv = tf.compat.v1.placeholder(tf.float32, [None], name="adv")
+            self.r = tf.compat.v1.placeholder(tf.float32, [None], name="r")
             log_prob_tf = tf.nn.log_softmax(pi.logits)
             prob_tf = tf.nn.softmax(pi.logits)
             # 1) the "policy gradients" loss: its derivative is preciesly the policy gradient
@@ -333,42 +333,42 @@ class A3C(object):
 
                 # do not backprop to policy
                 if constants['POLICY_NO_BACKPROP_STEPS'] > 0:
-                    grads = [tf.scalar_mul(tf.to_float(tf.greater(self.global_step, constants['POLICY_NO_BACKPROP_STEPS'])), grads_i) for grads_i in grads]
+                    grads = [tf.scalar_mul(tf.compat.v1.to_float(tf.greater(self.global_step, constants['POLICY_NO_BACKPROP_STEPS'])), grads_i) for grads_i in grads]
             
             self.runner = RunnerThread(env, pi, constants['ROLLOUT_MAXLEN'], visualise, predictor, envWrap, noReward)
 
             # storing summaries
-            bs = tf.to_float(tf.shape(pi.x)[0])
+            bs = tf.compat.v1.to_float(tf.shape(pi.x)[0])
             if use_tf12_api:
                 tf.summary.scalar("model/policy_loss", pi_loss)
                 tf.summary.scalar("model/value_loss", vf_loss)
                 tf.summary.scalar("model/entropy", entropy)
                 tf.summary.scalar("model/state", pi.x)  # max_outputs=10
-                tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
-                tf.summary.scalar("model/var_globacl_norm", tf.global_norm(pi.var_list))
+                tf.summary.scalar("model/grad_global_norm", tf.compat.v1.global_norm(grads))
+                tf.summary.scalar("model/var_globacl_norm", tf.compat.v1.global_norm(pi.var_list))
                 if self.unsup:
                     tf.summary.scalar("model/predloss", self.predloss)
                     if 'action' in unsupType:
                         tf.summary.scalar("model/inv_loss", predictor.invloss)
                         tf.summary.scalar("model/forward_loss", predgrads.forwardloss)
-                    tf.summary.scalar("model/predgrad_global_norm", tf.global_norm(predgrads))
-                    tf.summary.scalar("model/predvar_global_norm", tf.global_norm(predictor.var_list))
-                self.summary_op = tf.summary.merge_all()
+                    tf.summary.scalar("model/predgrad_global_norm", tf.compat.v1.global_norm(predgrads))
+                    tf.summary.scalar("model/predvar_global_norm", tf.compat.v1.global_norm(predictor.var_list))
+                self.summary_op = tf.compat.v1.summary.merge_all()
             else:
-                tf.scalar_summary("model/policy_loss", pi_loss)
-                tf.scalar_summary("model/value_liss", vf_loss)
-                tf.scalar_summary("model/entropy", entropy)
-                tf.image_summary("model/state", pi.x)
-                tf.scalar_summary("model/grad_global_norm", tf.global_norm(grads))
-                tf.scalar_summary("model/var_global_norm", tf.global_norm(pi.var_list))
+                tf.compat.v1.scalar_summary("model/policy_loss", pi_loss)
+                tf.compat.v1.scalar_summary("model/value_liss", vf_loss)
+                tf.compat.v1.scalar_summary("model/entropy", entropy)
+                tf.compat.v1.image_summary("model/state", pi.x)
+                tf.compat.v1.scalar_summary("model/grad_global_norm", tf.compat.v1.global_norm(grads))
+                tf.compat.v1.scalar_summary("model/var_global_norm", tf.compat.v1.global_norm(pi.var_list))
                 if self.unsup:
-                    tf.scalar_summary("model/predloss", self.predloss)
+                    tf.compat.v1.scalar_summary("model/predloss", self.predloss)
                     if 'action' in unsupType:
-                        tf.scalar_summary("model/inv_loss", predictor.invloss)
-                        tf.scalar_summary("model/forward_loss", predictor.forwardloss)
-                    tf.scalar_summary("model/predvar_global_norm", tf.global_norm(predgrads))
-                    tf.scalar_summary("model/predvar_global_norm", tf.global_norm(predictor.var_list))
-                self.summary_op = tf.merge_all_summaries()
+                        tf.compat.v1.scalar_summary("model/inv_loss", predictor.invloss)
+                        tf.compat.v1.scalar_summary("model/forward_loss", predictor.forwardloss)
+                    tf.compat.v1.scalar_summary("model/predvar_global_norm", tf.compat.v1.global_norm(predgrads))
+                    tf.compat.v1.scalar_summary("model/predvar_global_norm", tf.compat.v1.global_norm(predictor.var_list))
+                self.summary_op = tf.compat.v1.merge_all_summaries()
             
             # clip gradients
             grads, _=tf.clip_by_global_norm(grads, constants['GRAD_NORM_CLIP'])
@@ -385,7 +385,7 @@ class A3C(object):
             # TODO: make optimizer global shared, if needed
             print("Optimizer: ADAM with lr: %f" % (constants['LEARNING_RATE']))
             print("Input observation shape: ", env.observation_space.shape)
-            opt = tf.train.AdamOptimizier(constants['LEARNING_RATE'])
+            opt = tf.compat.v1.train.AdamOptimizer(constants['LEARNING_RATE'])
             self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
 
             # copy weights from the parameter server to the local model
@@ -463,6 +463,6 @@ class A3C(object):
             print("Global Step Counter: %d"%fetched[-1])
         
         if should_compute_summary:
-            self.summary_writer.add_summary(tf.Summary.FromString(fetched[0]), fetched[-1])
+            self.summary_writer.add_summary(tf.compat.v1.summary.FromString(fetched[0]), fetched[-1])
             self.summary_writer.flush()
         self.local_steps += 1

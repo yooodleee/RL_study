@@ -27,17 +27,17 @@ def inference(args):
     numaction = env.action_space.n
 
     with tf.device("/cpu:0"):
-        config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
+        config = tf.compat.v1.ConfigProto(allow_soft_placement=True, log_device_placement=False)
         with tf.Session(config=config) as sess:
             logger.info("Restoring trainable global parameters.")
-            saver = tf.train.import_meta_graph(args.ckpt+'.meta')
+            saver = tf.compat.v1.train.import_meta_graph(args.ckpt+'.meta')
             saver.restore(sess, args.ckpt)
 
-            probs = tf.get_collection("probs")[0]
-            sample = tf.get_collection("sample")[0]
-            vf = tf.get_collection("vf")[0]
-            state_out_0 = tf.get_collection("state_out_0")[0]
-            state_out_1 = tf.get_collection("state_out_1")[1]
+            probs = tf.compat.v1.get_collection("probs")[0]
+            sample = tf.compat.v1.get_collection("sample")[0]
+            vf = tf.compat.v1.get_collection("vf")[0]
+            state_out_0 = tf.compat.v1.get_collection("state_out_0")[0]
+            state_out_1 = tf.compat.v1.get_collection("state_out_1")[1]
 
             last_state = env.reset()
             if args.render or args.record:
@@ -111,4 +111,4 @@ def main():
     inference(args)
 
 if __name__ == "__main__":
-    tf.app.run()
+    tf.compat.v1.app.run()
