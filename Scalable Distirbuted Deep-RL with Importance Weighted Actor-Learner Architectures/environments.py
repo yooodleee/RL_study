@@ -159,4 +159,59 @@ class FlowEnvironment(object):
             reward/transition type that lead to the observation in 'StepOutput'.
         """
         with tf.name_scope('flow_environment_initial'):
-            ini
+            initial_reward = tf.constant(0.)
+            initial_info = StepOutputInfo(tf.constant(0.), tf.constant(0))
+            initial_done = tf.constant(True)
+            initial_observation = self._env.initial()
+
+            initial_output = StepOutput(
+                initial_reward,
+                initial_info,
+                initial_done,
+                initial_observation)
+            
+            # Control dependency to make sure the next step can't be taken before the
+            # initial output has been read from the environment.
+            with tf.control_dependencies(nest.flatten(initial_output)):
+                initial_flow = tf.constant(0, dtype=tf.int64)
+            initial_state = (initial_flow, initial_info)
+            return initial_output, initial_state
+        
+    def step(self, action, state):
+        """
+        Takes a step in the environment.
+
+        Args:
+            action: An action tensor suitable for the underlying environment.
+            state: The environment state from the last step or initial state.
+
+        Returns:
+            A tuple of ('StepOutput', environment state). The environment state should
+            be passed in to the enxt invocation of 'ste' and should not be used in
+            any other way. On episode end (i.e. 'done' is True), the returned reward
+            should be included in the sum of rewards for the endinf episode and not
+            part of the next episode.
+        """
+        with tf.name_scope('flow_environment_step'):
+            flow, info = nest.map_structure(tf.convert_to_tensor(), state)
+
+            # Make sure the previous step has been excuted before running the next
+            # step.
+            with tf.control_dependencies([flow]):
+                reward, done, observation = self._env.step(action)
+            
+            with tf.control_dependencies(nest.flatten(observation)):
+                new_flow = tf.add(flow, 1)
+            
+            # When done, include the reward in the output info but not in the
+            # state for the next state.
+            new_info = StepOutputInfo(
+                info.episode_return + reward,
+                info.episode_step + 1)
+            new_state = new_flow, nest.map_structure(
+                lambda a, b: tf.where(done, a, b),
+                StepOutputInfo(tf.constant(0.), tf.constant(0)),
+                new_info)
+            
+            output = StepOutput(reward, new_info, done, observation)
+            return output, new_state
