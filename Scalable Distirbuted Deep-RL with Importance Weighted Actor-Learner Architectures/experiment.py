@@ -325,4 +325,113 @@ def compute_policy_gradient_loss(logits, actions, advantages):
 
 
 def build_learner(agent, agent_state, env_outputs, agent_outputs):
+    """Builds the learner loop.
+
+    Args:
+        agent: A snt.RNNcore module outputting 'AgentOutput' named tuples, with an
+            'unroll' call for computing the outputs for a whole trajectory.
+        agent_state: The initial agent state for each sequence in the batch.
+        env_outputs: A 'StepOutput' namedtuple where each field is of shape 
+            [T+1, ...].
+        agent_outputs: An 'AgentOutput' namedtuple where each field is of shape
+            [T+1, ...].
+
+    Returns:
+        A tuple of (done, infos, and environment frames) where
+            the environment frames tensor causes an update.
+    """
+    learner_outputs, _= agent.unroll(agent_outputs.action, env_outputs, agent_state)
+
+    # Use last baseline value (from the value function) to bootstrap.
+    bootstrap_value = learner_outputs.baseline[-1]
+
+    # At this point, the environment outputs at time step 't' are the inputs that
+    # lead to the learner_outputs at time step 't'. After the following shifting,
+    # the actions in agent_outputs and learner_outputs at time step 't' is what
+    # leads to the environment outputs at tiem step 't'.
+    agnet_outputs = nest.map_structure(lambda t: t[1:], agent_outputs)
+    rewards, infos, done, _ = nest.map_structure(
+        lambda t: t[1:], env_outputs)
+    learner_outputs = nest.map_structure(lambda t: t[:-1], learner_outputs)
+
+    if FLAGS.reward_clipping == 'abs_one':
+        clipped_rewards = tf.clip_by_value(rewards, -1, 1)
+    elif FLAGS.reward_clipping == 'soft_asymmetric':
+        squeezed = tf.tanh(rewards / 5.0)
+        # Negative rewards are given less weight than positive rewards.
+        clipped_rewards = tf.where(rewards < 0, .3 * squeezed, squeezed) * 5.
+    
+    discounts = tf.compat.v1.to_float(~done) * FLAGS.discounting
+
+    # Compute V-trace returns and weights
+    # Note, this is put on the CPU because it's faster than on GPU. It can be
+    # improvd further with XLA-compilation or with a custom TensorFlow operation.
+    with tf.device('/cpu'):
+        vtrace_returns = vtrace.from_logits(
+            behaviour_policy_logits=agent_outputs.policy_logits,
+            target_policy_logits=learner_outputs.policy_logits,
+            actions=agent_outputs.action,
+            discounts=discounts,
+            rewards=clipped_rewards,
+            values=learner_outputs.baseline,
+            bootstrap_value=bootstrap_value)
+    
+    # Compute loss as a weighted sum of the baseline loss, the policy gradient
+    # loss and an entropy regularization term.
+    total_loss = compute_policy_gradient_loss(
+        learner_outputs.policy_logits,
+        agent_outputs.action,
+        vtrace_returns.pg_advantages)
+    total_loss += FLAGS.baseline_cost * compute_baseline_loss(
+        vtrace_returns.vs - learner_outputs.baseline)
+    total_loss += FLAGS.entropy_cost * compute_entropy_loss(
+        learner_outputs.policy_logits)
+    
+    # Optimization
+    num_env_frames = tf.compat.v1.train.get_global_step()
+    learning_rate = tf.compat.v1.train.polynomial_decay(
+        FLAGS.learning_rate, num_env_frames, FLAGS.total_environment_frames, 0)
+    optimizer = tf.train.RMSPropOptimizer(
+        learning_rate, FLAGS.decay, FLAGS.momentum, FLAGS.epsilon)
+    train_op = optimizer.minimize(total_loss)
+
+    # Merge updating the network and environment frames into a single tensor.
+    with tf.control_dependencies([train_op]):
+        num_env_frames_and_train = num_env_frames.assign_add(
+            FLAGS.batch_size * FLAGS.unroll_length * FLAGS.num_action_repeats)
+    
+    # Adding a few summaries.
+    tf.summary.scalar('learning_rate', learning_rate)
+    tf.summary.scalar('total_loss', total_loss)
+    tf.summary.histogram('action', agent_outputs.action)
+
+    return done, infos, num_env_frames_and_train
+
+
+def create_environment(level_name, seed, is_test=False):
+    """Creates an environment wrapped in a 'FlowEnvironment'."""
+    if level_name in dmlab30.ALL_LEVELS:
+        level_name = 'contributed/dmlab30/' + level_name
+    
+    # Note, you may want to use a level cache to speed of compilation of
+    # environment maps. See the documentation for the Python interface of DeepMind
+    # Lab.
+    config = {
+        'width': FLAGS.width,
+        'height': FLAGS.height,
+        'datasetPath': FLAGS.dataset_path,
+        'logLevel': 'WARN',
+    }
+    if is_test:
+        config['allowHoldOutLevels'] = 'true'
+        # Mixer seed for evaluation, see
+        # https://github.com/deepmind/lab/blob/master/docs/users/python_api.md
+        config['mixerSeed'] = 0x600D5EED
+    p = py_process.PyProcess(
+        environments.PyProcessDmLab, level_name, config, FLAGS.num_action_repeats, seed)
+    return environments.FlowEnvironment(p.proxy)
+
+
+@contextlib.contextmanager
+def pin_global_variables(device):
     
