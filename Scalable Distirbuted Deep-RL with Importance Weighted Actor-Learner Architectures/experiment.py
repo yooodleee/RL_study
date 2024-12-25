@@ -477,19 +477,19 @@ def train(action_set, level_names):
             cluster, job_name=FLAGS.job_name, task_index=FLAGS.task)
         filters = [shared_job_device, local_job_device]
 
-        # Only used to find the actor output structure.
-        with tf.Graph().as_default():
-            agent = Agent(len(action_set))
-            env = create_environment(level_names[0], seed=1)
-            structure = build_actor(agent, env, level_names[0], action_set)
-            flatten_structure = nest.flatten(structure)
-            dtypes = [t.dtype for t in flatten_structure]
-            shapes = [t.shape.as_list() for t in flatten_structure]
+    # Only used to find the actor output structure.
+    with tf.Graph().as_default():
+        agent = Agent(len(action_set))
+        env = create_environment(level_names[0], seed=1)
+        structure = build_actor(agent, env, level_names[0], action_set)
+        flatten_structure = nest.flatten(structure)
+        dtypes = [t.dtype for t in flatten_structure]
+        shapes = [t.shape.as_list() for t in flatten_structure]
         
-        with tf.Graph().as_default(), \
-             tf.device(local_job_device + '/cpu'), \
-             pin_global_variables(global_variable_device):
-            tf.compat.v1.set_random_seed(FLAGS.seed)    # Makes initialization deterministic.
+    with tf.Graph().as_default(), \
+         tf.device(local_job_device + '/cpu'), \
+         pin_global_variables(global_variable_device):
+        tf.compat.v1.set_random_seed(FLAGS.seed)    # Makes initialization deterministic.
         
         # Create Queue and Agent on the learner.
         with tf.device(shared_job_device):
@@ -521,4 +521,122 @@ def train(action_set, level_names):
                     with tf.device(shared_job_device):
                         enqueue_ops.append(queue.enqueue(nest.flatten(actor_output)))
             
-            
+                # If running in a single machine setup, run actors with QueueRunners
+                # (seperate threads).
+                if is_learner and enqueue_ops:
+                    tf.compat.v1.train.add_queue_runner(tf.compat.v1.train.QueueRunner(queue, enqueue_ops))
+                
+                # Build learner.
+                if is_learner:
+                    # Create global step, which is the number of environment frames processed.
+                    tf.compat.v1.get_variable(
+                        'num_environment_frames',
+                        initializer=tf.zeros_initializer(),
+                        shape=[],
+                        dtype=tf.int64,
+                        trainable=False,
+                        collections=[tf.compat.v1.GraphKeys.GLOBAL_STEP, tf.compat.v1.GraphKeys.GLOBAL_VARIABLES])
+                    
+                    # Create batch (time major) and recreate structure.
+                    dequeued = queue.dequeue_many(FLAGS.batch_size)
+                    dequeued = nest.pack_sequence_as(structure, dequeued)
+
+                    def make_time_major(s):
+                        return nest.map_structure(
+                            lambda t: tf.transpose(t, [1, 0] + list(range(t.shape.ndims))[2:]), s)
+                    
+                    dequeued = dequeued._replace(
+                        env_outputs=make_time_major(dequeued.env_outputs),
+                        agent_outputs=make_time_major(dequeued.agent_outputs))
+                    
+                    with tf.device('/gpu'):
+                        # Using StagingArea allows us to prepare the next batch and send it to
+                        # the GPU while we're performing a training step. This adds up to 1 step
+                        # policy lag.
+                        flattened_output = nest.flatten(dequeued)
+                        area = tf.contrib.staging.StagingArea(
+                            [t.dtype for t in flattened_output],
+                            [t.shape for t in flattened_output])
+                        stage_op = area.put(flattened_output)
+
+                        data_from_actors = nest.pack_sequence_as(structure, area.get())
+
+                        # Unroll agent on sequence, create losses and update ops.
+                        output = build_learner(
+                            agent, data_from_actors.agent_state,
+                            data_from_actors.env_outputs,
+                            data_from_actors.agent_outputs)
+                        
+                        # Create MonitoredSession (to run the graph, checkpoint and log).
+                        tf.compat.v1.logging.info('Creating MonitoredSession, is_chief %s', is_learner)
+                        config = tf.compat.v1.ConfigProto(allow_soft_placement=True, device_filter=filters)
+                        with tf.compat.v1.train.MonitoredTrainingSession(
+                            server.target,
+                            is_chief=is_learner,
+                            checkpoint_dir=FLAGS.logdir,
+                            save_checkpoint_secs=600,
+                            save_summaries_secs=30,
+                            log_step_count_steps=50000,
+                            config=config,
+                            hooks=[py_process.PyProcessHook()]) as session:
+
+                            if is_learner:
+                                # Logging:
+                                level_returns = {level_name: [] for level_name in level_names}
+                                summary_writer = tf.compat.v1.summary.FileWriterCache.get(FLAGS.logdir)
+
+                                # Prepare data for first run.
+                                session.run_step_fn(
+                                    lambda step_context: step_context.session.run(stage_op))
+                                
+                                # Execute learning and track performance.
+                                num_env_frames_v = 0
+                                while num_env_frames_v < FLAGS.total_environment_frames:
+                                    level_names_v, done_v, infos_v, num_env_frames_v, _ = session.run(
+                                        (data_from_actors.level_name,) + output + (stage_op,))
+                                    level_names_v = np.repeat([level_names_v], done_v.shape[0], 0)
+
+                                    for level_name, episode_return, episode_step in zip(
+                                        level_names_v[done_v],
+                                        infos_v.episode_return[done_v],
+                                        infos_v.episode_step[done_v]):
+                                        episode_frames = episode_step * FLAGS.num_action_repeats
+
+                                        tf.compat.v1.logging.info('Level: %s Episode return: %f', level_name, episode_return)
+
+                                        summary = tf.compat.v1.summary.Summary()
+                                        summary.value.add(
+                                            tag=level_name + '/episode_return',
+                                            simple_value=episode_return)
+                                        summary.value.add(
+                                            tag=level_name + '/episode_frames',
+                                            simple_value=episode_frames)
+                                        summary.value.add(summary, num_env_frames_v)
+
+                                        if FLAGS.level_name == 'dmlab30':
+                                            level_returns[level_name].append(episode_return)
+                                    
+                                    if (FLAGS.level_name == 'dmlab30' and 
+                                        min(map(len(), level_returns.values())) >= 1):
+                                        no_cap = dmlab30.compute_human_normalized_score(
+                                            level_returns, per_level_cap=None)
+                                        cap_100 = dmlab30.compute_human_normalized_score(
+                                            level_returns, per_level_cap=100)
+                                        
+                                        summary = tf.compat.v1.summary.Summary()
+                                        summary.value.add(
+                                            tag='dmlab30/training_no_cap', simple_value=no_cap)
+                                        summary.value.add(
+                                            tag='dmlab30/training_cap_100', simple_value=cap_100)
+                                        summary_writer.add_summary(summary, num_env_frames_v)
+
+                                        # Clear level scores.
+                                        level_returns = {level_name: [] for level_name in level_names}
+                                else:
+                                    # Execute actors (they just need to enqueue their output).
+                                    while True:
+                                        session.run(enqueue_ops)
+
+
+def test(action_set, level_names):
+                                         
