@@ -434,4 +434,91 @@ def create_environment(level_name, seed, is_test=False):
 
 @contextlib.contextmanager
 def pin_global_variables(device):
+    """Pins global variables to the specified device."""
+    def getter(getter, *args, **kwargs):
+        var_collections = kwargs.get('collections', None)
+        if var_collections is None:
+            var_collections = [tf.compat.v1.GraphKeys.GLOBAL_VARIABLES]
+        if tf.compat.v1.GraphKeys.GLOBAL_VARIABLES in var_collections:
+            with tf.device(device):
+                return getattr(*args, **kwargs)
+        else:
+            return getattr(*args, **kwargs)
     
+    with tf.compat.v1.variable_scope('', custom_getter=getattr()) as vs:
+        yield vs
+
+
+def train(action_set, level_names):
+    """Train."""
+
+    if is_single_machine():
+        local_job_device = ''
+        shared_job_device = ''
+        is_actor_fn = lambda i: True
+        is_learner = True
+        global_variable_device = '/gpu'
+        server = tf.compat.v1.train.Server.create_local_server()
+        filters = []
+    else:
+        local_job_device = '/job:%s/task:%d' % (FLAGS.job_name, FLAGS.task)
+        shared_job_device = '/job:learner/task:0'
+        is_actor_fn = lambda i: FLAGS.job_name == 'actor' and i == FLAGS.task
+        is_learner = FLAGS.job_name == 'learner'
+
+        # Placing the variable on CPU, makes it cheaper to send it to all the
+        # actors. Continual copying the varaibles from the GPU is slow.
+        global_variable_device = shared_job_device + '/cpu'
+        cluster = tf.compat.v1.train.ClusterSpec({
+            'actor': ['localhost:%d' % (8001 + i) for i in range(FLAGS.num_actors)],
+            'learner': ['localhost:8000']
+        })
+        server = tf.compat.v1.train.Server(
+            cluster, job_name=FLAGS.job_name, task_index=FLAGS.task)
+        filters = [shared_job_device, local_job_device]
+
+        # Only used to find the actor output structure.
+        with tf.Graph().as_default():
+            agent = Agent(len(action_set))
+            env = create_environment(level_names[0], seed=1)
+            structure = build_actor(agent, env, level_names[0], action_set)
+            flatten_structure = nest.flatten(structure)
+            dtypes = [t.dtype for t in flatten_structure]
+            shapes = [t.shape.as_list() for t in flatten_structure]
+        
+        with tf.Graph().as_default(), \
+             tf.device(local_job_device + '/cpu'), \
+             pin_global_variables(global_variable_device):
+            tf.compat.v1.set_random_seed(FLAGS.seed)    # Makes initialization deterministic.
+        
+        # Create Queue and Agent on the learner.
+        with tf.device(shared_job_device):
+            queue = tf.compat.v1.FIFOQueue(1, dtypes, shapes, shared_name='buffer')
+            agent = Agent(len(action_set))
+
+            if is_single_machine() and 'dynamic_batching' in sys.modules:
+                # For single machine training, use dynamic batching for improved GPU
+                # utilization. The semantics of single machine training are slightly
+                # different from the distributed setting because within a single unroll
+                # of an environment, the actions may be computed using different weights
+                # if an update happens within the unroll.
+                old_build = agent._build()
+                @dynamic_batching.batch_fn
+                def build(*args):
+                    with tf.device('/gpu'):
+                        return old_build(*args)
+                tf.compat.v1.logging.info('Using dynamic batching.')
+                agent._build() = build()
+            
+            # Build actors and ops to enqueue their output.
+            enqueue_ops = []
+            for i in range(FLAGS.num_actors):
+                if is_actor_fn(i):
+                    level_name = level_names[i % len(level_names)]
+                    tf.compat.v1.logging.info('Creating actor %d with level %s', i, level_name)
+                    env = create_environment(level_name, seed=i + 1)
+                    actor_output = build_actor(agent, env, level_name, action_set)
+                    with tf.device(shared_job_device):
+                        enqueue_ops.append(queue.enqueue(nest.flatten(actor_output)))
+            
+            
