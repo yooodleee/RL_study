@@ -264,7 +264,7 @@ def build_actor(agent, env, level_name, action_set):
     # Run the unroll. 'read_value()' is needed to make sure later usage will
     # return the first values and not a new snapshot of the variables.
     first_values = nest.map_structure(lambda v: v.read_value(), persistent_state)
-    _, fist_env_output, first_agent_state, first_agent_output = first_values
+    _, first_env_output, first_agent_state, first_agent_output = first_values
 
     # Use scan to apply 'step' multiple times, therefore unrolling the agent
     # and environment interaction for 'FLAGS.unroll_length'. 'tf.scan' forwards
@@ -276,3 +276,53 @@ def build_actor(agent, env, level_name, action_set):
     # are in 'output' and will need to be added manually later.
     output = tf.scan(step, tf.range(FLAGS.unroll_length), first_values)
     _, env_outputs, _, agent_outputs = output
+
+    # Update persistent state with the last output from the loop.
+    assign_ops = nest.map_structure(
+        lambda v, t: v.assign(t[-1]), persistent_state, output)
+    
+    # The control dependency ensures that the final agent and environment states
+    # and outputs are stored in 'persistent_state' (to initialize next unroll).
+    with tf.control_dependencies(nest.flatten(assign_ops)):
+        # Remove the batch dimension from the agent state/output.
+        first_agent_state = nest.map_structure(lambda t: t[0], first_agent_state)
+        first_agent_output = nest.map_structure(lambda t: t[0], first_agent_output)
+        agent_outputs = nest.map_structure(lambda t: t[:, 0], agent_outputs)
+
+        # Concatenate first output and the unroll along the time dimension.
+        full_agent_outputs, full_env_outputs = nest.map_structure(
+            lambda first, rest: tf.concat([[first], rest], 0),
+            (first_agent_output, first_env_output), (agent_outputs, env_outputs))
+        
+        output = ActorOutput(
+            level_name=level_name, agent_state=first_agent_state,
+            env_outputs=full_env_outputs, agent_outputs=full_agent_outputs)
+        
+        # No backpropagarion should be done here.
+        return nest.map_structure(tf.stop_gradient(), output)
+
+
+def compute_baseline_loss(advantages):
+    # Loss for the baseline, summed over the time dimension.
+    # Multiply by 0.5 to match the standard update rule:
+    # d(loss) / d(baseline) = advantage
+    return .5 * tf.reduce_sum(tf.square(advantages))
+
+
+def compute_entropy_loss(logits):
+    policy = tf.nn.softmax(logits)
+    log_policy = tf.nn.log_softmax(logits)
+    entropy_per_timesteps = tf.reduce_sum(-policy * log_policy, axis=-1)
+    return tf.reduce_sum(entropy_per_timesteps)
+
+
+def compute_policy_gradient_loss(logits, actions, advantages):
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=actions, logits=logits)
+    advantages = tf.stop_gradient(advantages)
+    policy_gradient_loss_per_timesteps = cross_entropy * advantages
+    return tf.reduce_sum(policy_gradient_loss_per_timesteps)
+
+
+def build_learner(agent, agent_state, env_outputs, agent_outputs):
+    
