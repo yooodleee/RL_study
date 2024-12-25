@@ -113,3 +113,166 @@ class Agent(snt.RNNCore):
         dense = tf.compat.v1.sparse_tensor_to_dense(splitted, default_value='')
         length = tf.reduce_sum(
             tf.compat.v1.to_int32(tf.not_equal(dense, '')), axis=1)
+        
+        # To int64 hash buckets. Small risk of having collision. Alternatively, a
+        # vocabulary can be used.
+        num_hash_buckets = 1000
+        buckets = tf.compat.v1.string_to_hash_bucket_fast(dense, num_hash_buckets)
+
+        # Embed the instruction. Embedding size 20 seems to be enough.
+        embedding_size = 20
+        embedding = snt.Embed(num_hash_buckets, embedding_size)(buckets)
+
+        # Pad to make sure there is at least one output.
+        padding = tf.compat.v1.to_int32(tf.equal(tf.shape(embedding)[1], 0))
+        embedding = tf.pad(embedding, [[0, 0], [0, padding], [0, 0]])
+
+        # core = tf.contrib.rnn.LSTMBlockcell(64, name='language_lstm')
+        core = rnn.LSTMBlockcell(64, name='language_lstm')
+        output, _=tf.compat.v1.nn.dynamic_rnn(core, embedding, length, dtype=tf.float32)
+
+        # Return last output.
+        return tf.reverse_sequence(output, length, seq_axis=1)[:, 0]
+    
+    def _torso(self, intput_):
+        last_action, env_output = intput_
+        reward, _, _, (frame, instruction) = env_output
+
+        # Convert to floats.
+        frame = tf.compat.v1.to_float(frame)
+
+        frame /= 255
+        with tf.compat.v1.variable_scope('convent'):
+            conv_out = frame
+            for i, (num_ch, num_blocks) in enumerate([(16, 2), (32, 2), (32, 2)]):
+                # Downscale.
+                conv_out = snt.Conv2D(num_ch, 3, stride=1, padding='SAME')(conv_out)
+                conv_out = tf.nn.pool(
+                    conv_out,
+                    window_shape=[3, 3],
+                    pooling_type='MAX',
+                    padding='SAME',
+                    strides=[2, 2])
+                
+                # Residual block(s).
+                for j in range(num_blocks):
+                    with tf.compat.v1.variable_scope('residual_%d_%d' % (i, j)):
+                        block_input = conv_out
+                        conv_out = tf.nn.relu(conv_out)
+                        conv_out = snt.Conv2D(num_ch, 3, stride=1, padding='SAME')(conv_out)
+                        conv_out = tf.nn.relu(conv_out)
+                        conv_out = snt.Conv2D(num_ch, 3, stride=1, padding='SAME')(conv_out)
+                        conv_out += block_input
+        
+        conv_out = tf.nn.relu(conv_out)
+        conv_out = snt.BatchFlatten()(conv_out)
+
+        conv_out = snt.Linear(256)(conv_out)
+        conv_out = tf.nn.relu(conv_out)
+
+        instruction_out = self._instruction(instruction)
+
+        # Append clipped last reward and one hot last action.
+        clipped_reward = tf.expand_dims(tf.clip_by_value(reward, -1, 1), -1)
+        one_hot_last_action = tf.one_hot(last_action, self._num_actions)
+        return tf.concat(
+            [conv_out, clipped_reward, one_hot_last_action, instruction_out],
+            axis=1)
+    
+    def _head(self, core_output):
+        policy_logits = snt.Linear(self._num_actions, name='policy_logits')(
+            core_output)
+        baseline = tf.squeeze(snt.Linear(1, name='baseline')(core_output), axis=-1)
+
+        # Sample an action from the policy.
+        new_action = tf.compat.v1.multinomial(
+            policy_logits, num_samples=1, output_dtype=tf.int32)
+        new_action = tf.squeeze(new_action, 1, name='new_action')
+
+        return AgentOutput(new_action, policy_logits, baseline)
+    
+    def _build(self, input_, core_state):
+        action, env_output = input_
+        actions, env_outputs = nest.map_structure(
+            lambda t: tf.expand_dims(t, 0), (action, env_output))
+        outputs, core_state = self.unroll(actions, env_outputs, core_state)
+        return nest.map_structure(lambda t: tf.squeeze(t, 0), outputs), core_state
+    
+    @snt.reuse_variable
+    def unroll(self, actions, env_outputs, core_state):
+        _, _, done, _ = env_outputs
+
+        torso_outputs = snt.BatchApply(self._torso())((actions, env_outputs))
+
+        # Note, in this implementation, can't use CuDNN RNN to speed things up due
+        # to the state reset. This can be XLA-complied (LSTMBlockcell needs to be
+        # changed to implement snt.LSTMcell).
+        initial_core_state = self._core.zero_state(tf.shape(actions)[1], tf.float32)
+        core_output_list = []
+        for input_, d in zip(tf.unstack(torso_outputs), tf.unstack(done)):
+            # If the episode ended, the core state should be reset before the next.
+            core_state = nest.map_structure(
+                functools.partial(tf.where(), d), initial_core_state, core_state)
+            core_output, core_state = self._core(input_, core_state)
+            core_output_list.append(core_output)
+        
+        return snt.BacthApply(self._head())(tf.stack(core_output_list)), core_state
+
+
+def build_actor(agent, env, level_name, action_set):
+    """Build the actor loop."""
+    # Initial values.
+    initial_env_output, initial_env_state = env.initial()
+    initial_agent_state = agent.initial_state(1)
+    initial_action = tf.zeros([1], dtype=tf.int32)
+    dummy_agent_output, _ = agent(
+        (initial_action, nest.map_structure(lambda t: tf.expand_dims(t, 0), initial_env_output)),
+        initial_agent_state)
+    initial_agent_output = nest.map_structure(
+        lambda t: tf.zeros(t.shape, t.dtype), dummy_agent_output)
+    
+    # All state that needs to persist across training iterations. This includes
+    # the last environment output, agent state and last agent output. These
+    # variables should never go on the parameter servers.
+    def create_state(t):
+        # Creates a unique variable scope to ensure the variable name is unique.
+        with tf.compat.v1.variable_scope(None, default_name='state'):
+            return tf.compat.v1.get_local_variable(t.op.name, initializer=t, use_resource=True)
+    
+    persistent_state = nest.map_structure(
+        create_state(), (initial_env_state, initial_env_output, initial_agent_state,
+                         initial_agent_output))
+    
+    def step(input_, unsued_i):
+        """Steps through the agent and the environment."""
+        env_state, env_output, agent_state, agent_output = input_
+
+        # Run agent.
+        action = agent_output[0]
+        batched_env_output = nest.map_structure(
+            lambda t: tf.expand_dims(t, 0), env_output)
+        agent_output, agent_state = agent((action, batched_env_output), agent_state)
+
+        # Convert action index to the native action.
+        action = agent_output[0][0]
+        raw_action = tf.gather(action_set, action)
+
+        env_output, env_state = env.step(raw_action, env_state)
+
+        return env_state, env_output, agent_state, agent_output
+    
+    # Run the unroll. 'read_value()' is needed to make sure later usage will
+    # return the first values and not a new snapshot of the variables.
+    first_values = nest.map_structure(lambda v: v.read_value(), persistent_state)
+    _, fist_env_output, first_agent_state, first_agent_output = first_values
+
+    # Use scan to apply 'step' multiple times, therefore unrolling the agent
+    # and environment interaction for 'FLAGS.unroll_length'. 'tf.scan' forwards
+    # the output of each call of 'step' as input of the subsequent call of 'step'.
+    # The unroll sequence is initialized with the agent and environment states
+    # and outputs as stored at the end of the previous unroll.
+    # 'output' stores lists of all states and outputs stacked along the entire
+    # unroll. Note that the initial states and outputs (fed through 'initializer')
+    # are in 'output' and will need to be added manually later.
+    output = tf.scan(step, tf.range(FLAGS.unroll_length), first_values)
+    _, env_outputs, _, agent_outputs = output
