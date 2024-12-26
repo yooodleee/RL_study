@@ -35,6 +35,7 @@ from __future__ import division
 from __future__ import print_function
 
 import multiprocessing
+import multiprocessing.pool
 import tensorflow as tf
 
 from tensorflow.python.util import function_utils
@@ -119,3 +120,74 @@ class _TFProxy(object):
             while True:
                 # Recieve request.
                 serialized = in_.recv()
+
+                if serialized is None:
+                    if hasattr(o, 'close'):
+                        o.close()
+                    in_.close()
+                    return
+                
+                method_name = str(serialized[0])
+                inputs = serialized[1:]
+
+                # Compute result.
+                results = getattr(0, method_name)(*inputs)
+                if results is not None:
+                    results = nest.flatten(results)
+                
+                # Respond.
+                in_.send(results)
+        except Exception as e:
+            if 'o' in locals() and hasattr(o, 'close'):
+                try:
+                    o.close()
+                except:
+                    pass
+            in_.send(e)
+
+
+
+class PyProcess(object):
+    COLLECTION = 'py_process_processes'
+
+    def __init__(self, type_, *constructor_args, **constructor_kwargs):
+        self._type = type_
+        self._constructor_kwargs = dict(
+            zip(function_utils.fn_args(type_.__init__)[1:], constructor_args))
+        self._constructor_kwargs.update(constructor_kwargs)
+
+        tf.compat.v1.add_to_collection(PyProcess.COLLECTION, self)
+
+        self._proxy = _TFProxy(type_, self._constructor_kwargs)
+    
+    @property
+    def proxy(self):
+        """A proxy that creates TensorFlow operations for each method call."""
+        return self._proxy
+    
+    def close(self, session):
+        self._proxy._close(session)
+    
+    def start(self):
+        self._proxy._start()
+
+
+
+class PyProcessHook(tf.compat.v1.train.SessionRunHook):
+    """A MonitoredSession hook that starts and stops PyProcess instances."""
+
+    def begin(self):
+        tf.compat.v1.logging.info('Starting all processes.')
+        tp = multiprocessing.pool.ThreadPool()
+        tp.map(lambda p: p.start(), tf.compat.v1.get_collection(PyProcess.COLLECTION))
+        tp.close()
+        tp.join()
+        tf.compat.v1.logging.info('All process started.')
+    
+    def end(self, session):
+        tf.compat.v1.logging.info('Closing all processes.')
+        tp = multiprocessing.pool.ThreadPool()
+        tp.map(lambda p: p.close(session), tf.compat.v1.get_collection(PyProcess.COLLECTION))
+        tp.close()
+        tp.join()
+        tf.compat.v1.logging.info('All processes closed.')
