@@ -242,4 +242,154 @@ class DownSample(torch.nn.Module):
             padding=1,
             bias=False,
         )
+        self.resblocks1 = torch.nn.ModuleList(
+            [ResidualBlock(out_channels // 2) for _ in range(2)]
+        )
+        self.conv2 = torch.nn.Conv2d(
+            out_channels // 2,
+            out_channels,
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            bias=False,
+        )
+        self.resblocks2 = torch.nn.ModuleList(
+            [ResidualBlock(out_channels) for _ in range(3)]
+        )
+        self.pooling1 = torch.nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
+        self.resblocks3 = torch.nn.ModuleList(
+            [ResidualBlock(out_channels) for _ in range(3)]
+        )
+        self.pooling2 = torch.nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        for block in self.resblocks1:
+            x = block(x)
+        x = self.conv2(x)
+        for block in self.resblocks2:
+            x = block(x)
+        x = self.pooling1(x)
+        for block in self.resblocks3:
+            x = block(x)
+        x = self.pooling2(x)
+        return x
+
+
+class DownsampleCNN(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, h_w):
+        super().__init__()
+        mid_channels = (in_channels + out_channels) // 2
+        self.features = torch.nn.Sequential(
+            torch.nn.Conv2d(
+                in_channels, mid_channels, kernel_size=h_w[0] * 2, stride=4, padding=2
+            ),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+            torch.nn.Conv2d(mid_channels, out_channels, kernel_size=5, padding=2),
+            torch.nn.ReLU(inplace=True),
+            torch.nn.MaxPool2d(kernel_size=3, stride=2),
+        )
+        self.avgpool = torch.nn.AdaptiveAvgPool2d(h_w)
+    
+    def forward(self, x):
+        x = self.features(x)
+        x = self.avgpool(x)
+        return x
+
+
+class RepresentationNetwork(torch.nn.Module):
+    def __init__(
+        self,
+        observation_shape,
+        stacked_observations,
+        num_blocks,
+        num_channels,
+        downsample,
+    ):
+        super().__init__()
+        self.downsample = downsample
+        if self.downsample:
+            if self.downsample == "resnet":
+                self.downsample_net = DownSample(
+                    observation_shape[0] * (stacked_observations + 11)
+                    + stacked_observations,
+                    num_channels,
+                )
+            elif self.downsample == "CNN":
+                self.downsample_net = DownsampleCNN(
+                    observation_shape[0] * (stacked_observations + 1)
+                    + stacked_observations,
+                    num_channels,
+                    (
+                        math.ceil(observation_shape[1] / 16),
+                        math.ceil(observation_shape[2] / 16),
+                    ),
+                )
+            else:
+                raise NotImplementedError('downsample should be "resnet" or "CNN".')
+        self.conv = conv3x3(
+            observation_shape[0] * (stacked_observations + 1) + stacked_observations,
+            num_channels,
+        )
+        self.bn = torch.nn.BatchNorm2d(num_channels)
+        self.resblocks = torch.nn.ModuleList(
+            [ResidualBlock(num_channels) for _ in range(num_blocks)]
+        )
+    
+    def forward(self, x):
+        if self.downsample:
+            x = self.downsample_net(x)
+        else:
+            x = self.conv(x)
+            x = self.bn(x)
+            x = torch.nn.functional.relu(x)
         
+        for block in self.resblocks:
+            x = block(x)
+        return x
+
+
+class DynamicsNetwork(torch.nn.Module):
+    def __init__(
+        self,
+        num_blocks,
+        num_channels,
+        reduced_channels_reward,
+        fc_reward_layers,
+        full_support_size,
+        block_output_size_reward,
+    ):
+        super().__init__()
+        self.conv = conv3x3(num_channels, num_channels - 1)
+        self.bn = torch.nn.BatchNorm2d(num_channels - 1)
+        self.resblocks = torch.nn.ModuleList(
+            [ResidualBlock(num_channels - 1) for _ in range(num_blocks)]
+        )
+
+        self.conv1x1_reward = torch.nn.Conv2d(
+            num_channels - 1, reduced_channels_reward, 1
+        )
+        self.block_output_size_reward = block_output_size_reward
+        self.fc = mlp(
+            self.block_output_size_reward,
+            fc_reward_layers,
+            full_support_size,
+        )
+    
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = torch.nn.functional.relu(x)
+        for block in self.resblocks:
+            x = block(x)
+        state = x
+        x = self.conv1x1_reward(x)
+        x = x.view(-1, self.block_output_size_reward)
+        reward = self.fc(x)
+        return state, reward
+
+
+
+class PredictionNetwork(torch.nn.Module):
+    
