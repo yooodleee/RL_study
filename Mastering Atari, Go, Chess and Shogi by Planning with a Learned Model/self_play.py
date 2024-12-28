@@ -370,3 +370,73 @@ class MCTS:
         }
         return root, extra_info
     
+    def select_child(self, node, min_max_stats):
+        """Select the child with the highest UCB score."""
+
+        max_ucb = max(
+            self.ucb_score(node, child, min_max_stats)
+            for action, child in node.children.items()
+        )
+        action = numpy.random.choice(
+            [
+                action
+                for action, child in node.children.items()
+                if self.ucb_score(node, child, min_max_stats) == max_ucb
+            ]
+        )
+        return action, node.children[action]
+    
+    def ucb_score(self, parent, child, min_max_stats):
+        """
+        The score for a node is based on its value,
+        plus an exploration bonus based on the prior.
+        """
+        pb_c = (
+            math.log(
+                (parent.visit_count + self.config.pb_c_base + 1) / self.config.pb_c_base
+            )
+            + self.config.pb_c_init
+        )
+        pb_c *= math.sqrt(parent.visit_count) / (child.visit_count + 1)
+
+        prior_score = pb_c * child.prior
+
+        if child.visit_count > 0:
+            # Mean value Q
+            value_score = min_max_stats.normalize(
+                child.reward
+                + self.config.discount
+                + (child.value() if len(self.config.players) == 1 else -child.value())
+            )
+        else:
+            value_score = 0
+        
+        return prior_score + value_score
+    
+    def backpropagate(self, search_path, value, to_play, min_max_stats):
+        """At the end of a simulation, we propagate the evaluation all the way up the tree
+        to the root.
+        """
+        if len(self.config.players) == 1:
+            for node in reversed(search_path):
+                node.value_sum += value
+                node.visit_count += 1
+                min_max_stats.update(node.reward + self.config.discount * node.value())
+
+                value = node.reward + self.config.discount * value
+            
+        elif len(self.config.players) == 2:
+            for node in reversed(search_path):
+                node.value_sum += value if node.to_play == to_play else -value
+                node.visit_count += 1
+                min_max_stats.update(node.reward + self.config.discount * -node.value())
+
+                value = (
+                    -node.reward if node.to_play == to_play else node.reward
+                ) + self.config.discount * value
+        
+        else:
+            raise NotImplementedError("More than two player mode not implemented.")
+
+
+
