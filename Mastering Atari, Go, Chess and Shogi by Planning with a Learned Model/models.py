@@ -527,4 +527,115 @@ class MuZeroResidualNetwork(AbstractNetwork):
         return policy, value
     
     def representation(self, observation):
-        
+        encoded_state = self.representation_network(observation)
+
+        # Scale encoded state between [0, 1] (See appendix paper Training)
+        min_encoded_state = (
+            encoded_state.view(
+                -1,
+                encoded_state.shape[1],
+                encoded_state.shape[2] * encoded_state.shape[3],
+            )
+            .min(2, keepdim=True)[0]
+            .unsqueeze(-1)
+        )
+        max_encoded_state = (
+            encoded_state.view(
+                -1,
+                encoded_state.shape[1],
+                encoded_state.shape[2] * encoded_state.shape[3],
+            )
+            .max(2, keepdim=True)[0]
+            .unsqueeze(-1)
+        )
+        scale_encoded_state = max_encoded_state - min_encoded_state
+        scale_encoded_state[scale_encoded_state < 1e-5] += 1e-5
+        encoded_state_normalized = (
+            encoded_state - min_encoded_state
+        ) / scale_encoded_state
+        return encoded_state_normalized
+    
+    def dynamics(self, encoded_state, action):
+        # stack encoded_state with a game specific one hot encoded action (See paper appendix Network Architecture)
+        action_one_hot = (
+            torch.ones(
+                (
+                    encoded_state.shape[0],
+                    1,
+                    encoded_state.shape[2],
+                    encoded_state.shape[3],
+                )
+            )
+            .to(action.device)
+            .float()
+        )
+        action_one_hot = (
+            action[:, :, None, None] * action_one_hot / self.action_space_size
+        )
+        x = torch.cat((encoded_state, action_one_hot), dim=1)
+        next_encoded_state, reward = self.dynamics_network(x)
+
+        # Scale encoded state between [0, 1] (See paper appendix Training)
+        min_next_encoded_state = (
+            next_encoded_state.view(
+                -1,
+                next_encoded_state.shape[1],
+                next_encoded_state.shape[2] * next_encoded_state.shape[3],
+            )
+            .min(2, keepdim=True)[0]
+            .unsqueeze(-1)
+        )
+        max_next_encoded_state = (
+            next_encoded_state.view(
+                -1,
+                next_encoded_state.shape[1],
+                next_encoded_state.shape[2] * next_encoded_state.shape[3],
+            )
+            .max(2, keepdim=True)[0]
+            .unsqueeze(-1)
+        )
+        scale_next_encoded_state = max_next_encoded_state - min_next_encoded_state
+        scale_next_encoded_state[scale_next_encoded_state < 1e-5] += 1e-5
+        next_encoded_state_normalized = (
+            next_encoded_state - min_next_encoded_state
+        ) / scale_next_encoded_state
+        return next_encoded_state_normalized, reward
+    
+    def initial_inference(self, observation):
+        encoded_state = self.representation(observation)
+        policy_logits, value = self.prediction(encoded_state)
+        # reward equal to 0 for consistency
+        reward = torch.log(
+            (
+                torch.zeros(1, self.full_support_size)
+                .scatter(1, torch.tensor([[self.full_support_size // 2]]).long(), 1.0)
+                .repeat(len(observation), 1)
+                .to(observation.device)
+            )
+        )
+        return (
+            value,
+            reward,
+            policy_logits,
+            encoded_state,
+        )
+    
+    def recurrent_inference(self, encoded_state, action):
+        next_encoded_state, reward = self.dynamics(encoded_state, action)
+        policy_logits, value = self.prediction(next_encoded_state)
+        return value, reward, policy_logits, next_encoded_state
+
+
+
+############ End ResNet #############
+#####################################
+
+
+def mlp(
+    input_size,
+    layer_sizes,
+    output_size,
+    output_activation=torch.nn.Identity,
+    activation=torch.nn.ELU,
+):
+    
