@@ -364,4 +364,64 @@ class MuZero:
         self.reanalyse_worker = None
         self.replay_buffer_worker = None
         self.shared_storage_worker = None
+    
+    def test(
+        self,
+        render=True,
+        opponent=None,
+        muzero_player=None,
+        num_tests=1,
+        num_gpus=0,
+    ):
+        """
+        Test the model in a dedicated thread.
+
+        Args:
+            render (bool): To display or not the environment. Defaults to True.
+            opponent (str): "self" for self-play, "human" for playing against MuZero and "random"
+                for a random agent, None will use the opponent in the config. Defaults to None.
+            muzero_player (int): Player number of MuZero in case of multiplayer
+                games, None let MuZero play all players turn by turn, None will use muzero_player in
+                the config. Defaults to None.
+            num_tests (int): Number of games to average. Defaults to 1.
+            num_gpus (int): Number of GPUs to use, 0 forces to use the CPU. Defaults to 0.
+        """
+        opponent = opponent if opponent else self.config.opponent
+        muzero_player = muzero_player if muzero_player else self.config.muzero_player
+        self_play_worker = self_play.SelfPlay.options(
+            num_cpus=0,
+            num_gpus=num_gpus,
+        ).remote(self.checkpoint, self.Game, self.config, numpy.random.randint(10000))
         
+        results = []
+        for i in range(num_tests):
+            print(f"Testing {i+1}/{num_tests}")
+            results.append(
+                ray.get(
+                    self_play_worker.play_game.remote(
+                        0,
+                        0,
+                        render,
+                        opponent,
+                        muzero_player,
+                    )
+                )
+            )
+        self_play_worker.close_game.remote()
+
+        if len(self.config.players) == 1:
+            result = numpy.mean([sum(history.reward_history) for history in results])
+        else:
+            result = numpy.mean(
+                [
+                    sum(
+                        reward
+                        for i, reward in enumerate(history.reward_history)
+                        if history.to_play_history[i - 1] == muzero_player
+                    )
+                    for history in results
+                ]
+            )
+        return result
+    
+    def 
