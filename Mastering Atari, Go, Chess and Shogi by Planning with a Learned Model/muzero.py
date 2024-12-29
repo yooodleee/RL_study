@@ -207,4 +207,142 @@ class MuZero:
             )
     
     def logging_loop(self, num_gpus):
+        """
+        Keep track of the training performance.
+        """
+        # Launch the test worker to get performance metrics
+        self.test_worker = self_play.SelfPlay.options(
+            num_cpus=0,
+            num_gpus=num_gpus,
+        ).remote(
+            self.checkpoint,
+            self.Game,
+            self.config,
+            self.config.seed + self.config.num_workers,
+        )
+        self.test_worker.continuous_self_play.remote(
+            self.shared_storage_worker, None, True
+        )
+
+        # Write everything in TensorBoard
+        writer = SummaryWriter(self.config.results_path)
+
+        print(
+            "\nTraining...\nRun tensorboard --logdir ./results and go th http://localhost:6006/ to see in real time the training performance.\n"
+        )
+        
+        # Save hyperparameters to TensorBoard
+        hp_table = [
+            f"| {key} | {value} |" for key, value in self.config.__dict__.items()
+        ]
+        writer.add_text(
+            "Hyperparameters",
+            "| Parameter | value |\n|------|------|\n" + "\n".join(hp_table),
+        )
+        # Save model representation
+        writer.add_text(
+            "Model summary",
+            self.summary,
+        )
+        # Loop for updating the training performance
+        counter = 0
+        keys = [
+            "total_reward",
+            "muzero_reward",
+            "opponent_reward",
+            "episode_length",
+            "mean_value",
+            "training_step",
+            "lr",
+            "total_loss",
+            "value_loss",
+            "reward_loss",
+            "policy_loss",
+            "num_played_games",
+            "num_played_steps",
+            "num_reanalysed_games",
+        ]
+        info = ray.get(self.shared_storage_worker.get_info.remote(keys))
+        try:
+            while info["training_step"] < self.config.training_steps:
+                info = ray.get(self.shared_storage_worker.get_info.remote(keys))
+                writer.add_scalar(
+                    "1.Total_reward/1.Total_reward",
+                    info["total_reward"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "1.Total_reward/2.Mean_value",
+                    info["mean_value"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "1.Total_reward/3.Episode_length",
+                    info["episode_length"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "1.Total_reward/4.MuZero_reward",
+                    info["muzero_reward"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "1.Total_reward/5.Opponent_reward",
+                    info["opponent_reward"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/1.Self_played_games",
+                    info["num_played_games"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/2.Training_steps", info["training_step"], counter
+                )
+                writer.add_scalar(
+                    "2.Workers/3.Self_played_steps", info["num_played_steps"], counter
+                )
+                writer.add_scalar(
+                    "2.Workers/4.Reanalysed_games",
+                    info["num_reanalysed_games"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers.5.Training_steps_per_self_played_step_ratio",
+                    info["training_step"] / max(1, info["num_played_steps"]),
+                    counter,
+                )
+                writer.add_scalar("2.Workers/6.Learning_rate", info["lr"], counter)
+                writer.add_scalar(
+                    "3.Loss/1.Total_weighted_loss", info["total_loss"], counter
+                )
+                writer.add_scalar("3.Loss/Value_loss", info["value_loss"], counter)
+                writer.add_scalar("3.Loss/Reward_loss", info["reward_loss"], counter)
+                writer.add_scalar("3.Loss/Policy_loss", info["policy_loss"], counter)
+                print(
+                    f'Last test reward: {info["total_reward"]:.2f}. Training step: {info["training_step"]}/{self.config.training_steps}. Played games: {info["num_played_games"]}. Loss: {info["total_loss"]:.2f}',
+                    end="\r",
+                )
+                counter += 1
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            pass
+
+        self.terminate_workers()
+
+        if self.config.save_model:
+            # Persist replay buffer to disk
+            path = self.config.results_path / "replay_buffer.pkl"
+            print(f"\n\nPersisting replay buffer games to disk at {path}")
+            pickle.dump(
+                {
+                    "buffer": self.replay_buffer,
+                    "num_played_games": self.checkpoint["num_played_games"],
+                    "num_played_steps": self.checkpoint["num_played_steps"],
+                    "num_reanalysed_games": self.checkpoint["num_reanalysed_games"],
+                },
+                open(path, "wb"),
+            )
+    
+    def terminate_workers(self):
         
