@@ -424,4 +424,38 @@ class MuZero:
             )
         return result
     
-    def 
+    def load_model(self, checkpoint_path=None, replay_buffer_path=None):
+        """
+        Load a model and/or a saved replay buffer.
+
+        Args:
+            checkpoint_path (str): Path to model.checkpoint or model.weights.
+            replay_buffer_path (str): Path to replay_buffer.pkl
+        """
+        # Load checkpoint
+        if checkpoint_path:
+            checkpoint_path = pathlib.Path(checkpoint_path)
+            self.checkpoint = torch.load(checkpoint_path)
+            print(f"\nUsing checkpoint from {checkpoint_path}")
+        
+        # Load replay buffer
+        if replay_buffer_path:
+            replay_buffer_path = pathlib.Path(replay_buffer_path)
+            with open(replay_buffer_path, "rb") as f:
+                replay_buffer_infos = pickle.load(f)
+            self.replay_buffer = replay_buffer_infos["buffer"]
+            self.checkpoint["num_played_steps"] = replay_buffer_infos[
+                "num_played_games"
+            ]
+            self.checkpoint["num_reanalysed_games"] = replay_buffer_infos[
+                "num_reanalysed_games"
+            ]
+
+            print(f"\nIntializing replay buffer with {replay_buffer_path}")
+        else:
+            print(f"Using empty buffer.")
+            self.replay_buffer = {}
+            self.checkpoint["training_step"] = 0
+            self.checkpoint["num_played_steps"] = 0
+            self.checkpoint["num_played_games"] = 0
+            self.checkpoint["num_reanalysed_games"] = 0
