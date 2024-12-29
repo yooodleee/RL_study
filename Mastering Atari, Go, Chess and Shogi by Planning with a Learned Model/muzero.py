@@ -127,4 +127,84 @@ class MuZero:
         self.replay_buffer_worker = None
         self.shared_storage_worker = None
     
+    def train(self, log_in_tensorboard=True):
+        """
+        Spawn ray workers and launch the training/
+
+        Args:
+            log_in_tensorboard (bool): start a testing worker and log its performance in TensorBoard.
+        """
+        if log_in_tensorboard or self.config.save_model:
+            self.config.results_path.mkdir(parents=True, exist_ok=True)
+        
+        # manage GPUs
+        if 0 < self.num_gpus:
+            num_gpus_per_worker = self.num_gpus / (
+                self.config.train_on_gpu
+                + self.config.num_workers * self.config.selfplay_on_gpu
+                + log_in_tensorboard * self.config.selfplay_on_gpu
+                + self.config.use_last_model_save * self.config.reanalyse_on_gpu
+            )
+            if 1 < num_gpus_per_worker:
+                num_gpus_per_worker = math.floor(num_gpus_per_worker)
+        
+        else:
+            num_gpus_per_worker = 0
+        
+        # Initialize workers
+        self.training_worker = trainer.Trainer.options(
+            num_cpus = 0,
+            num_cpus = num_gpus_per_worker if self.config.train_on_gpu else 0,
+        ).remote(self.checkpoint, self.config)
+
+        self.shared_storage_worker = shared_storage.Sharedstorage.remote(
+            self.checkpoint,
+            self.config,
+        )
+        self.shared_storage_worker.set_info.remote("terminate", False)
+
+        self.replay_buffer_worker = replay_buffer.ReplayBuffer.remote(
+            self.checkpoint, self.replay_buffer, self.config
+        )
+
+        if self.config.use_last_model_value:
+            self.reanalyse_worker = replay_buffer.Reanalyse.options(
+                num_cpus=0,
+                num_gpus=num_gpus_per_worker if self.config.reanalyse_on_gpu else 0,
+            ).remote(self.checkpoint, self.config)
+
+        self.self_play_workers = [
+            self_play.SelfPlay.options(
+                num_cpus=0,
+                num_gpus=num_gpus_per_worker if self.config.selfplay_on_gpu else 0,
+            ).remote(
+                self.checkpoint,
+                self.Game,
+                self.config,
+                self.config.seed + seed,
+            )
+            for seed in range(self.config.num_workers)
+        ]
+
+        # Launch workers
+        [
+            self_play_worker.continuous_self_play.remote(
+                self.shared_storage_worker, self.replay_buffer_worker
+            )
+            for self_play_worker in self.self_play_workers
+        ]
+        self.training_worker.continuous_update_weights.remote(
+            self.replay_buffer_worker, self.shared_storage_worker
+        )
+        if self.config.use_last_model_value:
+            self.reanalyse_worker.reanlyse.remote(
+                self.replay_buffer_worker, self.shared_storage_worker
+            )
+        
+        if log_in_tensorboard:
+            self.logging_loop(
+                num_gpus_per_worker if self.config.selfplay_on_gpu else 0,
+            )
     
+    def logging_loop(self, num_gpus):
+        
