@@ -345,4 +345,23 @@ class MuZero:
             )
     
     def terminate_workers(self):
+        """
+        Softly terminate the running tasks and garbage collect the workers.
+        """
+        if self.shared_storage_worker:
+            self.shared_storage_worker.set_info.remote("terminate", True)
+            self.checkpoint = ray.get(
+                self.shared_storage_worker.get_checkpoint.remote()
+            )
+        if self.replay_buffer_worker:
+            self.replay_buffer = ray.get(self.replay_buffer_worker.get_buffer.remote())
+        
+        print("\nShutting down workers...")
+
+        self.self_play_workers = None
+        self.test_worker = None
+        self.training_worker = None
+        self.reanalyse_worker = None
+        self.replay_buffer_worker = None
+        self.shared_storage_worker = None
         
