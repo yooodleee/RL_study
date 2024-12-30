@@ -237,4 +237,34 @@ class Actor(types_lib.Agent):
 
         self._step_t = -1
     
-    
+    @torch.no_grad()
+    def step(self, timestep: types_lib.TimeStep)-> types_lib.Action:
+        """
+        Given timestep, return action a_t, and push transition into global queue
+        """
+        self._step_t += 1
+
+        if self._step_t % self._actor_update_interval == 0:
+            self._update_actor_network()
+        
+        q_t, a_t, hidden_s  = self.act(timestep)
+
+        # Note the reward is for s_tm1, a_tm1, because it's only available one agent step after,
+        # and the done mark is for current timestep s_t.
+        transition = R2d2Transition(
+            s_t=timestep.observation,
+            a_t=a_t,
+            q_t=q_t,
+            r_t=timestep.reward,
+            done=timestep.done,
+            last_action=self._last_action,
+            init_h=self._lstm_state[0].squeeze(1).cpu().numpy(),    # remove batch dimension
+            init_c=self._lstm_state[1].squeeze(1).cpu().numpy(),
+        )
+        unrolled_transition = self._unroll.add(transition, timestep.done)
+        self._last_action, self._lstm_state = a_t, hidden_s
+
+        if unrolled_transition is not None:
+            self._put_unroll_onto_queue(unrolled_transition)
+        
+        return a_t
