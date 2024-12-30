@@ -459,3 +459,56 @@ class MuZero:
             self.checkpoint["num_played_steps"] = 0
             self.checkpoint["num_played_games"] = 0
             self.checkpoint["num_reanalysed_games"] = 0
+    
+    def diagnose_model(self, horizon):
+        """
+        Play a game only with the learned model then play the game trajectory in the real
+        environment and display information.
+
+        Args:
+            horizon (int): Number of timesteps for which we collect information.
+        """
+
+        game = self.Game(self.config.seed)
+        obs = game.reset()
+        dm = diagnose_model.DiagnoseModel(self.checkpoint, self.config)
+        dm.compare_virtual_with_real_trajectories(obs, game, horizon)
+        input("Press enter to close all plots")
+        dm.close_all()
+
+
+@ray.remote(num_cpus=0, num_gpus=0)
+class CPUActor:
+    # Trick to force DataParallel to stay on CPU to get weights on CPU even if there is a GPU
+    def __init__(self):
+        pass
+
+    def get_initial_weights(self, config):
+        model = models.MuZeroNetwork(config)
+        weights = model.get_weights()
+        summary = str(model).replace("\n", " \n\n")
+        return weights, summary
+
+
+def hyperparameter_search(
+    game_name, parameterization, budget, parallel_experiments, num_tests
+):
+    """
+    Search for hyperparameters by launching parallel experiments.
+
+    Args:
+        game_name (str): Name of the game module, it should match the name of a .py file
+        in the "./games" directory.
+
+        parameterization: Nevergrad parameterization, please refer to nevergrad documentation.
+
+        budget (int): Number of experiments to launch in total.
+
+        parallel_experiments (int): Number of experiments to launch in parallel.
+
+        num_tests (int): Number of games to average for evaluating an experiment.
+    """
+    optimizer = nevergrad.optimizers.OnePlusOne(
+        parametrization=parameterization, budget=budget
+    )
+    
