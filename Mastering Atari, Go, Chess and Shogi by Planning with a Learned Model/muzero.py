@@ -579,3 +579,41 @@ def hyperparameter_search(
     return recommendation.value
 
 
+def load_model_menu(muzero, game_name):
+    # Configure running options
+    options = ["Specify paths manually"] + sorted(
+        (pathlib.Path("results") / game_name).glob("*/")
+    )
+    options.reverse()
+    print()
+    for i in range(len(options)):
+        print(f"{i}. {options[i]}")
+    
+    choice = input("Enter a number to choose a model to load: ")
+    valid_inputs = [str(i) for i in range(len(options))]
+    while choice not in valid_inputs:
+        choice = input("Invalid input, enter a number listed above: ")
+    choice = int(choice)
+
+    if choice == (len(options) - 1):
+        # manual path option
+        checkpoint_path = input(
+            "Enter a path to the model.checkpoint, or ENTER if none: "
+        )
+        while checkpoint_path and not pathlib.Path(checkpoint_path).is_file():
+            checkpoint_path = input("Invalid checkpoint path. Try again: ")
+        replay_buffer_path = input(
+            "Enter a path to the replay_buffer.pkl, or ENTER if none: "
+        )
+        while replay_buffer_path and not pathlib.Path(replay_buffer_path).is_file():
+            replay_buffer_path = input("Invalid replay buffer path. Try again: ")
+    else:
+        checkpoint_path = options[choice] / "model.checkpoint"
+        replay_buffer_path = options[choice] / "replay_buffer.pkl"
+    
+    muzero.load_model(
+        check_path = checkpoint_path,
+        replay_buffer_path = replay_buffer_path,
+    )
+
+
