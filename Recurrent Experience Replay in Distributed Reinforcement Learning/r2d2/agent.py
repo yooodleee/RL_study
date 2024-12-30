@@ -153,3 +153,88 @@ def calculate_losses_and_priorities(
     return losses, priorities
 
 
+class Actor(types_lib.Agent):
+    """R2D2 actor"""
+
+    def __init__(
+        self,
+        rank: int,
+        data_queue: multiprocessing.Queue,
+        network: torch.nn.Module,
+        random_state: numpy.random.RandomState, # pylint: disable=no-member
+        num_actors: int,
+        action_dim: int,
+        unroll_length: int,
+        burn_in: int,
+        actor_update_interval: int,
+        device: torch.device,
+        shared_params: dict,
+    )-> None:
+        """
+        Args:
+            rank: the rank number for the actor.
+            data_queue: a multiprocessing. Queue to send collected transitions to learner process.
+            network: the Q network for actor to make action choice.
+            random_state: used to sample random actions for e-greedy policy.
+            num_actors: the number actiors for calculating e-greedy epsilon.
+            action_dim: the number of valid actions in the environment.
+            unroll_length: how many agent time step to unroll transitions before put on to queue.
+            burn_in: two conseucutive unrolls will overlap on burn_in+1 steps.
+            actor_update_interval: the frequency to update actor local Q network.
+            device: pyTorch runtime device.
+            shared_params: a shared dict, so we can later update the parameters for actors.
+        """
+        if not 0 < num_actors:
+            raise ValueError(
+                f'Expect num_actors to be positive integer, got {num_actors}'
+            )
+        if not 0 < action_dim:
+            raise ValueError(
+                f'Expect action_dim to be positive integer, got {action_dim}'
+            )
+        if not 1 <= unroll_length:
+            raise ValueError(
+                f'Expect unroll_length to be integer greater than or equal to 1, got {unroll_length}'
+            )
+        if not 0 <= burn_in < unroll_length:
+            raise ValueError(
+                f'Expect burn_in to be integer between [0, {unroll_length}), got {burn_in}]'
+            )
+        if not 1 <= actor_update_interval:
+            raise ValueError(
+                f'Expect actor_update_interval to be integer greater thann or equal to 1, got {actor_update_interval}'
+            )
+        
+        self.rank = rank
+        self.agent_name = f'R2D2-actor{rank}'
+
+        self._network = network.to(device=device)
+
+        # Disable autograd for actor's network
+        no_autograd(self._network)
+
+        self._shared_params = shared_params
+        
+        self._queue = data_queue
+        
+        self._device = device
+        self._random_state = random_state
+        self._action_dim = action_dim
+        self._actor_update_interval = actor_update_interval
+
+        self._unroll = replay_lib.Unroll(
+            unroll_length=unroll_length,
+            overlap=burn_in + 1,    # Plus 1 to add room for shift during learning
+            structure=TransitionStructure,
+            cross_episode=False,
+        )
+
+        epsilons = distributed.get_actor_exploration_epsilon(num_actors)
+        self._exploration_epsilon = epsilons[self.rank]
+
+        self._last_action = None
+        self._lstm_state = None     # stroes nn.LSTM hidden state and cell state
+
+        self._step_t = -1
+    
+    
