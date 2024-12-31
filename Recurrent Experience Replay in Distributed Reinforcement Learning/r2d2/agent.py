@@ -268,3 +268,210 @@ class Actor(types_lib.Agent):
             self._put_unroll_onto_queue(unrolled_transition)
         
         return a_t
+    
+    def reset(self)-> None:
+        """
+        This method should be called at the beginning of every episode before
+        take any action.
+        """
+        self._unroll.reset()
+        self._last_action = self._random_state.randint(0, self._action_dim) # Initialize a_tm1 randomly
+        self._lstm_state = self._network.get_initial_hidden_state(batch_size=1)
+    
+    def act(
+        self, timestep: types_lib.TimeStep
+    )-> Tuple[numpy.ndarray, types_lib.Action, Tuple[torch.Tensor]]:
+        """
+        Given state s_t and done marks, return an action.
+        """
+        return self._choose_action(timestep, self._exploration_epsilon)
+    
+    @torch.no_grad()
+    def _choose_action(
+        self, timestep: types_lib.TiemStep, epsilon: float
+    )-> Tuple[numpy.ndarray, types_lib.Action, Tuple[torch.Tensor]]:
+        """
+        Given state s_t, choose action a_t
+        """
+        pi_output = self._network(self._prepare_network_input(timestep))
+        q_t = pi_output.q_values.squeeze()
+        a_t = torch.argmax(q_t, dim=-1).cpu().item()
+
+        # To make sure every actors generates the same amount of samples, we apply e-greedy after the network pass,
+        # otherwise the actor with higher epsilons will generate more samples,
+        # while the actor with lower epsilon will generate less samples.
+        if self._random_state.rand() <= epsilon:
+            # randint() return random integers from low (inclusive) to high (exclusive).
+            a_t = self._random_state.randint(0, self._action_dim)
+        
+        return (q_t.cpu().numpy(), a_t, pi_output.hidden_s)
+    
+    def _prepare_network_input(
+        self, timestep: types_lib.TimeStep
+    )-> RnnDqnNetworkInputs:
+        # R2D2 network expect input shape [T, B, state_shape],
+        # and additionally 'last action', 'reward for last action', and hidden state from previous timestep.
+        s_t = torch.from_numpy(
+            timestep.observation[None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(
+            self._last_action, device=self._device, dtype=torch.int64
+        )
+        r_t = torch.tensor(
+            timestep.reward, device=self._device, dtype=torch.float32
+        )
+        hidden_s = tuple(
+            s.to(device=self._device) for s in self._lstm_state
+        )
+
+        return RnnDqnNetworkInputs(
+            s_t = s_t.unsqueeze(0), # [T, B, state_shape]
+            a_tm1 = a_tm1.unsqueeze(0), # [T, B]
+            r_t = r_t.unsqueeze(0),     # [T, B]
+            hidden_s = hidden_s,
+        )
+    
+    def _put_unroll_onto_queue(self, unrolled_transition):
+        # Important note, store hidden states for every step in the unroll will consume HUGE memory.
+        self._queue.put(unrolled_transition)
+
+    def _update_actor_network(self):
+        state_dict = self._shared_params['network']
+
+        if state_dict is not None:
+            if self._device != 'cpu':
+                state_dict = {
+                    k: v.to(device=self._device) for k, v in state_dict.items()
+                }
+            self._network.load_state_dict(state_dict)
+    
+    @property
+    def statistics(self)-> Mapping[Text, float]:
+        """
+        Returns current actor's statistics as a dictionary.
+        """
+        return {'exploration_epsilon': self._exploration_epsilon}
+
+
+
+class Leaner(types_lib.Leaner):
+    """
+    R2D2 learner
+    """
+
+    def __init__(
+        self,
+        network: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        replay: replay_lib.PrioritizedReplay,
+        target_net_update_interval: int,
+        min_replay_size: int,
+        batch_size: int,
+        n_step: int,
+        discount: float,
+        burn_in: int,
+        priority_eta: float,
+        rescale_epsilon: float,
+        clip_grad: bool,
+        max_grad_norm: float,
+        device: torch.device,
+        shared_params: dict,
+    )-> None:
+        """
+        Args:
+            network: the Q network we want to train and optimize.
+            optimize: the optimizer for Q network
+            replay: prioritized recurrent experience replay.
+            target_net_update_interval: how often to copy online network parameters to target.
+            min_replay_size: wait till experience replay buffer this number before start to learn.
+            batch_size: sample batch_size of transitions.
+            n_step: TD n-step bootstrap.
+            discount: the gamma discount for future rewards.
+            burn_in: burn n transitions to generate initial hidden state before learning.
+            prioirty_eta: coefficient to mix the max and mean absolute TD errors.
+            rescale_epsilon: rescaling factor for n-step targets in the invertible rescaling function.
+            clip_grad: if True, clip gradients norm.
+            max_grad_norm: the maximum gradient norm for clip grad, only works if clip_grad is True.
+            device: PyTorch runtime device.
+            shared_params: a shared dict, so we can later update the parameters for actors.
+        """
+        if not 1 <= target_net_update_interval:
+            raise ValueError(
+                f'Expect target_net_update_interval to be positive integer, '
+                f'got {target_net_update_interval}'
+            )
+        if not 1 <= min_replay_size:
+            raise ValueError(
+                f'Expect min_replay_size to be integer greater than or equal to 1, '
+                f'got {min_replay_size}'
+            )
+        if not 1 <= batch_size <= 512:
+            raise ValueError(
+                f'Expect batch_size to in the range [1, 512], '
+                f'got {batch_size}'
+            )
+        if not 1 <= n_step:
+            raise ValueError(
+                f'Expect n_step to be integer greater than or equal to 1, '
+                f'got {n_step}'
+            )
+        if not 0.0 <= discount <= 1.0:
+            raise ValueError(
+                f'Expect discount to in the range [0.0, 1.0], '
+                f'got {discount}'
+            )
+        if not 0.0 <= priority_eta <= 1.0:
+            raise ValueError(
+                f'Expect rescale_epsilon to in the range [0.0, 1.0], '
+                f'got {rescale_epsilon}'
+            )
+        
+        self.agent_name = 'R2D2-learner'
+        self._device = device
+        self._network = network.to(device=device)
+        self._optimizer = optimizer
+        # Lazy way to create target Q network
+        self._target_network = copy.deepcopy(self._network).to(device=self._device)
+
+        # Disable autograd for target network
+        no_autograd(self._target_network)
+
+        self._shared_params = shared_params
+
+        self._batch_size = batch_size
+        self._n_step = n_step
+        self._burn_in = burn_in
+        self._target_net_update_interval = target_net_update_interval
+        self._discount = discount
+        self._clip_grad = clip_grad
+        self._max_grad_norm = max_grad_norm
+        self._rescale_epsilon = rescale_epsilon
+
+        self._replay = replay
+        self._min_replay_size = min_replay_size
+        self._priority_eta = priority_eta
+
+        self._max_seen_priority = 1.0   # New unroll will use this as priority
+
+        # Counters
+        self._step_t = -1
+        self._update_t = 0
+        self._target_update_t = 0
+        self._loss_t = numpy.nan
+    
+    def step(self)-> Iterable[Mapping[Text, float]]:
+        """
+        Increment learner step, and potentially do a update when called.
+
+        Yields:
+            learner statistics if network parameters update occurred, otherwise returns None.
+        """
+        self._step_t += 1
+
+        if self._replay.size < self._min_replay_size or self._step_t % max(4, int(self._batch_size * 0.25)) != 0:
+            return
+        
+        self._learn()
+        yield self.statistics
+    
+    
