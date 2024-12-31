@@ -474,4 +474,148 @@ class Leaner(types_lib.Leaner):
         self._learn()
         yield self.statistics
     
+    def reset(self)-> None:
+        """
+        Should be called at the beginning of every iteration.
+        """
+    
+    def received_item_from_queue(self, item)-> None:
+        """
+        Received from send by actors through multiprocessing queue.
+        """
+        self._replay.add(item, self._max_seen_priority)
+    
+    def get_network_state_dict(self):
+        # To keep things consistent, we move the parameters to CPU.
+        return {k: v.cpu() for k, v in self._network.state_dict().items()}
+    
+    def _learn(self)-> None:
+        transitions, indices, weights = self._replay.sample(self._batch_size)
+        priorities = self._update(transitions, weights)
+        self._update_t += 1
+
+        if priorities.shape != (self._batch_size):
+            raise RuntimeError(
+                f'Expect priorities has shape ({self._batch_size},), '
+                f'got {priorities.shape}'
+            )
+        priorities = numpy.abs(priorities)
+        self._max_seen_priority = numpy.max(
+            [self._max_seen_priority, numpy.max(priorities)]
+        )
+        self._replay.update_priorities(indices, priorities)
+
+        self._shared_params['network'] = self.get_network_state_dict()
+
+        # Copy online Q network parameters to target Q network, every m updates
+        if self._update_t > 1 and self._update_t % self._target_net_update_interval == 0:
+            self._update_target_network()
+    
+    def _update(
+        self, transitions: R2d2Transition, weights: numpy.ndarray
+    )-> numpy.ndarray:
+        """
+        Update online Q network.
+        """
+        weights = torch.from_numpy(weights).to(
+            device=self._device, dtype=torch.float32
+        )   # [batch_size]
+        base.assert_rank_and_dtype(weights, 1, torch.float32)
+
+        # Get initial hidden state, handle possible burn in.
+        init_hidden_s = self._extract_first_step_hidden_state(transitions)
+        burn_transitions, lean_transitions = replay_lib.split_structure(
+            transitions, TransitionStructure, self._burn_in
+        )
+        if burn_transitions is not None:
+            hidden_s, target_hidden_s = self._burn_in_unroll_q_networks(
+                burn_transitions, init_hidden_s
+            )
+        else:
+            hidden_s = tuple(
+                s.clone().to(device=self._device) for s in init_hidden_s
+            )
+            target_hidden_s = tuple(
+                s.clone().to(device=self._device) for s in init_hidden_s
+            )
+        
+        self._optimizer.zero_grad()
+        # [batch_size]
+        loss, priorities = self._calc_loss(
+            lean_transitions, hidden_s, target_hidden_s
+        )
+
+        # Multiply loss by sampling weigts, averaging over batch dimension
+        loss = torch.mean(loss * weights.detach())
+        loss.backward()
+
+        if self._clip_grad:
+            torch.nn.utils.clip_grad_norm_(
+                self._network.parameters(), self._max_grad_norm
+            )
+        
+        self._optimizer.step()
+
+        # For logging only.
+        self._loss_t = loss.detach().cpu().item()
+        return priorities
+    
+    def _calc_loss(
+        self,
+        transitions: R2d2Transition,
+        hidden_s: HiddenState,
+        target_hidden_s: HiddenState,
+    )-> Tuple[torch.Tensor, numpy.ndarray]:
+        """
+        calculate loss and priorities for given unroll sequence transitions.
+        """
+        s_t = torch.from_numpy(
+            transitions.s_t).to(device=self._device, dtype=torch.float32)   # [T+1, B, state_shape]
+        a_t = torch.from_numpy(
+            transitions.a_t).to(device=self._device, dtype=torch.int64) # [T+1, B]
+        last_action = torch.from_numpy(
+            transitions.last_action).to(device=self._device, dtype=torch.float32)   # [T+1, B]
+        r_t = torch.from_numpy(
+            transitions.r_t).to(device=self._device, dtype=torch.float32)   # [T+1, B]
+        done = torch.from_numpy(
+            transitions.done).to(device=self._device, dtype=torch.bool) # [T+1, B]
+        
+        # Rank and dtype checks, note we have a new unroll time dimension, 
+        # states may be images, which is rank 5.
+        base.assert_rank_and_dtype(s_t, (3, 5), torch.float32)
+        base.assert_rank_and_dtype(a_t, 2, torch.long)
+        base.assert_rank_and_dtype(last_action, 2, torch.long)
+        base.assert_rank_and_dtype(r_t, 2, torch.float32)
+        base.assert_rank_and_dtype(done, 2, torch.bool)
+
+        # Get q values from online Q network
+        q_t = self._network(
+            RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=hidden_s)
+        ).q_values
+
+        # Computes raw target q values, use double Q
+        with torch.no_grad():
+            # Get best actions a* for 's_t' from online Q network.
+            best_a_t = torch.argmax(q_t, dim=-1)    # [T, B]
+
+            # Get estimated q values for 's_t' from target Q network, using above best action a*.
+            target_q_t = self._target_network(
+                RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=target_hidden_s)
+            ).q_values
+        
+        losses, priorities = calculate_losses_and_priorities(
+            q_value=q_t,
+            action=a_t,
+            reward=r_t,
+            done=done,
+            target_qvalue=target_q_t,
+            target_action=best_a_t,
+            gamma=self._discount,
+            n_step=self._n_step,
+            eps=self._rescale_epsilon,
+            eta=self._priority_eta,
+        )
+        
+        return (losses, priorities)
+    
     
