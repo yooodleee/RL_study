@@ -108,14 +108,3 @@ SAC Hyperparameters
 10.  `target smoothing coefficient (𝜏)`: 0.005
 11.  `target update interval`: 1
 12.  `gradient steps`: 1
-
----
-
-## **9. About SAC**
-
-Model-free RL algorithms have been applied to a sequential decision making and control tasks. However, these methods suffer from two major challenges;
-high sample complexity and brittleness to hyperparameters. These challenges limit the applicability of real-world domains.
-In this paper, researchers described Soft-Actor-Critic(SAC), introduced off-policy actor-critic algorithms based on the maximum entropy RL framework.
-In this framework, the actor aims to maximize expected return and entropy; to succeed at the task while acting as randomly as possible.
-They extend SAC to incorporate modifications that accelerate training and improve stability with the hyperparameters, including a constrained formulation that automatically tunes the temperature hyperparameters.
-Also they systemically evaluate SAC on a range of benchmark tasks, as well as challenging real-world tasks.
