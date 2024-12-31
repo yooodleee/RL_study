@@ -618,4 +618,78 @@ class Leaner(types_lib.Leaner):
         
         return (losses, priorities)
     
+    @torch.no_grad()
+    def _burn_in_unroll_q_networks(
+        self, transitions: R2d2Transition, init_hidden_s: HiddenState
+    )-> Tuple[HiddenState, HiddenState]:
+        """
+        Unroll both online and target q networks to generate hidden states for LSTM.
+        """
+        s_t = torch.from_numpy(
+            transitions.s_t).to(device=self._device, dtype=torch.float32)   # [burn_in, B, state_shape]
+        last_action = torch.from_numpy(
+            transitions.s_t).to(device=self._device, dtype=torch.int64) # [burn_in, B]
+        r_t = torch.from_numpy(
+            transitions.r_t).to(device=self._device, dtype=torch.float32)   # [burn_in, B]
+        
+        # Rank and dtype checks, note we have a new unroll time dimension, states may be images, which is rank 5.
+        base.assert_rank_and_dtype(s_t, (3, 5), torch.float32)
+        base.assert_rank_and_dtype(last_action, 2, torch.long)
+        base.assert_rank_and_dtype(r_t, torch.float32)
+
+        _hidden_s = tuple(
+            s.clone().to(device=self._device) for s in init_hidden_s
+        )
+        _target_hidden_s = tuple(
+            s.clone().to(device=self._device) for s in init_hidden_s
+        )
+
+        # Burn in to generate hidden states for LSTM, we unroll both online and target Q networks
+        hidden_s = self._network(
+            RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=hidden_s)
+        ).hidden_s
+        target_hidden_s = self._target_network(
+            RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=target_hidden_s)
+        ).hidden_s
+
+        return (hidden_s, target_hidden_s)
     
+    def _extract_first_step_hidden_state(
+        self, transitions: R2d2Transition
+    )-> HiddenState:
+        # We only need the first step hidden states in replay, shape [batch_size, num_lstm_layers, lstm_hidden_size]
+        init_h = torch.from_numpy(
+            transitions.init_h[0:1]).squeeze(0).to(device=self._device, dtype=torch.float32)
+        init_c = torch.from_numpy(
+            transitions.init_c[0:1]).squeeze(0).to(device=self._device, dtype=torch.float32)
+        
+        # Randk and dtype checks.
+        base.assert_rank_and_dtype(init_h, 3, torch.float32)
+        base.assert_rank_and_dtype(init_c, 3, torch.float32)
+
+        # Swap batch and num_lstm_layers axis.
+        init_h = init_h.swapaxes(0, 1)
+        init_c = init_c.swapaxes(0, 1)
+
+        # Batch dimension checks.
+        base.assert_batch_dimension(init_h, self._batch_size, 1)
+        base.assert_batch_dimension(init_c, self._batch_size, 1)
+
+        return (init_h, init_c)
+    
+    def _update_target_network(self):
+        self._target_network.load_state_dict(self._network.state_dict())
+        self._target_update_t += 1
+    
+    @property
+    def statistics(self)-> Mapping[Text, float]:
+        """
+        Returns current agent statistics as a dictionary.
+        """
+        return {
+            # 'learning_rate': self._optimizer.param_groups[0]['lr'],
+            'loss': self._loss_t,
+            # 'discount': self._discount,
+            'updates': self._update_t,
+            'target_updates': self._target_update_t,
+        }
