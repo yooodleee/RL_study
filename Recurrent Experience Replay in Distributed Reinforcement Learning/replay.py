@@ -685,5 +685,94 @@ class Unroll:
 
 
 def stack_list_of_transitions(
+    transitions, structure, dim=0
+):
+    """
+    Stack list of transition objects into one transition object with lists
+    of tensors on a given dimension (default 0)
+    """
+
+    transposed = zip(*transitions)
+    stacked = [
+        torch.stack(xs, dim=dim) for xs in transposed
+    ]
+    return type(structure)(*stacked)
+
+
+
+def np_stack_list_of_transitions(
+    transitions, structure, axis=0
+):
+    """
+    Stack list of transition objects into one transition object with lists 
+    of tensors on a given dimension (default 0)
+    """
+
+    transposed = zip(*transitions)
+    stacked = [
+        np.stack(xs, axis=axis) for xs in transposed
+    ]
+    return type(structure)(*stacked)
+
+
+
+def split_structure(
+    input_,
+    structure,
+    prefix_length: int,
+    axis: int = 0,
+)-> Tuple[ReplayStructure]:
+    """
+    Splits a structure of np.array along the axis, default 0.
+    """
+
+    # Compatibility check.
+    if prefix_length > 0:
+        for v in input_:
+            if v.shape[axis] < prefix_length:
+                raise ValueError(
+                    f'Expect prefix_length to be less or equal to {v.shape[axis]}, got {prefix_length}'
+                )
     
-)
+    if prefix_length == 0:
+        return (None, input_)
+    else:
+        split = [
+            np.split(
+                xs,
+                [prefix_length, xs.shape[axis]],    # for torch.split() [prefix_length, xs.shape[axis] - prefix_length],
+                axis=axis,
+            )
+            for xs in input_
+        ]
+
+        _prefix = [pair[0] for pair in split]
+        _suffix = [pair[1] for pair in split]
+
+        return (
+            type(structure)(*_prefix), type(structure)(*_suffix)
+        )
+    
+
+
+def compress_array(
+    array: np.ndarray
+)-> CompressedArray:
+    """
+    Compresses a numpy array with snappy.
+    """
+    return snappy.compress(array), array.shape, array.dtype
+
+
+
+def uncompress_array(
+    compressed: CompressedArray
+)-> np.ndarray:
+    """
+    Uncompresses a numpy array with snappy given its shape and dtype.
+    """
+    compressed_array, shape, dtype = compressed
+    byte_string = snappy.uncompress(compress_array)
+    return np.frombuffer(
+        byte_string, dtype=dtype
+    ).reshape(shape)
