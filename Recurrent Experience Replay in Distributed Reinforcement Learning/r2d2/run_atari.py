@@ -24,50 +24,80 @@ from deel_rl_zoo import replay as replay_lib
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    'environment_name', 'Pong', 'Atari name without NoFrameskip and version, like Breakout, Pong, Sequest.'
+    'environment_name', 
+    'Pong', 
+    'Atari name without NoFrameskip and version, like Breakout, Pong, Sequest.'
 )
 flags.DEFINE_integer(
-    'environment_height', 84, 'Environment frame screen height.'
+    'environment_height', 
+    84, 
+    'Environment frame screen height.'
 )
 flags.DEFINE_integer(
-    'environment_width', 84, 'Environment frame screen width.'
+    'environment_width', 
+    84, 
+    'Environment frame screen width.'
 )
 flags.DEFINE_integer(
-    'environment_frame_skip', 4, 'Number of frames to skip.'
+    'environment_frame_skip', 
+    4, 
+    'Number of frames to skip.'
 )
 flags.DEFINE_integer(
-    'environment_frame_stack', 1, 'Number of frames to stack.'
+    'environment_frame_stack', 
+    1, 
+    'Number of frames to stack.'
 )
 flags.DEFINE_bool(
-    'compress_state', True, 'Compress state images when store in experience replay.'
+    'compress_state', 
+    True, 
+    'Compress state images when store in experience replay.'
 )
 flags.DEFINE_integer(
-    'num_actors', 16, 'Number of actor processes to run in parallel.'
+    'num_actors', 
+    16, 
+    'Number of actor processes to run in parallel.'
 )
 flags.DEFINE_integer(
-    'replay_capacity', 20000, 'Maximum replay size (in number of unrolls stored).'
+    'replay_capacity', 
+    20000, 
+    'Maximum replay size (in number of unrolls stored).'
 )   # watch for out of RAM
 flags.DEFINE_integer(
-    'min_replay_size', 1000, 'Minimum replay size before learning starts (in number of unrolls stored).'
+    'min_replay_size', 
+    1000, 
+    'Minimum replay size before learning starts (in number of unrolls stored).'
 )
 flags.DEFINE_bool(
-    'clip_grad', True, 'Clip gradients, default on.'
+    'clip_grad', 
+    True, 
+    'Clip gradients, default on.'
 )
 flags.DEFINE_float(
-    'max_grad_norm', 40.0, 'Max gradients norm when do gradients clip.'
+    'max_grad_norm', 
+    40.0, 
+    'Max gradients norm when do gradients clip.'
 )
 
 flags.DEFINE_float(
-    'learning_rate', 0.0001, 'Learning rate for adam.'
+    'learning_rate', 
+    0.0001, 
+    'Learning rate for adam.'
 )
 flags.DEFINE_float(
-    'adam_eps', 0.0001, 'Epsilon for adam.'
+    'adam_eps', 
+    0.0001, 
+    'Epsilon for adam.'
 )
 flags.DEFINE_float(
-    'discount', 0.997, 'Discount rate.'
+    'discount', 
+    0.997, 
+    'Discount rate.'
 )
 flags.DEFINE_float(
-    'unroll_length', 80, 'Sequence of transitions to unroll before add to replay.'
+    'unroll_length', 
+    80, 
+    'Sequence of transitions to unroll before add to replay.'
 )
 flags.DEFINE_integer(
     'burn_in',
@@ -77,31 +107,47 @@ flags.DEFINE_integer(
     'two consecutive unrolls will overlap on burn_in steps.',
 )
 flags.DEFINE_integer(
-    'batch_size', 32, 'Batch size for learning.'
+    'batch_size', 
+    32, 
+    'Batch size for learning.'
 )
 
 flags.DEFINE_float(
-    'priority_exponent', 0.9, 'Priority exponent used in prioritized replay.'
+    'priority_exponent', 
+    0.9, 
+    'Priority exponent used in prioritized replay.'
 )
 flags.DEFINE_float(
-    'importance_sampling_exponent', 0.6, 'Importance sampling exponent value.'
+    'importance_sampling_exponent', 
+    0.6, 
+    'Importance sampling exponent value.'
 )
 flags.DEFINE_float(
-    'normalize_weights', True, 'Normalize sampling weights in prioritized replay.'
+    'normalize_weights', 
+    True, 
+    'Normalize sampling weights in prioritized replay.'
 )
 
 flags.DEFINE_float(
-    'priority_eta', 0.9, 'Priority eta to mix the max and mean absolute TD errors.'
+    'priority_eta', 
+    0.9, 
+    'Priority eta to mix the max and mean absolute TD errors.'
 )
 flags.DEFINE_float(
-    'rescale_epsilon', 0.001, 'Epsilon used in the invertible value rescaling for n-step targets.'
+    'rescale_epsilon', 
+    0.001, 
+    'Epsilon used in the invertible value rescaling for n-step targets.'
 )
 flags.DEFINE_integer(
-    'n_step', 5, 'TD n-step bootstrap.'
+    'n_step', 
+    5, 
+    'TD n-step bootstrap.'
 )
 
 flags.DEFINE_integer(
-    'num_iterations', 100, 'Number of iterations to run.'
+    'num_iterations', 
+    100, 
+    'Number of iterations to run.'
 )
 flags.DEFINE_integer(
     'num_train_step', 
@@ -291,4 +337,94 @@ def main(argv):
     # so actors can later access it
     shared_params = manager.dict({'network': None})
 
+    # Create R2D2 learner instance
+    laerner_agent = agent.Learner(
+        network = network,
+        optimizer = optimizer,
+        replay = replay,
+        min_replay_size = FLAGS.min_replay_size,
+        target_net_update_interval = FLAGS.target_net_update_interval,
+        discount = FLAGS.discount,
+        burn_in = FLAGS.burn_in,
+        priority_eta = FLAGS.priority_eta,
+        rescale_epsilon = FLAGS.rescale_epsilon,
+        batch_size = FLAGS.batch_size,
+        n_step = FLAGS.n_step,
+        clip_grad = FLAGS.clip_grad,
+        max_grad_norm = FLAGS.max_grad_norm,
+        device = runtime_device,
+        shared_params = shared_params,
+    )
+
+    # Create actor environment, actor instances.
+    actor_envs = [
+        environment_builder() for _ in range(FLAGS.num_actors)
+    ]
+
+    actor_diveces = ['cpu'] * FLAGS.num_actors
+    # Evenly distribute the actors to all available GPUs
+    if torch.cuda.is_available() and FLAGS.actors_on_gpu:
+        num_gpus = torch.cuda.device_count()
+        actor_diveces = [
+            torch.device(f'cuda:{i % num_gpus}')
+            for i in random_state(FLAGS.num_actors)
+        ]
     
+    # Rank 0 is the most explorative actor, while rank N-1 is the most exploitative actor.
+    # Each actor has it's own network with different weights.
+    actors = [
+        agent.Actor(
+            rank = 1,
+            data_queue = data_queue,
+            network = copy.deepcopy(network),
+            random_state = np.random.RandomState(FLAGS.seed + int(i)),  # pylint: disable=no-member
+            num_actors = FLAGS.num_actors,
+            action_dim = action_dim,
+            unroll_length = FLAGS.unroll_length,
+            burn_in = FLAGS.burn_in,
+            actor_update_interval = FLAGS.actor_update_interval,
+            device = actor_diveces[i],
+            shared_params = shared_params,
+        )
+        for i in range(FLAGS.num_actors)
+    ]
+
+    # Create evaluation agent instance
+    eval_agent = greedy_actors.R2d2EpsilonGreedActor(
+        network = network,
+        exploration_epsilon = FLAGS.eval_exploration_epsilon,
+        random_state = random_state,
+        device = runtime_device,
+    )
+
+    # Setup checkpoint.
+    checkpoint = PyTorchCheckpoint(
+        environment_name = FLAGS.environment_name,
+        agent_name = 'R2D2',
+        save_dir = FLAGS.checkpoint_dir,
+    )
+    checkpoint.register_pair(('network', network))
+
+    # Run parallel training iterations.
+    main_loop.run_parallel_training_iterations(
+        num_iterations = FLAGS.num_iterations,
+        num_train_steps = FLAGS.num_train_steps,
+        num_eval_steps = FLAGS.num_eval_steps,
+        laerner_agent = laerner_agent,
+        eval_agent = eval_agent,
+        eval_env = eval_env,
+        actors = actors,
+        actor_envs = actor_envs,
+        data_queue = data_queue,
+        checkpoint = checkpoint,
+        csv_file = FLAGS.results_csv_path,
+        use_tensorboard = FLAGS.use_tensorboard,
+        tag = FLAGS.tag,
+        debug_screenshots_interval = FLAGS.debug_screenshots_interval,
+    )
+
+
+if __name__ == '__main__':
+    # Set multiprocessing start mode
+    multiprocessing.set_start_method('spawn')
+    app.run(main)
