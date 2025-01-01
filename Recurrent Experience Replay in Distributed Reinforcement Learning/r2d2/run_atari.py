@@ -173,3 +173,122 @@ flags.register_validator(
 )
 
 
+def main(argv):
+    """
+    Trains R2D2 agent on Atari.
+    """
+    del argv
+
+    runtime_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logging.info(f'Runs R2D2 agent on {runtime_device}')
+    np.random.seed(FLAGS.seed)
+    torch.manual_seed(FLAGS.seed)
+    
+    if torch.backends.cudnn.enabled:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    
+    random_state = np.random.RandomState(FLAGS.seed)    # pylint: disable=no-member
+
+    # Create evaluation envrionment, like R2D2, we disable terminate-on-life-loss and clip reward.
+    def environment_builder():
+        return gym_env.create_atari_environment(
+            env_name = FLAGS.environment_name,
+            frame_height = FLAGS.environment_height,
+            frame_width = FLAGS.environment_width,
+            frame_skip = FLAGS.environment_frame_skip,
+            frame_stack = FLAGS.environment_frame_stack,
+            max_episode_steps = FLAGS.max_episode_steps,
+            seed = random_state.randint(1, 2**10),
+            noop_max = 30,
+            terminal_on_life_loss = True,
+            sticky_action = False,
+            clip_reward = False,
+        )
+    
+    eval_env = environment_builder()
+
+    state_dim = eval_env.observation_space.shape
+    action_dim = eval_env.action_space.n
+
+    logging.info('Environment: %s', FLAGS.environment_name)
+    logging.info('Action spec: %s', action_dim)
+    logging.info('Observation spec: %s', state_dim)
+
+    # Test environment and state shape.
+    obs = eval_env.reset()
+    assert isinstance(obs, np.ndarray)
+    assert obs.shape == (
+        FLAGS.environment_frame_stack,
+        FLAGS.environment_height,
+        FLAGS.environment_width,
+    )
+
+    # Create network for learner to optimize, actor will use the same network with share memory.
+    network = R2d2DqnConvNet(
+        state_dim=state_dim, action_dim=action_dim
+    )
+    optimizer = torch.optim.Adam(
+        network.parameters(),
+        lr = FLAGS.learning_rate,
+        eps = FLAGS.adam_eps,
+    )
+
+    # Test network output.
+    x = RnnDqnNetworkInputs(
+        s_t = torch.from_numpy(obs[None, None, ...]).float(),
+        a_tm1 = torch.zeros(1, 1).long(),
+        r_t = torch.zeros(1, 1).float(),
+        hidden_s = network.get_initial_hidden_state(1),
+    )
+    network_output = network(x)
+    assert network_output.q_values.shape == (1, 1, action_dim)
+    assert len(network_output.hidden_s) == 2
+
+    # Create prioritized transition replay, no importance_sampling_exponent decay
+    importance_sampling_exponent = FLAGS.importance_sampling_exponent
+
+    def importance_sampling_exponent_schedule(x):
+        return importance_sampling_exponent
+    
+    if FLAGS.compress_state:
+
+        def encoder(transition):
+            return transition._replace(
+                s_t = replay_lib.compress_array(transition.s_t),
+            )
+        
+        def decoder(transition):
+            return transition._replace(
+                s_t = replay_lib.uncompress_array(transition.s_t),
+            )
+    
+    else:
+        encoder = None
+        decoder = None
+    
+    replay = replay_lib.Prioritizedreplay(
+        capacity = FLAGS.replay_capacity,
+        structure = agent.TransitionsStructure,
+        priority_exponent = FLAGS.priority_exponent,
+        importance_sampling_exponent = importance_sampling_exponent_schedule(),
+        normalize_weights = FLAGS.normalize_weights,
+        random_state = random_state,
+        time_major = True,
+        encode = encoder(),
+        decoder = decoder(),
+    )
+
+    # Create queue to shared transitions between actors and learner
+    data_queue = multiprocessing.Queue(
+        maxsize=FLAGS.num_actors * 2
+    )
+
+    # Create shared objects so all actors processes can access them
+    manager = multiprocessing.Manager()
+
+    # Store copy of latest parameters of the nn in a shared directory,
+    # so actors can later access it
+    shared_params = manager.dict({'network': None})
+
+    
