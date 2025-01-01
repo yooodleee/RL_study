@@ -562,3 +562,128 @@ class NStepTransitionAccumulator:
         self._a_tm1 = None
 
 
+class Unroll:
+    """
+    Unroll transitions to a specific timestep, used for RNN networks
+    like R2D2, IMPALA, support cross episodes and do not cross episodes.
+    """
+
+    def __init__(
+        self,
+        unroll_length: int,
+        overlap: int,
+        structure: ReplayStructure,
+        cross_episode: bool = True
+    )-> None:
+        """
+        Args:
+            unroll_weight: the unroll length
+            overlap: adjacent unrolls overlap.
+            structure: transition structure, used to stack sequence of unrolls
+                into a single transition.
+            cross_episode: should unroll cross episode, default on.
+        """
+
+        self.structure = structure
+        self._unroll_length = unroll_length
+        self._overlap = overlap
+        self._full_unroll_length = unroll_length + overlap
+        self._cross_episode = cross_episode
+
+        self._storage = collections.deque(
+            maxlen=self._full_unroll_length
+        )
+
+        # Persist last unrolled transitions incase not cross episode.
+        # Sometimes the episode ends without reaching a full 'unroll length',
+        # we will reuse some transition from last unroll to try to make a 'full length unroll'.
+        self._last_unroll = None
+
+    def add(
+        self, transition: Any, doen: bool
+    )-> Union[ReplayStructure, None]:
+        """
+        Add new transition into storage.
+        """
+        self._storage.append(transition)
+
+        if self.full:
+            return self._pack_unroll_into_single_transition()
+        if done:
+            return self._handle_episode_end()
+        return None
+    
+    def _pack_unroll_into_single_transition(
+        self
+    )-> Union[ReplayStructure, None]:
+        """
+        Return a single transition object with transitions stacked with
+        the unroll structure.
+        """
+        if not self.full:
+            return None
+        
+        _sequence = list(self._storage)
+        # Save for last use.
+        self._last_unroll = copy.deepcopy(_sequence)
+        self._storage.clear()
+
+        # Handling adjacnet unroll sequences overlapping
+        if self._overlap > 0:
+            for transition in _sequence[-self._overlap :]:  # noqa: E203
+                self._storage.append(transition)
+        return self._stack_unroll(_sequence)
+    
+    def _handle_episode_end(
+        self
+    )-> Union[ReplayStructure, None]:
+        """
+        Handle episode end, incase no cross episodes, try to build a full
+        unroll if last unroll is available.
+        """
+        if self._cross_episode:
+            return None
+        if self.size > 0 and self._last_unroll is not None:
+            # Incase episode ends without reaching a full 'unroll length'
+            # Use whatever we got from current unroll, fill in the missing ones 
+            # from previous sequence
+            _suffix = list(self._storage)
+            _prefix_indices = self._full_unroll_length - len(_suffix)
+            _prefix = self._last_unroll[-_prefix_indices]
+            _sequence = list(itertools.chain(_prefix, _suffix))
+            return self._stack_unroll(_sequence)
+        else:
+            return None
+
+    def reset(self):
+        """
+        Reset unroll storage.
+        """ 
+        self._storage.clear()
+        self._last_unroll = None
+    
+    def _stack_unroll(self, sequence):
+        if len(sequence) != self._full_unroll_length:
+            raise RuntimeError(
+                f'Expect sequence length to be {self._full_unroll_length}, got {len(sequence)}'
+            )
+        return np_stack_list_of_transitions(sequence, self.structure)
+    
+    @property
+    def size(self):
+        """
+        Return current unroll size.
+        """
+        return len(self._storage)
+    
+    @property
+    def full(self):
+        """
+        return is unroll full.
+        """
+        return len(self._storage) == self._storage.maxlen
+
+
+def stack_list_of_transitions(
+    
+)
