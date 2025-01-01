@@ -191,5 +191,82 @@ flags.DEFINE_string(
 
 def main(argv):
     """
-    Trains
+    Trains R2D2 agent on classic control tasks.
     """
+    del argv
+
+    runtime_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logging.info(f'Run R2D2 agent on {runtime_device}')
+    np.random.seed(FLAGS.seed)
+    torch.manual_seed(FLAGS.seed)
+
+    if torch.backends.cudnn.enabled:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    
+    random_state = np.random.RandomState(FLAGS.seed)    # pylint: disable=no-member
+
+    # Create environment.
+    def environment_builder():
+        return gym_env.create_classic_environment(
+            env_name = FLAGS.environment_name,
+            seed = random_state.randint(1, 2**10),
+        )
+
+    eval_env = environment_builder()
+
+    state_dim = eval_env.observation_space.shape[0]
+    action_dim = eval_env.action_space.n
+
+    logging.info('Environment: %s', FLAGS.environment_name)
+    logging.info('Action spec: %s', action_dim)
+    logging.info('Observation spec: %s', state_dim)
+
+    # Create network for learner to optimize, actor will use the same network with share memory.
+    network = R2d2DqnMlpNet(state_dim = state_dim, action_dim = action_dim)
+    optimizer = torch.optim.Adam(
+        network.parameters(),
+        lr = FLAGS.learning_rate,
+        eps = FLAGS.adam_eps,
+    )
+
+    # Test network output.
+    obs = eval_env.reset()
+    x = RnnDqnNetworkInputs(
+        s_t = torch.from_numpy(obs[None, None, ...]).float(),
+        a_tm1 = torch.zeros(1, 1).long(),
+        r_t = torch.zeros(1, 1).float(),
+        hidden_s = network.get_initial_hidden_state(1),
+    )
+    network_output = network(x)
+    assert network_output.q_values.shape == (1, 1, action_dim)
+    assert len(network_output.hidden_s) == 2
+
+    # Create prioritized transition replay, no importance_sampling_exponent decay
+    importance_sampling_exponent = FLAGS.importance_sampling_exponent
+
+    def importance_sampling_exponent_schedule(x):
+        return importance_sampling_exponent
+    
+    replay = replay_lib.PrioritizedReplay(
+        capacity = FLAGS.replay_capacity,
+        structure = agent.TransitionStructure,
+        priority_exponent = FLAGS.priority_exponent,
+        importance_sampling_exponent = importance_sampling_exponent,
+        normalize_weights = FLAGS.normalize_weights,
+        random_state = random_state,
+        time_major = True,
+    )
+
+    # Create queue to shared transitions between actors and learner
+    data_queue = multiprocessing.Queue(maxsize=FLAGS.num_actors * 2)
+
+    # Create shared objects so all actors processes can access them
+    manager = multiprocessing.Manager()
+
+    # Store copy of latest parameters of the neural network in a shared dictionary,
+    # so actors can later access it
+    shared_params = manager.dict({'network': None})
+
+    # Create R2D2 learner instance
+    
