@@ -400,3 +400,79 @@ class GradientReplay(Generic[ReplayStructure]):
         return self._num_added
 
 
+class TransitionAccumulator:
+    """
+    Accumulates timesteps to form transitions.
+    """
+
+    def __init__(self):
+        self._timestep_tm1 = None
+        self._a_tm1 = None
+
+    def step(
+        self,
+        timestep_t: types_lib.TimeStep,
+        a_t: int
+    )-> Iterable[Transition]:
+        """
+        Accumulates timestep and resulting action, maybe yield a transition.
+
+        We only need the s_t, r_t, and done flag for a given timestep_t
+        the first timestep yield nothing since we don't have a full transition
+
+        if the given timestep_t transition is terminal state, we need to reset the state of the accumulator,
+        so the next timestep which is the start of a new episode yields nothing
+        """
+        if timestep_t.first:
+            self.reset()
+        
+        if self._timestep_tm1 is None:
+            if not timestep_t.first:
+                raise ValueError(
+                    f'Expected first timestep, got {str(timestep_t)}'
+                )
+            self._timestep_tm1 = timestep_t
+            self._a_tm1 = a_t
+            return  # Empty iterable.
+
+        transition = Transition(
+            s_tm1 = self._timestep_tm1.observation,
+            a_tm1 = self.a_tm1,
+            r_t = timestep_t.reward,
+            s_t = timestep_t.observation,
+            done = timestep_t.done,
+        )
+        self._timestep_tm1 = timestep_t
+        self._a_tm1 = a_t
+        yield transition
+    
+    def reset(self)-> None:
+        """
+        Rests the accumulator.
+        Following timestep is expected to be 'FIRST'.
+        """
+        self._timestep_tm1 = None
+        self._a_tm1 = None
+
+
+def _build_n_step_transition(
+    transitions: Iterable[Transition],
+    discount: float,
+)-> Transition:
+    """
+    Builds a single n-step transition from n 1-step transitions.
+    """
+    r_t = 0.0
+    discount_t = 1.0
+    for transition in transitions:
+        r_t += discount_t * transition.r_t
+        discount_t *= discount
+    
+    return Transition(
+        s_tm1 = transitions[0].s_tm1,
+        a_tm1 = transitions[0].a_tm1,
+        r_t = r_t,
+        s_t = transitions[-1].s_t,
+        done = transitions[-1].done,
+    )
+
