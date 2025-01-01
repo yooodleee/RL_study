@@ -283,4 +283,120 @@ class PrioritizedReplay:
         for index, priority in zip(indices, priorities):
             self._priorities[index] = priority
     
+    @property
+    def stack_dim(self)-> int:
+        """
+        Stack dimension, for RNN we may need to make the tensor time major 
+        by stacking on second dimension as [T, B, ...].
+        """
+        if self._time_major:
+            return 1
+        else:
+            return 0
     
+    @property
+    def size(self)-> None:
+        """
+        Number of elements currently contained in replay.
+        """
+        return min(self._num_added, self._capacity)
+    
+    @property
+    def capacity(self)-> None:
+        """
+        Total capacity of replay (maximum number of items that can be stored.)
+        """
+        return self._capacity
+    
+    @property
+    def importance_sampling_exponent(self):
+        """
+        Importance sampling exponent at current step.
+        """
+        return self._importance_sampling_exponent(self._num_added)
+
+
+class GradientReplay(Generic[ReplayStructure]):
+    """
+    Store and retrieve aggregated network gradients for training A2C agent
+    with gradients parallelism method.
+    """
+
+    def __init__(
+        self,
+        capacity: int,
+        network: torch.nn.Module,
+        compress: bool,
+    )-> None:
+        if capacity <= 0:
+            raise ValueError(
+                f'Expect capacity to be a positive integer, got {capacity}'
+            )
+        super().__init__()
+        self._capacity = capacity
+        self._decode = uncompress_array if compress else lambda s: s
+
+        self._num_added = 0
+
+        # Get number of layers in the network
+        params = list(network.parameters())
+        self._num_layers = len(params)
+        del params
+
+        # Create a list of lists (for each layer) to store gradients
+        # with outer list size num_layers, inner list size maxsize
+        self._gradients = [
+            [None] * self._capacity for _ in range(self._num_layers)
+        ]
+    
+    def add(
+        self, gradients: List[np.ndarray]
+    )-> None:
+        """
+        Store extracted gradients with [param.grad.data.cpu().numpy()
+        for param net.parameters()]
+        """
+        assert len(gradients) == self._num_layers
+
+        for i, grad_layer_i in enumerate(gradients):    # for each layer
+            j = self._num_added % self._capacity    # current batch index
+            self._gradients[i][j] = self._decode(grad_layer_i)
+
+        self._num_added += 1
+    
+    def sample(self)-> List[np.ndarray]:
+        """
+        Aggregate stored gradients by batch size and clear internal state
+        """
+        gradients = []
+
+        for batch_grad_layer_i in self._gradients:
+            grad_array = np.stack(
+                batch_grad_layer_i, axis=0
+            ).astype(np.float32)    # [batch_size, layer_shape]
+            gradients.append(grad_array)
+        
+        self.reset()
+        return gradients
+    
+    def reset(self)-> None:
+        """
+        Reset size counter is enough.
+        """
+        self._num_added = 0
+    
+    @property
+    def num_layers(self)-> int:
+        """
+        Returns number of layers in the network.
+        """
+        return self._num_layers
+    
+    @property
+    def size(self)-> int:
+        """
+        Returns added samples.
+        """
+        return self._num_added
+
+
