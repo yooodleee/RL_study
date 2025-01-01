@@ -476,3 +476,89 @@ def _build_n_step_transition(
         done = transitions[-1].done,
     )
 
+
+class NStepTransitionAccumulator:
+    """
+    Accumulates timesteps to form n-step transitions.
+
+    Let `t` be the index of timestep within an episode and `T` be the index of
+    the final timestep within an episode. Then given the step type of the timestep
+    passed into `step()` the accumulator will:
+    *   `FIRST`: yield nothing.
+    *   `MID`: if `t < n`, yield nothing, else yield one n-step transition
+        `s_{t - n} -> s_t`.
+    *   `LAST`: yield all transitions that end at `s_t = s_T` from up to n steps
+        away, specifically, `s_{T - min(n, T)} -> s_T, ..., s_{T - 1} -> s_T`.
+        These are `min(n, T)`-step, ..., `1`-step transitions.
+    """
+
+    def __init__(self, n, discount):
+        self._discount = discount
+        self._transitions = collections.deque(maxlen=n) # Store 1-step transitions.
+        self._timestep_tm1 = None
+        self._a_tm1 = None
+
+    def step(
+        self,
+        timestep_t: types_lib.TimeStep,
+        a_t: int
+    )-> Iterable[Transition]:
+        """
+        Accumulates timestep and resulting action, yields transitions.
+        """
+        if timestep_t.first:
+            self.reset()
+        
+        # There are no transitions on the first timestep.
+        if self._timestep_tm1 is None:
+            assert self._a_tm1 is None
+            if not timestep_t.first:
+                raise ValueError(
+                    f'Expected first timestep, got {str(timestep_t)}'
+                )
+            self._timestep_tm1 = timestep_t
+            self._a_tm1 = a_t
+            return  # Empty iterable.
+        
+        self._transitions.append(
+            Transition(
+                s_tm1 = self._timestep_tm1.observation,
+                a_tm1 = self._a_tm1,
+                r_t = timestep_t.reward,
+                s_t = timestep_t.observation,
+                done = timestep_t.done,
+            )
+        )
+
+        self._timestep_tm1 = timestep_t
+        self._a_tm1 = a_t
+
+        if timestep_t.done:
+            # Yield any remaining n, n-1, ..., 1-step transitions at episode end.
+            while self._transitions:
+                yield _build_n_step_transition(
+                    self._transitions, self._discount
+                )
+                self._transitions.popleft()
+        else:
+            # Wait for n transitions before yielding anything.
+            if len(self._transitions) < self._transitions.maxlen:
+                return  # Empty iterable.
+            
+            assert len(self._transitions) == self._transitions.maxlen
+
+            # This is the typical case, yield a single n-step transition.
+            yield _build_n_step_transition(
+                self._transitions, self._discount
+            )
+    
+    def reset(self)-> None:
+        """
+        Resets the accumulator.
+        Following timestep is expected to be FIRST.
+        """
+        self._transitions.clear()
+        self._timestep_tm1 = None
+        self._a_tm1 = None
+
+
