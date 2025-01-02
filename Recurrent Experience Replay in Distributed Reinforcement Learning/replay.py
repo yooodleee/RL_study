@@ -600,7 +600,7 @@ class Unroll:
         self._last_unroll = None
 
     def add(
-        self, transition: Any, doen: bool
+        self, transition: Any, done: bool
     )-> Union[ReplayStructure, None]:
         """
         Add new transition into storage.

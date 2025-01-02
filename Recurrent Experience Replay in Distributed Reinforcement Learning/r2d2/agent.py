@@ -18,15 +18,15 @@ import torch
 from torch import nn
 
 # pylint: disable=import-error
-import deep_rl_zoo.replay as replay_lib
-import deep_rl_zoo.types as types_lib
+import replay as replay_lib
+import types as types_lib
 from deep_rl_zoo import (
     base,
     multistep,
     distributed,
     transforms,
 )
-from deep_rl_zoo.networks.value import RnnDqnNetworkInputs
+from networks.value import RnnDqnNetworkInputs
 
 torch.autograd.set_detect_anomaly(True)
 

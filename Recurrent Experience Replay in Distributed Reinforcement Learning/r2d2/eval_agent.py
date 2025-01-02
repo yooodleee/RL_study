@@ -7,8 +7,8 @@ import numpy as np
 import torch
 
 # pylint: disable-import-error
-from deep_rl_zoo.networks.value import R2d2DqnMlpNet, R2d2DqnConvNet
-from deel_rl_zoo.checkpoint import PyTorchCheckpoint
+from networks.value import R2d2DqnMlpNet, R2d2DqnConvNet
+from checkpoint import PyTorchCheckpoint
 from deep_rl_zoo import main_loop, gym_env, greedy_actors
 
 

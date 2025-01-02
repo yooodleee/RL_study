@@ -15,9 +15,9 @@ import torch
 import copy
 
 # pylint: disable=import-error
-from deel_rl_zoo.networks.value import R2d2DqnMlpNet, RnnDqnNetworkInputs
+from networks.value import R2d2DqnMlpNet, RnnDqnNetworkInputs
 from r2d2 import agent
-from deep_rl_zoo.checkpoint import pyTorchCheckpoint
+from checkpoint import pyTorchCheckpoint
 from deep_rl_zoo import (
     main_loop,
     gym_env,
