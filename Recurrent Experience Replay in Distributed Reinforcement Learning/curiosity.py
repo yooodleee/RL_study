@@ -6,4 +6,4 @@ from typing import NamedTuple, Dict
 import numpy as np
 import torch
 import base
-import nonmalizer
+import normalizer
