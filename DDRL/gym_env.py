@@ -456,3 +456,14 @@ class ObservationChannelFirst(gym.ObservationWrapper):
         )
 
 
+class ObservationToNumpy(gym.ObservationWrapper):
+    """
+    Make the observation into numpy ndarrays.
+    """
+
+    def observation(self, obs):
+        return np.asarray(
+            obs, dtype=self.observation_space.dtype
+        )
+
+
