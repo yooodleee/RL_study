@@ -9,6 +9,7 @@ import gym.wrappers
 import gym.wrappers
 import gym.wrappers
 import gym.wrappers
+import gym.wrappers
 import gym.wrappers.clip_action
 import gym.wrappers.time_limit
 import numpy as np
@@ -451,7 +452,9 @@ class ObservationChannelFirst(gym.ObservationWrapper):
     
     def observation(self, obs):
         # Permute [H, W, C] array to in the range [C, H, W]
-        # return np.transpose(observation, axes=(2, 0, 1)).astype(self.observation_space.dtype)
+        # return np.transpose(
+        #   observation, axes=(2, 0, 1)
+        # ).astype(self.observation_space.dtype)
         obs = np.asarray(
             obs, dtype=self.observation_space.dtype
         ).transpose(2, 0, 1)
@@ -536,12 +539,16 @@ def create_atari_environment(
             of each episode to reduce determinism. These no-ops are appled at a
             low-level, before frame skipping.
         max_episode_steps: maximum steps for an episode.
-        obscure_epsilon: with epsilon probability [0.0, 1.0), obscure the state to make it POMDP.
+        obscure_epsilon: with epsilon probability [0.0, 1.0), obscure the state 
+            to make it POMDP.
         terminal_on_life_loss: if True, mark end of game when loss a life, default off.
         clip_reward: clip reward in the range of [-1, 1], default on.
-        sticky_action: if True, randomly re-use last action with 0.25 probability, default on.
-        scale_on: scale the frame by divide 255, turn this on may require 4-5x more RAM when using experience replay, default off.
-       channel_first: if True, change observation image from shape [H, W, C] to in the range [C, H, W], this is for PyTorch only, default on. 
+        sticky_action: if True, randomly re-use last action with 0.25 probability,
+            default on.
+        scale_on: scale the frame by divide 255, turn this on may require 4-5x more RAM 
+            when using experience replay, default off.
+        channel_first: if True, change observation image from shape [H, W, C] to in the range [C, H, W],
+            this is for PyTorch only, default on. 
     
     Returns:
         preprocessed gym.Env for Atari games.
@@ -613,8 +620,10 @@ def create_classic_environment(
     Args:
         env_name: the environment name with version attached.
         seed: seed the runtime.
-        max_abs_reward: clip reward in the range of [-max_abs_reward, max_abs_reward], default off.
-        obscure_epsilon: with epsilon probability [0.0, 1.0) obscure the state to make it POMDP.
+        max_abs_reward: clip reward in the range of [-max_abs_reward, max_abs_reward],
+            default off.
+        obscure_epsilon: with epsilon probability [0.0, 1.0) obscure the state 
+            to make it POMDP.
 
     Returns:
         gym.Env for classic control tasks.
@@ -662,8 +671,12 @@ def create_continuous_environment(
 
     # Optionally clipping the observation and rewards.
     # Notice using lambda function does not work with python multiprocessing
-    # env = gym.wrappers.TransformObservation(env, lambda reward: np.clip(obs, -max_abs_obs, max_abs_obs))
-    # env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -max_abs_reward, max_abs_reward))
+    # env = gym.wrappers.TransformObservation(
+    #           env, lambda reward: np.clip(obs, -max_abs_obs, max_abs_obs)
+    # )
+    # env = gym.wrappers.TransformReward(
+    #           env, lambda reward: np.clip(reward, -max_abs_reward, max_abs_reward)
+    # )
     env = ClipObservationWithBound(env, max_abs_obs)
     env = ClipRewardWithBound(env, max_abs_reward)
 
@@ -674,3 +687,71 @@ def create_continuous_environment(
     return env
 
 
+def play_and_record_video(
+    agent: types_lib.Agent,
+    env: gym.Env,
+    save_dir: str = './recordings',
+)-> None:
+    """
+    Self-play and record a video for a single game.
+
+    Args:
+        env: the gym environment to play.
+        agent: the agent which should have step() method return action for 
+            a given state.
+        save_dir: the recording video file directory, default to 
+            'recordings/{agent_name}_{env.spec.id}_{timestamp}'.
+
+    Raises:
+        if agent is not an instance of types_lib.Agent.
+    """
+
+    if not isinstance(agent, types_lib.Agent):
+        raise RuntimeError(
+            'Expect agent to have a callable step() method.'
+        )
+    
+    # Create dir if needed
+    if save_dir is not None and save_dir != '' \
+        and not os.path.exists(save_dir):
+        _dir = Path(save_dir)
+        _dir.mkdir(parents=True, exist_ok=False)
+    
+    assert os.path.exists(save_dir) and os.path.isdir(save_dir)
+
+    # Create a sub folder with name env.id + timestamp
+    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    full_save_dir = os.path.join(
+        save_dir, f'{agent.agent_name}_{env.spec.id}_{ts}'
+    )
+    logging.info(
+        f'Recording self-play video at "{full_save_dir}'
+    )
+
+    env = gym.wrappers.RecordVideo(env, full_save_dir)
+
+    observation = env.reset()
+    agent.reset()
+
+    reward = 0.0
+    done = False
+    first_step = True
+
+    t = 0
+
+    while True:
+        timestep_t = types_lib.TimeStep(
+            observation=observation,
+            reward=reward,
+            done=done,
+            first=first_step,
+            info=None,  # No tracking here
+        )
+        a_t = agent.step(timestep_t)
+        observation, reward, done, _ = env.step(a_t)
+        t += 1
+
+        first_step = False
+        if done: break
+    
+    env.close()
