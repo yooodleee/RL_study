@@ -467,3 +467,20 @@ class ObservationToNumpy(gym.ObservationWrapper):
         )
 
 
+class ClipObservationWithBound(gym.ObservationWrapper):
+    """
+    Make the observation into [-max_abs_value, max_abs_value].
+    """
+
+    def __init__(
+        self, env, max_abs_value
+    ):
+        super().__init__(env)
+        self._max_abs_value = max_abs_value
+    
+    def observation(self, obs):
+        return np.clip(
+            obs, -self._max_abs_value, self._max_abs_value
+        )
+
+
