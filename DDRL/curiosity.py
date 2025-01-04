@@ -184,3 +184,77 @@ class EpisodicBounusModule:
         self._embedding_network.load_state_dict(state_dict)
 
 
+
+class RndLifeLongBonusModule:
+    """
+    RND lifelong intrinsic bonus module, used in NGU and Agent57.
+    """
+
+    def __init__(
+        self,
+        target_network: torch.nn.Module,
+        predictor_network: torch.nn.Module,
+        device: torch.device,
+        discount: float,
+    )-> None:
+        self._target_network = target_network.to(device = device)
+        self._predictor_network = predictor_network.to(device = device)
+        self._device = device
+        self._discount = discount
+
+        # RND module observation and lifeline intrinsic reward normalizers
+        self._int_reward_normalizer = normalizer.RnningMeanstd(shape = (1,))
+        self._rnd_obs_normalizer = normalizer.TorchRunningMeanStd(
+            shape = (1, 84, 84), device = self._device
+        )
+
+    @torch.no_grad()
+    def _normalize_rnd_obs(self, rnd_obs):
+        rnd_obs = rnd_obs.to(device = self._device, dtype = torch.float32)
+
+        normed_obs = self._rnd_obs_normalizer.normalize(rnd_obs)
+
+        normed_obs = normed_obs.clamp(-5, 5)
+
+        self._rnd_obs_normalizer.update_single(rnd_obs)
+
+        return normed_obs
+    
+    def _normalize_int_rewards(self, int_rewards):
+        """
+        Compute returns then normalize the intrinsic reward based on these returns
+        """
+        self._int_reward_normalizer.update_single(int_rewards)
+
+        normed_int_rewards = int_rewards / np.sqrt(self._int_reward_normalizer.var + 1e-8)
+
+        return normed_int_rewards.item()
+    
+    @torch.no_grad()
+    def compute_bonus(self, s_t: torch.Tensor)-> float:
+        """
+        Compute lifelong bonus for a given state.
+        """
+        base.assert_rank_and_dtype(
+            s_t, (2, 4), torch.float32
+        )
+
+        normed_s_t = self._normalize_rnd_obs(s_t)
+
+        pred = self._predictor_network(normed_s_t)
+        target = self._target_network(normed_s_t)
+
+        int_r_t = torch.square(
+            pred - target
+        ).mean(dim = 1).detach().cpu().numpy()
+
+        # Normalize intrinsic reward
+        normed_int_r_t = self._normalize_int_rewards(int_r_t)
+
+        return normed_int_r_t
+    
+    def update_predictor_network(self, state_dict: Dict)-> None:
+        """
+        Update RND predictor network.
+        """
+        self._predictor_network.load_state_dict(state_dict)
