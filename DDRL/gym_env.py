@@ -385,3 +385,27 @@ class VisitedRoomInfo(gym.Wrapper):
         return obs, rew, done, info
 
 
+class ObscureObservation(gym.ObservationWrapper):
+    """
+    Make the environment POMDP by obscure the state with probability epsilon.
+    this should be used before frame stack.
+    """
+
+    def __init__(self, env, epsilon: float = 0.0):
+        super().__init__(env)
+
+        if not 0.0 <= epsilon < 1.0:
+            raise ValueError(
+                f'Expect obscure epsilon should be between [0.0, 1), '
+                f'got {epsilon}'
+            )
+        self._eps = epsilon
+    
+    def observation(self, obs):
+        if self.env.unwrapped.np_random.random() <= self._eps:
+            obs = np.zeros_like(
+                obs, dtype=self.observation_space.dtype
+            )
+        return obs
+
+
