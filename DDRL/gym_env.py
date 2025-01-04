@@ -4,6 +4,7 @@ gym environment processing components.
 
 import os
 import datetime
+import gym.wrappers
 import numpy as np
 import cv2
 import logging
@@ -98,5 +99,27 @@ class FireOnReset(gym.Wrapper):
     
     def step(self, action):
         return self.env.step(action)
+
+
+class StickyAction(gym.Wrapper):
+    """
+    Repeats the last action with epsilon (default 0.25) probability.
+    """
+
+    def __init__(self, env, eps=0.25):
+        gym.Wrapper.__init__(self, env)
+        self.eps = eps
+        self.last_action = 0
+    
+    def step(self, action):
+        if np.random.uniform() < self.eps:
+            action = self.last_action
+        
+        self.last_action = action
+        return self.env.step(action)
+    
+    def reset(self, **kwargs):
+        self.last_action = 0
+        return self.env.reset(**kwargs)
 
 
