@@ -598,3 +598,36 @@ def create_atari_environment(
     return env
 
 
+def create_classic_environment(
+    env_name: str,
+    seed: int = 1,
+    max_abs_reward: int = None,
+    obscure_epsilon: float = 0.0,
+)-> gym.Env:
+    """
+    Process gym env for classic control tasks like CartPole, Lunarlander, MountainCar
+
+    Args:
+        env_name: the environment name with version attached.
+        seed: seed the runtime.
+        max_abs_reward: clip reward in the range of [-max_abs_reward, max_abs_reward], default off.
+        obscure_epsilon: with epsilon probability [0.0, 1.0) obscure the state to make it POMDP.
+
+    Returns:
+        gym.Env for classic control tasks.
+    """
+
+    env = gym.make(env_name)
+    
+    # Clip reward to max absolute reward bound
+    if max_abs_reward is not None:
+        env = RecordRawReward(env)
+        env = ClipRewardWithBound(env, abs(max_abs_reward))
+    
+    # Obscure observation with obscure_epsilon_probability
+    if obscure_epsilon > 0.0:
+        env = ObscureObservation(env, obscure_epsilon)
+    
+    return env
+
+
