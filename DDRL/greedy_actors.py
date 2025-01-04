@@ -568,3 +568,69 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
         }
 
 
+class PolicyGreedyActor(types_lib.Agent):
+    """
+    Agent that acts with a given set of policy network parameters.
+    """
+
+    def __init__(
+        self,
+        network: torch.nn.Module,
+        device: torch.device,
+        name: str = '',
+    ):
+        self.agent_name = name
+        self._device = device
+        self._network = network.to(device=device)
+    
+    def step(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Given current timestep, return best action.
+        """
+        return self.act(timestep)
+    
+    def act(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Selects action given a timestep.
+        """
+        return self._select_action(timestep)
+    
+    def reset(self)-> None:
+        """
+        Resets the agent's episodic state such as frame stack and action repeat.
+        This method should be called at the beginning of every episode.
+        """
+
+    @torch.no_grad()
+    def _select_action(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Samples action from policy at given state.
+        """
+        s_t = torch.tensor(
+            timestep.observation[None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+        pi_logits_t = self._network(s_t).pi_logits
+
+        # Sample an action
+        a_t = distributions.categorical_distribution(pi_logits_t).sample()
+
+        # # can also try act greedy
+        # prob-t = F.softmax(pi_logits, dim=1)
+        # a_t = torch.argmax(prob_t, dim=1)
+
+        return a_t.cpu().item()
+    
+    @property
+    def statistics(self)-> Mapping[Text, float]:
+        """
+        Empty statistics.
+        """
+        return {}
+    
+
