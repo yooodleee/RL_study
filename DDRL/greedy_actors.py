@@ -186,3 +186,71 @@ class DrqnEpsilonGreedyActor(EpsilonGreedyActor):
         self._lstm_state = self._network.get_initial_hidden_state(batch_size=1)
 
 
+class R2d2EpsilonGreedyActor(EpsilonGreedyActor):
+    """
+    R2D2 e-greedy actor.
+    """
+
+    def __init__(
+        self,
+        network: torch.nn.Module,
+        exploration_epsilon: float,
+        random_state: np.random.RandomState,    # pylint: disable=no-member
+        device: torch.device,
+    ):
+        super().__init__(
+            network,
+            exploration_epsilon,
+            random_state,
+            device,
+            'R2D2-greedy',
+        )
+        self._last_action = None
+        self._lstm_state = None
+    
+    @torch.no_grad()
+    def _select_action(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Samples action from eps-greedy policy wrt Q-values at given state.
+        """
+        s_t = torch.tensor(
+            timestep.observation[None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(
+            self._last_action
+        ).to(device=self._device, dtype=torch.float64)
+        r_t = torch.tensor(
+            timestep.reward
+        ).to(device=self._device, dtype=torch.float32)
+        hidden_s = tuple(
+            s.to(device=self._device) for s in self._lstm_state
+        )
+
+        network_output = self._network(
+            RnnDqnNetworkInputs(
+                s_t=s_t[None, ...],
+                a_tm1=a_tm1[None, ...],
+                r_t=r_t[None, ...],
+                hidden_s=hidden_s[None, ...],
+            )
+        )
+        q_t = network_output.q_values
+        self._lstm_state = network_output.hidden_s
+
+        a_t = apply_egreedy_policy(
+            q_t, self._exploration_epsilon, self._random_state
+        )
+        self._last_action = a_t
+        
+        return a_t
+    
+    def reset(self)-> None:
+        """
+        Reset hidden state to zeros at new episodes.
+        """
+        self._last_action = 0   # During the first step of a new episode, use 'fake' previous action from network pass
+        self._lstm_state = self._network.get_initial_hidden_state(batch_size=1)
+
+
