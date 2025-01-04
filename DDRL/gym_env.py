@@ -208,3 +208,51 @@ class MaxAndSkip(gym.Wrapper):
         return self.env.reset(**kwargs)
 
 
+class ResizeAndGrayscaleFrame(gym.ObservationWrapper):
+    """
+    Resize frames to 84x84, and grayscale image as done in the Nature paper.
+    """
+
+    def __init__(
+        self,
+        env, 
+        width=84,
+        height=84,
+        grayscale=True,
+    ):
+        super().__init__(env)
+
+        assert self.observation_space.dtype \
+                == np.unit8 and len(self.observation_space.shape) \
+                == 3
+        
+        self.frame_width = width
+        self.frame_height = height
+        self.grayscale = grayscale
+        num_channels = 1 if self.grayscale else 3
+
+        self.observation_space = Box(
+            low=0,
+            high=255,
+            shape=(self.frame_height, self.frame_width, num_channels),
+            dtype=np.unit8,
+        )
+    
+    def observation(self, obs):
+        # pylint: disable=no-member
+
+        if self.grayscale:
+            obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
+        obs = cv2.resize(
+            obs,
+            (self.frame_width, self.frame_height),
+            interpolation=cv2.INTER_AREA, 
+        )
+        # pylint: disable=no-member
+
+        if self.grayscale:
+            obs = np.expand_dims(obs, -1)
+        
+        return obs
+
+
