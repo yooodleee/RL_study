@@ -7,6 +7,9 @@ import datetime
 import gym.spaces
 import gym.wrappers
 import gym.wrappers
+import gym.wrappers
+import gym.wrappers
+import gym.wrappers.clip_action
 import gym.wrappers.time_limit
 import numpy as np
 import cv2
@@ -554,7 +557,7 @@ def create_atari_environment(
 
     # Change TimeLimit wrapper to 108,000 steps (30 min) as default in the
     # literature instead of OpenAI Gym's default of 100,000 steps.
-    env = gym.wrappers.time_limit(
+    env = gym.wrappers.TimeLimit(
         env.env, max_episode_steps=None if max_episode_steps <= 0 else max_episode_steps
     )
 
@@ -627,6 +630,46 @@ def create_classic_environment(
     # Obscure observation with obscure_epsilon_probability
     if obscure_epsilon > 0.0:
         env = ObscureObservation(env, obscure_epsilon)
+    
+    return env
+
+
+def create_continuous_environment(
+    env_name: str,
+    seed: int = 1,
+    max_abs_obs: int = 10,
+    max_abs_reward: int = 10,
+)-> gym.Env:
+    """
+    Process gym env for classic robotic control tasks like Humanoid, Ant.
+
+    Args:
+        env_name: the environment name with version attached.
+        seed: seed the runtime.
+        max_abs_obs: clip observation in the range of [-max_abs_obs, max_abs_obs],
+            defualt 10.
+        max_abs_reward: clip reward in the range of [-max_abs_reward, max_abs_reward],
+            default 10.
+
+    Returns:
+        gym.Env for classic roboric control tasks.
+    """
+
+    env = gym.make(env_name)
+
+    env = gym.wrappers.ClipAction(env)
+    env = gym.wrappers.NormalizeObservation(env)
+
+    # Optionally clipping the observation and rewards.
+    # Notice using lambda function does not work with python multiprocessing
+    # env = gym.wrappers.TransformObservation(env, lambda reward: np.clip(obs, -max_abs_obs, max_abs_obs))
+    # env = gym.wrappers.TransformReward(env, lambda reward: np.clip(reward, -max_abs_reward, max_abs_reward))
+    env = ClipObservationWithBound(env, max_abs_obs)
+    env = ClipRewardWithBound(env, max_abs_reward)
+
+    env.seed(seed)
+    env.action_space.seed(seed)
+    env.observation_space.seed(seed)
     
     return env
 
