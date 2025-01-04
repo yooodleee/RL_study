@@ -4,6 +4,7 @@ gym environment processing components.
 
 import os
 import datetime
+import gym.spaces
 import gym.wrappers
 import numpy as np
 import cv2
@@ -337,5 +338,25 @@ class LazyFrames(object):
     
     def frame(self, i):
         return self._force()[..., i]
+
+
+class ScaleFrame(gym.ObservationWrapper):
+    """
+    Scale frame by divide 255.
+    """
+
+    def __init__(self, env):
+        gym.ObservationWrapper.__init__(self, env)
+        self.observation_space = gym.spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=env.observation_space.shape,
+            dtype=np.float32,
+        )
+    
+    def observation(self, obs):
+        # Carefull! This undoes the memory optimization, use
+        # with smaller replay buffer only.
+        return np.array(obs).astype(np.float32) / 255.0
 
 
