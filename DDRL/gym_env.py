@@ -256,3 +256,41 @@ class ResizeAndGrayscaleFrame(gym.ObservationWrapper):
         return obs
 
 
+class FrameStack(gym.Wrapper):
+    """
+    Stack k last frames.
+    
+    Returns lazy array, which is much more memory efficient.
+    See also
+    --------
+    baselines.common.atari_wrappers.LazyFrames
+    """
+
+    def __init__(self, env, k):
+        gym.Wrapper.__init__(self, env)
+        self.k = k
+        self.frames = deque([], maxlen=k)
+        shape = env.observation_space.shape
+        self.observation_space = Box(
+            low=0,
+            high=255,
+            shape=(shape[:-1] + (shape[-1] * k)),
+            dtype=env.observation_space.dtype,
+        )
+    
+    def reset(self, **kwargs):
+        obs = self.env.reset(**kwargs)
+        for _ in range(self.k):
+            self.frames.append(obs)
+        return self._get_obs()
+    
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.frames.append(obs)
+        return self._get_obs(), reward, done, info
+    
+    def _get_obs(self):
+        assert len(self.frames) == self.k
+        return LazyFrames(list(self.frames))
+
+
