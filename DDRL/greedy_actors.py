@@ -634,3 +634,108 @@ class PolicyGreedyActor(types_lib.Agent):
         return {}
     
 
+class ImpalaGreedyActor(PolicyGreedyActor):
+    """
+    IMPALA greedy actor to do evaluation during training.
+    """
+
+    def __init__(
+        self,
+        network: torch.nn.Module,
+        device: torch.device,
+    )-> None:
+        
+        super().__init__(
+            network,
+            device,
+            'IMPALA',
+        )
+
+        self._last_action = None
+        self._hidden_s = self._network.get_initial_hidden_state(batch_size=1)
+    
+    def step(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Given timestep, return action a_t
+        """
+        a_t = self.act(timestep)
+
+        # Update local states after create the transition
+        self._last_action = a_t
+
+        return a_t
+    
+    def act(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Given state s_t and done marks, return an action.
+        """
+        a_t = self._choose_action(timestep)
+        return a_t
+    
+    def reset(self)-> None:
+        """
+        This method should be called at the beginning of every episode before take any action.
+        """
+        self._last_action = 0   # During the first step of a new episode, use 'fake' previous action for network pass
+        self._hidden_s = self._network.get_initial_hidden_state(batch_size=1)
+
+    @torch.no_grad()
+    def _choose_action(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Given state s_t, choose action a_t.
+        """
+        # IMPALA network requires more than just the state input, but also action, 
+        # and reward for last action opionally the last hidden state from LSTM
+        # and done mask if using LSTM
+        s_t = torch.tensor(
+            timestep.observation[None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(
+            self._last_action
+        ).to(device=self._device, dtype=torch.int64)
+        r_t = torch.tensor(
+            timestep.reward
+        ).to(device=self._device, dtype=torch.float32)
+        done = torch.tensor(
+            timestep.done
+        ).to(device=self._device, dtype=torch.bool)
+
+        hidden_s = tuple(
+            s.to(device=self._device) for s in self._hidden_s
+        )
+
+        network_output = self._network(
+            ImpalaActorCriticNetworkInputs(
+                s_t=s_t[None, ...],
+                a_tm1=a_tm1[None, ...],
+                r_t=r_t[None, ...],
+                done=done[None, ...],
+                hidden_s=hidden_s,
+            )
+        )
+        pi_logits_t = network_output.pi_logits.squeeze(0)   # Remove T dimension
+
+        # Sample an action
+        a_t = distributions.categorical_distribution(pi_logits_t).sample()
+
+        # # Can also try to act greedy
+        # prob_t = F.softmax(pi_logits, dim=-1)
+        # a_t = torch.argmax(prob_t, dim=-1)
+
+        self._hidden_s = network_output.hidden_s    # Save last hidden state for next pass
+        return a_t.cpu().item()
+    
+    @property
+    def statistics(self)-> Mapping[Text, float]:
+        """
+        Returns current actor's statistics as a dictionary.
+        """
+        return {}
+
+
