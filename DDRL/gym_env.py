@@ -74,3 +74,29 @@ class NoopReset(gym.Wrapper):
         return self.env.step(action)
 
 
+class FireOnReset(gym.Wrapper):
+    """
+    Take fire action on reset for environments like Breakout.
+    """
+
+    def __init__(self, env):
+        gym.Wrapper.__init__(self, env)
+        assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
+        assert len(env.unwrapped.get_action_meanings()) >= 3
+    
+    def reset(self, **kwargs):
+        self.env.reset(**kwargs)
+
+        obs, _, done, _ = self.env.step(1)
+        if done:
+            self.env.render(**kwargs)
+
+        obs, _, done, _ = self.env.step(2)
+        if done:
+            self.env.reset(**kwargs)
+        return obs
+    
+    def step(self, action):
+        return self.env.step(action)
+
+
