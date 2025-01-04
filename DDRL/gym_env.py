@@ -484,3 +484,19 @@ class ClipObservationWithBound(gym.ObservationWrapper):
         )
 
 
+class RecordRawReward(gym.Wrapper):
+    """
+    This wrapper will add non-clipped/unscaled raw reward to the info dict.
+    """
+
+    def step(self, action):
+        """
+        Take action and add non-clipped/unscaled raw reward to the info dict.
+        """
+
+        obs, reward, done, info = self.env.step(action)
+        info['raw_reward'] = reward
+
+        return obs, reward, done, info
+
+
