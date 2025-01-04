@@ -423,3 +423,36 @@ class ClipRewardWithBound(gym.RewardWrapper):
                 else max(min(reward, self.bound), -self.bound)
 
 
+class ObservationChannelFirst(gym.ObservationWrapper):
+    """
+    Make observation image channel first, this is for PyTorch only.
+    """
+
+    def __init__(self, env, scale_obs):
+        super().__init__(env)
+        old_shape = env.observation_space.shape
+        new_shape = (
+            old_shape[-1], old_shape[0], old_shape[1]
+        )
+        _low, _high = (0.0, 255) if not scale_obs else (0.0, 1.0)
+        new_dtype = env.observation_space.dtype \
+                    if not scale_obs else np.float32
+        self.observation_space = Box(
+            low=_low,
+            high=_high,
+            shape=new_shape,
+            dtype=new_dtype,
+        )
+    
+    def observation(self, obs):
+        # Permute [H, W, C] array to in the range [C, H, W]
+        # return np.transpose(observation, axes=(2, 0, 1)).astype(self.observation_space.dtype)
+        obs = np.asarray(
+            obs, dtype=self.observation_space.dtype
+        ).transpose(2, 0, 1)
+        # Make sure it's C-contiguous for compress state
+        return np.ascontiguousarray(
+            obs, dtype=self.observation_space.dtype
+        )
+
+
