@@ -409,3 +409,17 @@ class ObscureObservation(gym.ObservationWrapper):
         return obs
 
 
+class ClipRewardWithBound(gym.RewardWrapper):
+    """
+    Clip reward to in the range [-bound, bound]
+    """
+
+    def __init__(self, env, bound):
+        super().__init__(env)
+        self.bound = bound
+    
+    def reward(self, reward):
+        return None if reward is None \
+                else max(min(reward, self.bound), -self.bound)
+
+
