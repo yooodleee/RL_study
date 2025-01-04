@@ -139,3 +139,50 @@ class IqnEpsilonGreedyActor(EpsilonGreedyActor):
         )
     
 
+class DrqnEpsilonGreedyActor(EpsilonGreedyActor):
+    """
+    DRQN e-greedy actor.
+    """
+
+    def __init__(
+        self,
+        network: torch.nn.Module,
+        exploration_epsilon: float,
+        random_state: np.random.RandomState,    # pylint: disable=no-member
+        device: torch.device,
+    ):
+        super().__init__(
+            network,
+            exploration_epsilon,
+            random_state,
+            device,
+            'DRQN-greedy',
+        )
+        self._lstm_state = None
+    
+    @torch.no_grad()
+    def _select_action(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Samples action from eps-greedy policy wrt Q-values at given state.
+        """
+        s_t = torch.tensor(
+            timestep.observation[None, None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+        hidden_s = tuple(s.to(device=self._device) for s in self._lstm_state)
+        network_output = self._network(s_t, hidden_s)
+        q_t = network_output.q_values
+        self._lstm_state = network_output.hidden_s
+        
+        return apply_egreedy_policy(
+            q_t, self._exploration_epsilon, self._random_state
+        )
+    
+    def reset(self)-> None:
+        """
+        Reset hidden state to zeros at new episodes.
+        """
+        self._lstm_state = self._network.get_initial_hidden_state(batch_size=1)
+
+
