@@ -19,7 +19,7 @@ import gym
 
 # pylint: disable=import-error
 import trackers as trackers_lib
-import types as types_lib
+from . import types as types_lib
 from log import CsvWriter
 from checkpoint import PyTorchCheckpoint
 import gym_env

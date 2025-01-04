@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 # pylint: disable=import-error
-import types as types_lib
+from . import types as types_lib
 import distributions
 from networks.policy import ImpalaActorCriticNetworkInputs
 from networks.value import (

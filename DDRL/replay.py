@@ -24,7 +24,7 @@ import snappy
 
 
 # pylint: disable=import-error
-import types as types_lib
+from . import types as types_lib
 
 
 CompressedArray = Tuple[bytes, Tuple, np.dtype]
