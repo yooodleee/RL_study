@@ -360,3 +360,28 @@ class ScaleFrame(gym.ObservationWrapper):
         return np.array(obs).astype(np.float32) / 255.0
 
 
+class VisitedRoomInfo(gym.Wrapper):
+    """
+    Add number of unique visited rooms to the info dictionary.
+    For Atari games like MontezumaRevenge and Pitfall.
+    """
+
+    def __init__(self, env, room_address):
+        gym.Wrapper.__init__(self, env)
+        self.room_address = room_address
+        self.visited_rooms = set()
+    
+    def get_current_room(self):
+        ram = unwrap(self.env).ale.getRAM()
+        assert len(ram) == 128
+        return int(ram[self.room_address])
+    
+    def step(self, action):
+        obs, rew, done, info = self.env.step(action)
+        self.visited_rooms.add(self.get_current_room())
+        if done:
+            info['episode_visited_rooms'] = len(self.visited_rooms)
+            self.visited_rooms.clear()
+        return obs, rew, done, info
+
+
