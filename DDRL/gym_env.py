@@ -6,6 +6,8 @@ import os
 import datetime
 import gym.spaces
 import gym.wrappers
+import gym.wrappers
+import gym.wrappers.time_limit
 import numpy as np
 import cv2
 import logging
@@ -498,5 +500,101 @@ class RecordRawReward(gym.Wrapper):
         info['raw_reward'] = reward
 
         return obs, reward, done, info
+
+
+def create_atari_environment(
+    env_name: str,
+    seed: int = 1,
+    frame_skip: int = 4,
+    frame_stack: int = 4,
+    frame_height: int = 84,
+    frame_width: int = 84,
+    noop_max: int = 30,
+    max_episode_steps: int = 108000,
+    obscure_epsilon: float = 0.0,
+    terminal_on_life_loss: bool = False,
+    clip_reward: bool = True,
+    sticky_action: bool = True,
+    scale_obs: bool = False,
+    channel_first: bool = True,
+)-> gym.Env:
+    """
+    Process gym env for Atari games according to the Nature DQN paper.
+
+    Args:
+        env_name: the environment name without 'NoFrameskip' and version.
+        seed: seed the runtime.
+        frame_skip: the frequency at which the agent experiments the game,
+            the environment will also repeat action.
+        frame_stack: stack n last frames.
+        frame_height: height of the resized frame.
+        frame_width: width of the resized frame.
+        noop_max: maximum number of no-ops to apply at the beginning
+            of each episode to reduce determinism. These no-ops are appled at a
+            low-level, before frame skipping.
+        max_episode_steps: maximum steps for an episode.
+        obscure_epsilon: with epsilon probability [0.0, 1.0), obscure the state to make it POMDP.
+        terminal_on_life_loss: if True, mark end of game when loss a life, default off.
+        clip_reward: clip reward in the range of [-1, 1], default on.
+        sticky_action: if True, randomly re-use last action with 0.25 probability, default on.
+        scale_on: scale the frame by divide 255, turn this on may require 4-5x more RAM when using experience replay, default off.
+       channel_first: if True, change observation image from shape [H, W, C] to in the range [C, H, W], this is for PyTorch only, default on. 
+    
+    Returns:
+        preprocessed gym.Env for Atari games.
+    """
+
+    if 'NoFrameskip' in env_name:
+        raise ValueError(
+            f'Environment name should not include NoFrameskip, got {env_name}'
+        )
+    
+    env = gym.make(f'{env_name}NoFrameskip-v4')
+    env.seed(seed)
+
+    # Change TimeLimit wrapper to 108,000 steps (30 min) as default in the
+    # literature instead of OpenAI Gym's default of 100,000 steps.
+    env = gym.wrappers.time_limit(
+        env.env, max_episode_steps=None if max_episode_steps <= 0 else max_episode_steps
+    )
+
+    if noop_max > 0:
+        env = NoopReset(env, noop_max=noop_max)
+    if sticky_action:
+        env = StickyAction(env)
+    if frame_skip > 0:
+        env = MaxAndSkip(env, skip=frame_skip)
+    
+    # Obscure observation with obscure_epsilon probability
+    if obscure_epsilon > 0.0:
+        env = ObscureObservation(env, obscure_epsilon)
+    if terminal_on_life_loss:
+        env = LifeLoss(env)
+    
+    env = ResizeAndGrayscaleFrame(
+        env, width=frame_width, height=frame_height
+    )
+
+    if scale_obs:
+        env = ScaleFrame(env)
+
+    if clip_reward:
+        env = RecordRawReward(env)
+        env = ClipRewardWithBound(env)
+    
+    if frame_stack > 1:
+        env = FrameStack(env, frame_stack)
+    if channel_first:
+        env = ObservationChannelFirst(env, scale_obs)
+    else:
+        # This is required as LazeFrame object is not numpy.array.
+        env = ObservationToNumpy(env)
+    
+    if 'Montezuma' in env_name or 'pitfall' in env_name:
+        env = VisitedRoomInfo(
+            env, room_address=3 if 'Montezuma' in env_name else 1
+        )
+
+    return env
 
 
