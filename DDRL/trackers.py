@@ -135,3 +135,45 @@ class EpisodeTracker:
         }
 
 
+class StepRateTracker:
+    """
+    Tracks step rate, number of steps taken and duration since last reset.
+    """
+
+    def __init__(self):
+        self._num_steps_since_reset = None
+        self._start = None
+
+    def step(
+        self, env, timestep_t, agent, a_t
+    )-> None:
+        """
+        Accumulates statistics from timestep.
+        """
+        del (env, timestep_t, agent, a_t)
+
+        self._num_steps_since_reset += 1
+    
+    def reset(self)-> None:
+        """
+        Reset statistics.
+        """
+        self._num_steps_since_reset = 0
+        self._start = timeit.default_timer()
+    
+    def get(self)-> Mapping[Text, float]:
+        """
+        Returns statistics as a dictionary.
+        """
+        duration = timeit.default_timer() - self._start
+        if self._num_steps_since_reset > 0:
+            step_rate = self._num_steps_since_reset / duration
+        else:
+            step_rate = np.nan
+        return {
+            'step_rate': step_rate,
+            'num_steps_since_reset': self._num_steps_since_reset,
+            'duration': duration,
+        }
+
+
