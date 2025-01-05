@@ -265,3 +265,50 @@ class TensorboardStepRateTracker(StepRateTracker):
             )
 
 
+class TensorboardAgentStatisticsTracker:
+    """
+    Write agent statistics to tensorboard.
+    """
+
+    def __init__(self, writer: SummaryWriter):
+        self._total_steps = 0   # Keep track total number of steps, does not reset
+        self._writer = writer
+
+    def step(
+        self, env, timestep_t, agent, a_t
+    )-> None:
+        """
+        Accumulates statistics from timestep.
+        """
+        del(env, a_t)
+        self._total_steps += 1
+
+        # To improve performance, only logging at end of an episode.
+        # This should not block the training loop if there's any exception.
+        if timestep_t.done:
+            try:
+                stats = agent.statistics
+                if stats:
+                    for k, v in stats.items():
+                        if isinstance(v, (int, float)):
+                            self._writer.add_scalar(
+                                f'agent_statistics(env_steps)/{k}',
+                                v,
+                                self._total_steps,
+                            )
+            except Exception:
+                pass
+    
+    def reset(self)-> None:
+        """
+        Reset statistics.
+        """
+        pass
+
+    def get(self)-> Mapping[Text, float]:
+        """
+        Returns statistics as a dictionary.
+        """
+        return {}
+
+
