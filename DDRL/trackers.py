@@ -16,7 +16,7 @@ from typing import (
     Union,
 )
 import numpy as np
-from torch.utils.tensorboard import summary
+from torch.utils.tensorboard import SummaryWriter
 
 # pylint: disable=model-error
 import replay as replay_lib
@@ -175,5 +175,61 @@ class StepRateTracker:
             'num_steps_since_reset': self._num_steps_since_reset,
             'duration': duration,
         }
+
+
+class TensorboardEpisodeTracker(EpisodeTracker):
+    """
+    Extend EpisodeTracker to write to tensorboard.
+    """
+
+    def __init__(self, writer: SummaryWriter):
+        super().__init__()
+        self._total_steps = 0   # Keep track total number of steps, does not reset
+        self._total_episodes = 0    # Keep track total number of episodes, does not reset
+        self._writer = writer
+    
+    def step(
+        self, env, timestep_t, agent, a_t
+    )-> None:
+        super().step(env, timestep_t, agent, a_t)
+
+        self._total_steps += 1
+
+        # To improve performance, only logging at end of an episode.
+        if timestep_t.done:
+            self._total_episodes += 1
+            tb_steps = self._total_steps
+
+            # tracker per episode
+            episode_return = self._episode_returns[-1]
+            episode_step = self._episode_steps[-1]
+
+            # tracker per step
+            self._writer.add_scalar(
+                'performance(env_steps)/num_episodes',
+                self._total_episodes,
+                tb_steps,
+            )
+            self._writer.add_scalar(
+                'performance(env_steps)/episode_return',
+                episode_return,
+                tb_steps,
+            )
+            self._writer.add_scalar(
+                'performance(env_steps)/episode_steps',
+                episode_step,
+                tb_steps,
+            )
+
+            # For Atari games like MontezumaRevenge and Pitfall
+            if isinstance(
+                timestep_t.info, dict
+            ) and 'episode_visited_rooms' in timestep_t.info:
+                episode_visited_rooms = self._episode_visited_rooms[-1]
+                self._writer.add_scalar(
+                    'performance(env_steps)/episode_visited_rooms',
+                    episode_visited_rooms,
+                    tb_steps,
+                )
 
 
