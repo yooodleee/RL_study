@@ -312,3 +312,57 @@ class TensorboardAgentStatisticsTracker:
         return {}
 
 
+class TensorboardScreenshotTracker:
+    """
+    Take screenshots of the environment and add to tensorboard every N episodes.
+    This should be used for debugging only.
+    """
+
+    def __init__(
+        self,
+        writer: SummaryWriter,
+        log_interval: int = 100,
+    ):
+        self._total_steps = 0   # Keep track total number of steps, does not reset
+        self._total_episodes = 0    # Keep track total number of steps, does not reset
+        self._log_interval = log_interval
+        self._writer = writer
+    
+    def step(
+        self, env, timestep_t, agent, a_t
+    )-> None:
+        """
+        Accumulates statistics from timestep.
+        """
+        del(agent, a_t)
+
+        self._total_steps += 1
+
+        if timestep_t.done:
+            self._total_episodes += 1
+
+            if self._total_episodes % self._log_interval == 0:
+                try:
+                    img = env.render(mode='rgb_array')
+                    self._writer.add_image(
+                        f'debug(episode)/episode_{self._total_episodes}',
+                        img,
+                        self._total_steps,
+                        dataformats='HWC',
+                    )
+                except Exception:
+                    pass
+    
+    def reset(self)-> None:
+        """
+        Reset statistics.
+        """
+        pass
+
+    def get(self)-> Mapping[Text, float]:
+        """
+        Returns statistics as a dictionary.
+        """
+        return {}
+
+
