@@ -233,3 +233,35 @@ class TensorboardEpisodeTracker(EpisodeTracker):
                 )
 
 
+class TensorboardStepRateTracker(StepRateTracker):
+    """
+    Extend stepRateTracker to write to tensorboard, for single thread training
+        agent only.
+    """
+
+    def __init__(self, writer: SummaryWriter):
+        super().__init__()
+
+        self._total_steps = 0   # Keep track total number of steps, does not reset
+        self._writer = writer
+
+    def step(
+        self, env, timestep_t, agent, a_t
+    )-> None:
+        """
+        Accumulates statistics from timestep.
+        """
+        super().step(env, timestep_t, agent, a_t)
+
+        self._total_steps += 1
+
+        # To improve performance, only logging at end of an episode.
+        if timestep_t.done:
+            time_stats = self.get()
+            self._writer.add_scalar(
+                'performance(env_steps)/step_rate',
+                time_stats['step_rate'],
+                self._total_steps,
+            )
+
+
