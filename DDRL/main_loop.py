@@ -726,3 +726,72 @@ def run_logger(
             pass
 
 
+def run_evaluation_iterations(
+    num_iterations: int,
+    num_eval_steps: int,
+    eval_agent: types_lib.Agent,
+    eval_env: gym.Env,
+    use_tensorboard: bool,
+    recording_video_dir: str = None,
+):
+    """
+    Testing an agent restored from checkpoint.
+
+    Args:
+        num_iterations: number of iterations to run.
+        num_eval_steps: number of evaluation steps, per iteration.
+        eval_agent: evaluation agent, expect the agent has step(), reset(),
+            and agent_name property.
+        eval_env: evaluation environment.
+        use_tensorboard: if True, use tensorboard to log the runs.
+        recording_video_dir: forlder to store agent self-play video for one
+            episode.
+    """
+
+    # Tensorboard log dir prefix.
+    test_tb_log_prefix = get_tb_log_prefix(
+        eval_env.spec.id,
+        eval_agent.agent_name,
+        None,
+        'test',
+    ) if use_tensorboard else None
+    test_trackers = trackers_lib.make_default_trackers(
+        test_tb_log_prefix
+    )
+
+    if num_iterations > 0 and num_eval_steps > 0:
+        for iteration in range(1, num_iterations + 1):
+            logging.info(
+                f'Testing iteration {iteration}'
+            )
+
+            # Run some testing steps.
+            eval_stats = run_env_steps(
+                num_eval_steps,
+                eval_agent,
+                eval_env,
+                test_trackers,
+            )
+
+            # Logging testing statistics.
+            log_output = [
+                ('iteration', iteration, '%3d'),
+                ('step', iteration * num_eval_steps, '%5d'),
+                ('episode_return', eval_stats['mean_episode_return'], '%2.2f'),
+                ('num_episode', eval_stats['num_episodes'], '%3d'),
+                ('step_rate', eval_stats['step_rate'], '%4.0f'),
+                ('duration', eval_stats['duration'], '%.2f'),
+            ]
+
+            log_output_str = ', '.join(
+                ('%s: ' + f) % (n, v) for n, v, f in log_output
+            )
+            logging.info(log_output_str)
+            iteration += 1
+    
+    if recording_video_dir is not None and recording_video_dir != '':
+        gym_env.play_and_record_video(
+            eval_agent, eval_env, recording_video_dir
+        )
+
+
