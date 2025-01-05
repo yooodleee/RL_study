@@ -405,3 +405,99 @@ def run_parallel_training_iterations(
     data_queue.close()
 
 
+def run_actor(
+    actor: types_lib.Agent,
+    actor_env: gym.Env,
+    data_queue: multiprocessing.Queue,
+    log_queue: multiprocessing.SimpleQueue,
+    num_train_steps: int,
+    iteration_count: multiprocessing.Value, # type: ignore
+    start_iteration_event: multiprocessing.Event, # type: ignore
+    stop_event: multiprocessing.Event, # type: ignore
+    tb_log_prefix: str = None,
+    debug_screenshots_interval: int = None,
+)-> None:
+    """
+    Run actor process for as long as required, only terminate if the 'stop_event'
+        is set to True.
+
+    * Each actor will wait for the 'start_iteration_event' signal to start run
+        num_train_steps (for one iteration).
+    * The actor whoever finished the current iteration fisrt will reset 'start_iteration_event'
+        to False, so it does not run into a loop that is out of control.
+
+    Args:
+        actor: the actor to run.
+        actor_env: environment for the actor instance.
+        data_queue: multiprocessing.Queue used for transferring data from actor to learner.
+        log_queue: multiprocessing.SimpleQueue used for transferring training statisitcs 
+            from actor, this is only for write to csv file, not for tensorboard.
+        num_train_steps: number of frames (or env steps) to run for one iteration.
+        iteration: a counter which is updated by the main process.
+        start_iteration_event: start training signal, set by the main process, clear by actor.
+        stop_event: end training signal.
+        tb_log_prefix: tensorboard run log dir prefix.
+        debug_screenshots_interval: the frequency to take screenshots and add to tensorboard,
+            default 0 no screenshots.
+
+    Rasies:
+        RuntimeError if the 'actor' is not a instance of types_lib.Agent.
+    """
+    if not isinstance(
+        actor, types_lib.Agent
+    ):
+        raise RuntimeError(
+            'Expect actor to be a instance of types_lig.Agent.'
+        )
+    
+    # Initialize logging.
+    init_absl_logging()
+
+    # Listen to signals to exit process.
+    handle_exit_signal()
+
+    actor_trackers = trackers_lib.make_default_trackers(
+        tb_log_prefix, debug_screenshots_interval
+    )
+
+    while not stop_event.is_set():
+        # Wait for start training event signal, which is set by the main process.
+        if not start_iteration_event.is_set():
+            continue
+
+        logging.info(
+            f'Starting {actor.agent_name} ...'
+        )
+        iteration = iteration_count.value
+
+        # Run training steps.
+        train_stats = run_env_steps(
+            num_train_steps,
+            actor,
+            actor_env,
+            actor_trackers,
+        )
+
+        # Mark work done to avoid infinite loop in 'run_learner_loop',
+        # also possible multiprocessing.Queue deadlock.
+        data_queue.put('PROCESS_DONE')
+
+        # Whoever finished one iteration first will clear the start training event.
+        if start_iteration_event.is_set():
+            start_iteration_event.clear()
+        
+        # Logging statistics after training finished
+        log_output = [
+            ('iteration', iteration, '%3d'),
+            ('role', actor.agent_name, '%2s'),
+            ('step', iteration * num_train_steps, '%5d'),
+            ('episode_return', train_stats['mean_episode_return'], '%2.2f'),
+            ('num_episodes', train_stats['num_episodes'], '%3d'),
+            ('step_rate', train_stats['step_rate'], '%4.0f'),
+            ('duration', train_stats['duration'], '%.2f'),
+        ]
+
+        # Add training statistics to log queue, so the logger process can write to csv file.
+        log_queue.put(log_output)
+
+
