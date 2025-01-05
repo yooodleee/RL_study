@@ -131,3 +131,145 @@ def run_env_steps(
     return stats
 
 
+def run_single_thread_training_iterations(
+    num_iterations: int,
+    num_train_steps: int,
+    num_eval_steps: int,
+    train_agent: types_lib.Agent,
+    train_env: gym.Env,
+    eval_agent: types_lib.Agent,
+    eval_env: gym.Env,
+    checkpoint: PyTorchCheckpoint,
+    csv_file: str,
+    use_tensorboard: bool,
+    tag: str = None,
+    debug_screenshots_interval: int = 0,
+)-> None:
+    """
+    Runs single-thread training and evaluation for N iterations.
+    The same code structure is shared by most single-threaded DQN agents,
+        and some policy gradients agents like reinforce, actor-critic.
+
+    For every iteration:
+        1. Start to run agent for num_train_steps training environment steps/frames.
+        2. Create checkpoint file.
+        3. (Optional) Run some evaluation steps with a seperate evaluation actor and
+            environment.
+    
+    Args:
+        num_iterations: number of iterations to run.
+        num_train_steps: number of frames (or env steps) to run, per iteration.
+        num_eval_steps: number of evaluation frames (or env steps) to run, per iteration.
+        train_agent: training agent, expect the agent to have step(), reset(), and a 
+            agent_name property.
+        train_env: training environment.
+        eval_agent: evaluation agent.
+        eval_env: evaluation environment.
+        checkpoint: checkpoint object.
+        csv_file: csv log file path and name.
+        use_tensorboard: if True, use tensorboard to log the runs.
+        tag: tensorboard run log tag, default None.
+        debug_screenshots_interval: the frequency to take screenshots and add to tensorboard,
+            default 0 no screenshots.
+    """
+
+    # Create log file writer.
+    writer = CsvWriter(csv_file)
+
+    # Create trackers for training and evaluation
+    train_tb_log_prefix = (
+        get_tb_log_prefix(
+            train_env.spec.id,
+            train_agent.agent_name,
+            tag,
+            'train',
+        ) if use_tensorboard else None
+    )
+    train_trackers = trackers_lib.make_default_trackers(
+        train_tb_log_prefix, debug_screenshots_interval
+    )
+
+    should_run_evaluator = False
+    eval_trackers = None
+    if num_eval_steps > 0 and eval_agent is not None \
+        and eval_env is not None:
+        eval_tb_log_prefix = (
+            get_tb_log_prefix(
+                eval_env.spec.id,
+                eval_agent.agent_name,
+                tag,
+                'eval',
+            ) if use_tensorboard else None
+        )
+        eval_trackers = trackers_lib.make_default_trackers(
+            eval_tb_log_prefix, debug_screenshots_interval
+        )
+    
+    # Start training
+    for iteration in range(1, num_iterations + 1):
+        logging.info(
+            f'Training iteration {iteration}'
+        )
+
+        # Run training steps.
+        train_stats = run_env_steps(
+            num_train_steps,
+            train_agent,
+            train_env,
+            train_trackers,
+        )
+
+        checkpoint.set_iteration(iteration)
+        saved_ckpt = checkpoint.save()
+
+        if saved_ckpt:
+            logging.info(
+                f'New checkpoint created at "{saved_ckpt}"'
+            )
+        
+        # Logging training statistics.
+        log_output = [
+            ('iteration', iteration, '%3d'),
+            ('train_step', iteration * num_train_steps, '%5d'),
+            ('train_episode_return', train_stats['mea_episode_return'], '%2.2f'),
+            ('train_num_episodes', train_stats['num_episodes'], '%3d'),
+            ('train_step_rate', train_stats['step_rate'], '%4.0f'),
+            ('train_duration', train_stats['duration'], '%.2f'),
+        ]
+
+        # Run evaluation steps.
+        if should_run_evaluator is True:
+            logging.info(
+                f'Evaluataion iteration {iteration}'
+            )
+
+            # Run some evaluation steps.
+            eval_stats = run_env_steps(
+                num_eval_steps,
+                eval_agent,
+                eval_env,
+                eval_trackers,
+            )
+
+            # Logging evaluation statistics.
+            eval_output = [
+                ('eval_step', iteration * num_eval_steps, '%5d'),
+                ('eval_episode_return', eval_stats['mean_episode_return'], '%2.2f'),
+                ('eval_num_episodes', eval_stats['num_episodes'], '%3d'),
+                ('eval_step_rate', eval_stats['step_rate'], '%4.0f'),
+                ('eval_duration', eval_stats['duration'], '%.2f'),
+            ]
+            log_output.extend(eval_output)
+        
+        log_output_str = ', '.join(
+            ('%s: ' + f) % (n, v) for n, v, f in log_output
+        )
+        logging.info(log_output_str)
+        writer.write(
+            collections.OrderedDict(
+                (n, v) for n, v, _ in log_output
+            )
+        )
+    writer.close()
+
+
