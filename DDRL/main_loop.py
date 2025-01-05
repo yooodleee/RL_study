@@ -501,3 +501,153 @@ def run_actor(
         log_queue.put(log_output)
 
 
+def run_learner(
+    num_iterations: int,
+    num_eval_steps: int,
+    learner: types_lib.Learner,
+    eval_agent: types_lib.Agent,
+    eval_env: gym.Env,
+    data_queue: multiprocessing.Queue,
+    log_queue: multiprocessing.SimpleQueue,
+    iteration_count: multiprocessing.Value, # type: ignore
+    start_iteration_event: multiprocessing.Event, # type: ignore
+    stop_event: multiprocessing.Event, # type: ignore
+    checkpoint: PyTorchCheckpoint,
+    num_actors: int,
+    use_tensorboard: bool,
+    tag: str = None,
+)-> None:
+    """
+    Run learner for N iterations.
+
+    For every iteration:
+        1. Signal actors to start a new iteration.
+        2. Start to run the learner loop until all actors are finished their work.
+        3. Create checkpoint file.
+        4. (Optional) Run evaluation steps with a seperate evaluation actor and 
+            environment.
+            
+    At the beginning of every iteration, learner will set the 'start_iteration_event'
+        to True, to signal actors to start training. The actor whoever finished the 
+        iteration first will reset 'start_iteration_event' to False.
+        Then on the next iteration, the learner will set the 'start_iteration_event' 
+        to True.
+
+    Args:
+        num_iterations: number of iterations to run.
+        num_eval_steps: number of evaluation frames (or env steps) to run, per iteration.
+        learner: learner agent, expect the agent to have run_train_loop() method.
+        eval_agent: evaluation agent.
+        eval_env: evaluation environment.
+        data_queue: a multiprocessing.Queue used receive samples from actor.
+        log_queue: a multiprocessing.SimpleQueue used send evaluation statistics to logger.
+        start_iteration_event: a multiprocessing.Event signal to actors for start training.
+        checkpoint: checkpoint object.
+        num_actors: number of actors running, used to check if one iteration is over.
+        use_tensorboard: if True, use tensorboard to log the runs.
+        tag: tensorboard run log tag.
+
+    Raises:
+        RuntimeError if the `learner` is not a instance of types_lig.Learner.
+    """
+    if not isinstance(learner, types_lib.Learner):
+        raise RuntimeError(
+            'Expect learner to be a instance of types_lib.Learner.'
+        )
+    
+    # Create trackers for learner and evaluator
+    learner_tb_log_prefix = get_tb_log_prefix(
+        eval_env.spec.id,
+        learner.agent_name,
+        tag,
+        'train',
+    ) if use_tensorboard else None
+    learner_trackers = trackers_lib.make_learner_trackers(
+        learner_tb_log_prefix
+    )
+    for tracker in learner_trackers:
+        tracker.reset()
+    
+    should_run_evaluator = False
+    eval_trackers = None
+    if num_eval_steps > 0 and eval_agent is not None \
+        and eval_env is not None:
+        should_run_evaluator = True
+        eval_tb_log_prefix = (
+            get_tb_log_prefix(
+                eval_env.spec.id,
+                eval_agent.agent_name,
+                tag,
+                'eval'
+            ) if use_tensorboard else None
+        )
+        get_trackers = trackers_lib.make_default_trackers(
+            eval_tb_log_prefix
+        )
+
+    # Start training
+    for iteration in range(1, num_iterations + 1):
+        logging.ingo(
+            f'Training iteration {iteration}'
+        )
+        logging.info(
+            f'Starting {learner.agent_name} ...'
+        )
+
+        # Update shared iteration count.
+        iteration_count.value = iteration
+
+        # Set start training event.
+        start_iteration_event.set()
+        learner.reset()
+
+        run_learner_loop(
+            learner,
+            data_queue,
+            num_actors,
+            learner_trackers,
+        )
+
+        start_iteration_event.clear()
+        checkpoint.set_iteration(iteration)
+        saved_ckpt = checkpoint.save()
+
+        if saved_ckpt:
+            logging.info(
+                f'New checkpoint create at "{saved_ckpt}"'
+            )
+        
+        # Run evaluation steps.
+        if should_run_evaluator is True:
+            logging.info(
+                f'Evaluation iteration {iteration}'
+            )
+
+            # Run some evaluation steps.
+            eval_stats = run_env_steps(
+                num_eval_steps,
+                eval_agent,
+                eval_env,
+                eval_trackers,
+            )
+
+            # Logging evaluation statistics.
+            log_output = [
+                ('iteration', iteration, '%3d'),
+                ('role', 'evaluation', '%3s'),
+                ('step', iteration * num_eval_steps, '%5d'),
+                ('episode_return', eval_stats['mean_episode_return'], '%2.2f'),
+                ('num_episodes', eval_stats['num_episodes'], '%3d'),
+                ('step_rate', eval_stats['step_rate'], '%4.0f'),
+                ('duration', eval_stats['duration'], '%.2f'),
+            ]
+            log_queue.put(log_output)
+        
+        time.sleep(5)
+    
+    # Signal actors training session ended.
+    stop_event.set()
+    # Signal logger training session ended, using stop_event seems not working.
+    log_queue.put('PROCESS_DONE')
+
+
