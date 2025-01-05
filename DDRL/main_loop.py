@@ -795,3 +795,46 @@ def run_evaluation_iterations(
         )
 
 
+def get_tb_log_prefix(
+    env_id: str,
+    agent_name: str,
+    tag: str,
+    suffix: str,
+)-> str:
+    """
+    Returns the composed tensorboard log prefix,
+        which is in the format {env_id}-{agent_name}-{tag}-{suffix}.
+    """
+    tb_log_prefix = f'{env_id}-{agent_name}'
+    if tag is not None and tag != '':
+        tb_log_prefix += f'-{tag}'
+    tb_log_prefix += f'-{suffix}'
+    return tb_log_prefix
+
+
+def init_absl_logging():
+    """
+    Initialize absl.logging when run the process without app.run()
+    """
+    logging._warn_preinit_stderr = 0    # pylint: disable=protected-access
+    logging.set_verbosity(logging.INFO)
+    logging.use_absl_handler()
+
+
+def handle_exit_signal():
+    """
+    Listen to exit signal like crtl-c or kill from os and try to exit
+        the process forcefully.
+    """
+
+    def shutdown(signal_code, frame):
+        del frame
+        logging.info(
+            f'Received signal {signal_code}: terminating process...',
+        )
+        sys.exit(128 + signal_code)
+    
+    # Listen to signals to exit process.
+    signal.signal(signal.SIGHUP, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
