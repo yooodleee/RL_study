@@ -651,3 +651,46 @@ def run_learner(
     log_queue.put('PROCESS_DONE')
 
 
+def run_learner_loop(
+    learner: types_lib.Learner,
+    data_queue: multiprocessing.Queue,
+    num_actors: int,
+    learner_trackers: Iterable[Any],
+)-> None:
+    """
+    Run learner loop by constantly pull item off multiprocessing.queue
+        and calls the learner.step() method.
+    """
+
+    num_done_actors = 0
+
+    # Run training steps.
+    while True:
+        # Try to pull one item off multiprocessing.queue
+        try:
+            item = data_queue.get()
+            if item == 'PROCESS_DONE':  # one actor process is done for current iteration
+                num_done_actors += 1
+            else:
+                learner.received_item_from_queue(item)
+        except queue.Empty:
+            pass
+        except EOFError:
+            pass
+
+        # Only break if all actor processes are done
+        if num_done_actors == num_actors:
+            break
+
+        # The returned stats_sequences could be None when call learner.step(),
+        # since it will perform internal checks.
+        stats_sequences = learner.step()
+
+        if stats_sequences is not None:
+            # Some agents may perform multiple network updates in a single call
+            # to method step(), like PPO.
+            for stats in stats_sequences:
+                for tracker in learner_trackers:
+                    tracker.step(stats)
+
+
