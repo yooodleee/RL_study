@@ -273,3 +273,135 @@ def run_single_thread_training_iterations(
     writer.close()
 
 
+def run_parallel_training_iterations(
+    num_iterations: int,
+    num_train_steps: int,
+    num_eval_steps: int,
+    learner_agent: types_lib.Learner,
+    eval_agent: types_lib.Agent,
+    eval_env: gym.Env,
+    actors: List[types_lib.Agent],
+    actor_envs: List[gym.Env],
+    data_queue: multiprocessing.Queue,
+    checkpoint: PyTorchCheckpoint,
+    csv_file: str,
+    use_tensorboard: bool,
+    tag: str = None,
+    debug_screenshots_interval: int = 0,
+)-> None:
+    """
+    This is the place to kick start parallel training with multiple actors processes
+        and a single learner process.
+
+    Args:
+        num_iterations: number of iterations to run.
+        num_train_steps: number of frames (or env steps) to run, per iteration.
+        num_eval_steps: number of evaluation frames (or env steps) to run, per 
+            iteration.
+        learner_agent: learner agent, expect the agent to have run_train_loop() 
+            method.
+        eval_agent: evaluation agent.
+        eval_env: evaluation environment.
+        actors: list of actor instances we wish to run.
+        actor_envs: list of gym.Env for each actor to run.
+        data_queue: a multiprocessing.Queue used to recieve transition samples from actors.
+        checkpoint: checkpoint object.
+        csv_file: csv log file path and name.
+        use_tensorboard: if True, use tensorboard to log the runs.
+        tag: tensorboard run log tag, default None.
+        debug_screenshots_interval: the frequency to take screenshots and add to tensorboard,
+            default 0 no screenshots.
+    """
+
+    # Create shared iteration count and start, end trainng event.
+    # start_iteration_event is used to signaling actors to run one training iteration,
+    # stop_event is used to signaling actors the end of training session.
+    # The start_iteration_event and stop_event are only set by the main process.
+    iteration_count = multiprocessing.Value('i', 0)
+    start_iteration_event = multiprocessing.Event()
+    stop_event = multiprocessing.Event()
+
+    # To get training statistics from each actor and the learner.
+    # Use a single writer to write to csv file.
+    log_queue = multiprocessing.SimpleQueue()
+
+    # Run learner train loop on a new thread.
+    learner = threading.Thread(
+        target=run_learner,
+        args=(
+            num_iterations,
+            num_eval_steps,
+            learner_agent,
+            eval_agent,
+            eval_env,
+            data_queue,
+            log_queue,
+            iteration_count,
+            start_iteration_event,
+            stop_event,
+            checkpoint,
+            len(actors),
+            use_tensorboard,
+            tag,
+        ),
+    )
+    learner.start()
+
+    # Start logging on a new thread, since it's very light-weight task.
+    logger = threading.Thread(
+        target=run_logger,
+        args=(log_queue, csv_file),
+    )
+    logger.start()
+
+    # Create and start actor processes once, this will preserve actor's 
+    # internal like steps etc.
+    # Tensorboard log dir prefix.
+    num_actors = len(actors)
+    actor_tb_log_prefixes = [None for _ in range(num_actors)]
+    if use_tensorboard:
+        # To get better performance, only log a maximum of 8 actor statistics 
+        # to tensorboard
+        _step = 1 if num_actors <= 8 else math.ceil(num_actors / 8)
+        for i in range(0, num_actors, _step):
+            actor_tb_log_prefixes[i] = get_tb_log_prefix(
+                actor_envs[i].spec.id,
+                actors[i].agent_name,
+                tag,
+                'train',
+            )
+    
+    processes = []
+    for actor, actor_env, tb_log_prefix in zip(
+        actors, actor_envs, actor_tb_log_prefixes
+    ):
+        p = multiprocessing.Process(
+            target=run_actor,
+            args=(
+                actor,
+                actor_env,
+                data_queue,
+                log_queue,
+                num_train_steps,
+                iteration_count,
+                start_iteration_event,
+                stop_event,
+                tb_log_prefix,
+                debug_screenshots_interval,
+            ),
+        )
+        p.start()
+        processes.append(p)
+    
+    # Wait for all actor to be finished.
+    for p in processes:
+        p.join()
+        p.close()
+    
+    # learner.join()
+    logger.join()
+
+    # Close queue.
+    data_queue.close()
+
+
