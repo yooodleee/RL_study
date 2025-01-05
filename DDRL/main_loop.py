@@ -694,3 +694,35 @@ def run_learner_loop(
                     tracker.step(stats)
 
 
+def run_logger(
+    log_queue: multiprocessing.SimpleQueue,
+    csv_file: str,
+):
+    """
+    Run logger and csv file writer on a separate thread,
+        this is only for training/evaluation statistics.
+    """
+
+    # Create log file writer.
+    writer = CsvWriter(csv_file)
+
+    while True:
+        try:
+            log_output = log_queue.get()
+            if log_output == 'PROCESS_DONE':
+                break
+            log_output_str = ', '.join(
+                ('%s: ' + f) % (n, v) for n, v, f in log_output
+            )
+            logging.info(log_output_str)
+            writer.write(
+                collections.OrderedDict(
+                    (n, v) for n, v, _ in log_output
+                )
+            )
+        except queue.Empty:
+            pass
+        except EOFError:
+            pass
+
+
