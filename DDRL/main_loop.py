@@ -104,3 +104,30 @@ def run_env_loop(
                 break
 
 
+def run_env_steps(
+    num_steps: int,
+    agent: types_lib.Agent,
+    env: gym.Env,
+    trackers: Iterable[Any],
+)-> Mapping[Text, float]:
+    """
+    Run some stps and return the statistics, this could be either training,
+        evaluation, or testing steps.
+
+    Args:
+        max_episode_steps: maximum steps per episode.
+        agent: agent to run, expect the agent to have step(), reset(),
+            and a agent_name property.
+        train_env: training environment.
+        trackers: statistics trackers.
+
+    Returns:
+        A Dict contains statistics about the result.
+    """
+    seq = run_env_loop(agent, env)
+    seq_truncated = itertools.islice(seq, num_steps)
+    stats = trackers_lib.generate_statistics(trackers, seq_truncated)
+
+    return stats
+
+
