@@ -87,4 +87,51 @@ class EpisodeTracker:
                     timestep_t.info['episode_visited_rooms']
                 )
     
+    def reset(self)-> None:
+        """
+        Resets all gathered statistics, not to be called between episodes.
+        """
+        self._num_steps_since_reset = 0
+        self._episode_returns = []
+        self._episode_steps = []
+        self._episode_visited_rooms = []
+        self._current_episode_step = 0
+        self._current_episode_rewards = []
     
+    def get(self)-> Mapping[str, Union[int, float, None]]:
+        """
+        Aggregates statistics and returns as a dictionary.
+
+        Here the convention is `episode_return` is set to `current_episode_return`
+            if a full episode has not been encountered. Otherwise it is set to
+            `mean_episode_return` which is the mean return of complete episodes only.
+            If no steps have been taken at all, `episode_return` is set to `NaN`.
+
+        Returns:
+            A dictionary of aggregated statistics.
+        """
+
+        # Note most games don't have visited romms info
+        mean_episode_visited_rooms = 0
+
+        if len(self._episode_returns) > 0:
+            mean_episode_return = np.array(
+                self._episode_returns
+            ).mean()
+
+            if len(self._episode_visited_rooms) > 0:
+                mean_episode_visited_rooms = np.array(
+                    self._episode_visited_rooms
+                ).mean()
+        else:
+            mean_episode_return = sum(self._current_episode_rewards)
+
+        return {
+            'mean_episode_return': mean_episode_return,
+            'mean_episode_visited_rooms': mean_episode_visited_rooms,
+            'num_episodes': len(self._episode_returns),
+            'current_episode_step': self._current_episode_step,
+            'num_steps_since_reset': self._num_steps_since_reset,
+        }
+
+
