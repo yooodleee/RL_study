@@ -100,3 +100,176 @@ def compute_transformed_q(
     )
 
 
+def no_autograd(net: torch.nn.Module):
+    """
+    Disable autograd for a network.
+    """
+
+    for p in net.parameters():
+        p.requires_grad = False
+
+
+class Agent(types_lib.Agent):
+    """
+    Agent57 actor.
+    """
+
+    def __init__(
+        self,
+        rank: int,
+        data_queue: multiprocessing.Queue,
+        neetwork: torch.nn.Module,
+        rnd_target_network: torch.nn.Module,
+        rnd_predictor_network: torch.nn.Module,
+        embedding_network: torch.nn.Module,
+        random_state: np.random.RandomState,
+        ext_discount: float,
+        int_discount: float,
+        num_actors: int,
+        action_dim: int,
+        unroll_length: int,
+        burn_in: int,
+        num_policies: int,
+        policy_beta: float,
+        ucb_window_size: int,
+        ucb_beta: float,
+        ucb_epsilon: float,
+        episodic_memory_capacity: int,
+        reset_episodic_memory: bool,
+        num_neighbors: int,
+        cluster_distance: float,
+        kernel_epsilon: float,
+        max_similarity: float,
+        actor_update_interval: int,
+        device: torch.device,
+        shared_params: dict,
+    )-> None:
+        """
+        Args:
+            rank: the rank number for the actor.
+            data_queue: a multiprocessing.Queue to send collected transitions to
+                learner process.
+            network: the Q network for actor to make action choice.
+            rnd_target_network: RND random target network.
+            rnd_predictor_network: RND predictor target network.
+            embedding_network: NGU action prediction network.
+            random_state: random state.
+            ext_discount: extrinsic reward discount.
+            int_discount: intrinsic reward discount.
+            num_actors: number of actors.
+            action_dim: number of valid actions in the environment.
+            unroll_length: how many agent time step to unroll transitions before
+                put on to queue.
+            burn_in: two consecutive unrolls will overlap on burn_in+1 steps.
+            num_policies: number of exploring and exploiting policies.
+            policy_beta: intrinsic reward scale beta.
+            ucb_window_size: window size of the sliding window UCB algorithm.
+            ucb_beta: beta for the sliding window UCB algorithm.
+            ucb_epsilon: exploration epsilon for sliding window UCB algorithm.
+            episodic_memory_capacity: maximum capacity of episodic memory.
+            reset_episodic_memory: Reset the episodic_memory on envery episode.
+            num_neighbors: number of K-NN neighbors for compute episodic bouns.
+            cluster_distance: K-NN neighbors cluster distance for compute episodic
+                bonus.
+            kernel_epislon: K-NN kernel epsilon for compute episodic bonus.
+            max_similarity: maximum similarity for compute episodic bonus.
+            actor_update_interval: the frequency to update actor's Q network.
+            device: PyTorch runtime device.
+            shared_params: a shared dict, so we can later update the parameters
+                for actors.
+        """
+        if not 0.0 <= ext_discount <= 1.0:
+            raise ValueError(
+                f'Expect ext_discount t0 be [0.0, 1.0), got {ext_discount}'
+            )
+        if not 0.0 <= int_discount <= 1.0:
+            raise ValueError(
+                f'Expect int_discount to be [0.0, 1.0), got {int_discount}'
+            )
+        if not 0 < num_actors:
+            raise ValueError(
+                f'Expect num_actors to be positive integer, got {num_actors}'
+            )
+        if not 0 < action_dim:
+            raise ValueError(
+                f'Expect action_dim to be positive integer, got {action_dim}'
+            )
+        if not 1 <= unroll_length:
+            raise ValueError(
+                f'Expect unroll_length to be integer greater than or equal to 1, got {unroll_length}'
+            )
+        if not 0 <= burn_in < unroll_length:
+            raise ValueError(
+                f'Expect burn_in length to be [0, {unroll_length}), got {burn_in}'
+            )
+        if not 1 <= num_policies:
+            raise ValueError(
+                f'Expect num_policies to be integer greater than or equal to 1, got {num_policies}'
+            )
+        if not 0.0 <= policy_beta <= 1.0:
+            raise ValueError(
+                f'Expect policy_beta to be [0.0, 1.0), got {policy_beta}'
+            )
+        if not 1 <= ucb_window_size:
+            raise ValueError(
+                f'Expect ucb_window_size to be integer greater than or equal to 1, got {ucb_window_size}'
+            )
+        if not 0.0 <= ucb_beta <= 100.0:
+            raise ValueError(
+                f'Expect ucb_beta to be [0.0, 100.0), got {ucb_beta}'
+            )
+        if not 0.0 <= ucb_epsilon <= 1.0:
+            raise ValueError(
+                f'Expect ucb_epsilon to be [0.0, 1.0), got {ucb_epsilon}'
+            )
+        if not 1 <= episodic_memory_capacity:
+            raise ValueError(
+                f'Expect episodic_memory_capacity to be integer greater than or equal to 1, got {episodic_memory_capacity}'
+            )
+        if not 1 <= num_neighbors:
+            raise ValueError(
+                f'Expect num_neighbors to be integer greater than or equal to 1, got {num_neighbors}'
+            )
+        if not 0.0 <= cluster_distance:
+            raise ValueError(
+                f'Expect cluster_disctance to be [0.0, 1.0], got {cluster_distance}'
+            )
+        if not 0.0 <= kernel_epsilon <= 1.0:
+            raise ValueError(
+                f'Expect kerenl_epsilon to be [0.0, 1.0], got {kernel_epsilon}'
+            )
+        if not 1 <= actor_update_interval:
+            raise ValueError(
+                f'Expect actor_update_interval to be integer greater than or equal to 1, got {actor_update_interval}'
+            )
+        
+        self.rank = rank
+        self.agent_name = f'Agent57-actor{rank}'
+
+        self._network = neetwork.to(device=device)
+        self._rnd_target_network = rnd_target_network.to(device=device)
+        self._rnd_predictor_network = rnd_predictor_network.to(device=device)
+        self._embedding_network = embedding_network.to(device=device)
+
+        # Disable autograd for actor's Q networks, embedding, and RND networks.
+        no_autograd(self._network)
+        no_autograd(self._rnd_target_network)
+        no_autograd(self._rnd_predictor_network)
+        no_autograd(self._embedding_network)
+
+        self._shared_params = shared_params
+
+        self._queue = data_queue
+        self._device = device
+        self._random_state = random_state
+        self._num_actors = num_actors
+        self._action_dim = action_dim
+        self._actor_update_interval = actor_update_interval
+        self._num_policies = num_policies
+
+        self._unroll = replay_lib.Unroll(
+            unroll_length=unroll_length,
+            overlap=burn_in + 1,    # Plus 1 to add room for shift during learning
+            structure=TransitionStructure,
+            cross_episode=False,
+        )
