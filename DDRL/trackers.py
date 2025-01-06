@@ -366,3 +366,69 @@ class TensorboardScreenshotTracker:
         return {}
 
 
+class TensorboardLearnerStatisticsTracker:
+    """
+    Write learner statistics to tensorboard, for parallel training agents with 
+        actor-learner scheme.
+    """
+
+    def __init__(self, writer: SummaryWriter):
+        self._total_steps = 0   # Keep track total number of steps, does not reset
+        self._num_steps_since_reset = 0
+        self._start = timeit.default_timer()
+        self._writer = writer
+    
+    def step(self, stats)-> None:
+        """
+        Accumulates statistics from timestep.
+        """
+        self._total_steps += 1
+        self._num_steps_since_reset += 1
+
+        # Log every N learner steps.
+        if self._total_steps % 100 == 0:
+            time_stats = self.get()
+            self._writer.add_scalar(
+                'learner_statistics(learner_steps)/step_rate',
+                time_stats['step_rate'],
+                self._total_steps,
+            )
+
+            # This should not block the training loop if there's any exception.
+            try:
+                if stats:
+                    for k, v in stats.items():
+                        if isinstance(
+                            v, (int, float)
+                        ):
+                            self._writer.add_scalar(
+                                f'learner_statistics(learner_steps)/{k}',
+                                v,
+                                self._total_steps,
+                            )
+            except Exception:
+                pass
+    
+    def reset(self)-> None:
+        """
+        Reset statistics.
+        """
+        self._num_steps_since_reset = 0
+        self._start = timeit.default_timer()
+    
+    def get(self)-> Mapping[Text, float]:
+        """
+        Returns statistics as a dictionary.
+        """
+        duration = timeit.default_timer() - self._start
+        if self._num_steps_since_reset > 0:
+            step_rate = self._num_steps_since_reset / duration
+        else:
+            step_rate = np.nan
+        return {
+            'step_rate': step_rate,
+            'num_steps_since_reset': self._num_steps_since_reset,
+            'duration': duration,
+        }
+
+
