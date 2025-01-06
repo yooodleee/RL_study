@@ -273,3 +273,60 @@ class Agent(types_lib.Agent):
             structure=TransitionStructure,
             cross_episode=False,
         )
+
+        # Meta-collector
+        self._meta_coll = bandit.SimplifiedSlidingWindowUCB(
+            self._num_policies,
+            ucb_window_size,
+            self._random_state,
+            ucb_beta,
+            ucb_epsilon,
+        )
+
+        self._betas, self._gammas = distributed.get_ngu_polic_betas_and_discounts(
+            num_policies=num_policies,
+            beta=policy_beta,
+            gamma_max=ext_discount,
+            gamma_min=int_discount,
+        )
+        self._policy_index = None
+        self._policy_beta = None
+        self._policy_discount = None
+        self._sample_policy()
+
+        self._reset_episodic_memory = reset_episodic_memory
+
+        # E-greedy policy epsilon, rank 0 has the lowest noise, while rank N-1
+        # has the highest noise.
+        epsilons = distributed.get_actor_exploration_epsilon(num_actors)
+        self._exploration_epsilon = epsilons[self.rank]
+
+        # Episodic intrinsic bonus module
+        self._episodic_module = EpisodicBounusModule(
+            embedding_network=self._embedding_network,
+            device=device,
+            capacity=episodic_memory_capacity,
+            num_neighbors=num_neighbors,
+            kernel_epsilon=kernel_epsilon,
+            cluster_distance=cluster_distance,
+            max_similarity=max_similarity,
+        )
+
+        # Lifelong intrinsic bonus module
+        self._lifelong_module = RndLifeLongBonusModule(
+            target_network=self._rnd_target_network,
+            predictor_network=self._rnd_predictor_network,
+            device=device,
+            discount=int_discount,
+        )
+
+        self._episodic_returns = 0.0
+        self._last_action = None
+        self._episodic_bonus_t = None
+        self._lifelong_bonus_t = None
+        self._ext_lstm_state = None # Stores nn.LSTM hidden state and cell state. for extrinsic Q network
+        self._int_lstm_state = None # Stores nn.LSTM hidden state and cell state. for intrinsic Q network
+
+        self._step_t = -1
+    
+    
