@@ -471,3 +471,25 @@ def make_default_trackers(
         return [EpisodeTracker(), StepRateTracker()]
 
 
+def make_learner_trackers(run_log_dir=None):
+    """
+    Create trackers for learner for parallel training (actor-learner) run.
+
+    Args:
+        run_log_dir: tensorboard run log directory.
+    """
+    if run_log_dir:
+        tb_log_dir = Path(f'runs/{run_log_dir}')
+
+        # Remove existing log directory.
+        if tb_log_dir.exists() and tb_log_dir.is_dir():
+            shutil.rmtree(tb_log_dir)
+        
+        writer = SummaryWriter(tb_log_dir)
+
+        return [TensorboardLearnerStatisticsTracker(writer)]
+    
+    else:
+        return []
+
+
