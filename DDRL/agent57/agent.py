@@ -564,3 +564,10 @@ class Agent(types_lib.Agent):
                         k: v.to(device=self._device) for k, v in state_dict.items()
                     }
                 network.load_state_dict(state_dict)
+
+    @property
+    def intrinsic_reward(self)-> float:
+        """
+        Returns intrinsic reward for last state s_tm1.
+        """
+        
