@@ -483,4 +483,49 @@ class Agent(types_lib.Agent):
             output.int_hidden_s,
         )
     
+    def _prepare_network_input(
+        self, timestep: types_lib.TimeStep
+    )-> Agent57NetworkInputs:
+        # Agent57 network expect input shape [T, B, state_shape],
+        # and additionally 'last_action', 'extrinsic reward for last action',
+        # last intrinsic reward, and intrinsic reward scale beta index.
+        s_t = torch.from_numpy(
+            timestep.observation[None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+        last_action = torch.tensor(
+            self._last_action,
+            device=self._device,
+            dtype=torch.int64,
+        )
+        ext_r_t = torch.tensor(
+            timestep.reward,
+            device=self._device,
+            dtype=torch.float32,
+        )
+        int_r_t = torch.tensor(
+            self.intrinsic_reward,
+            device=self._device,
+            dtype=torch.float32,
+        )
+        policy_index = torch.tensor(
+            self._policy_index,
+            device=self._device,
+            dtype=torch.int64,
+        )
+        ext_hidden_s = Tuple(
+            s.to(device=self._device) for s in self._ext_lstm_state
+        )
+        int_hidden_s = tuple(
+            s.to(device=self._device) for s in self._int_lstm_state
+        )
+
+        return Agent57NetworkInputs(
+            s_t=s_t.unsqueeze(0), # [T, B, state_shape]
+            a_tm1=last_action.unsqueeze(0), # [T, B]
+            ext_r_t=ext_r_t.unsqueeze(0),   # [T, B]
+            int_r_t=int_r_t.unsqueeze(0),   # [T, B]
+            policy_index=policy_index.unsqueeze(0), # [T, B]
+            ext_hidden_s=ext_hidden_s,
+            int_hidden_s=int_hidden_s,
+        )
     
