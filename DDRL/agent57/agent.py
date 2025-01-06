@@ -384,3 +384,39 @@ class Agent(types_lib.Agent):
             self._put_unroll_onto_queue(unrolled_transition)
 
         return a_t
+    
+    def reset(self)-> None:
+        """
+        This method should be called at the beginning of every episode before
+            take any action.
+        """
+        self._unroll.reset()
+
+        if self._reset_episodic_memory:
+            self._episodic_module.reset()
+        
+        self._update_actor_networ(True)
+
+        # Update Sliding Window UCB statistics.
+        self._meta_coll.update(
+            self._policy_index, self._episodic_returns
+        )
+
+        self._episodic_returns = 0.0
+
+        # Agent57 actor samples a policy using the Sliding Window UCB algorithm,
+        # then play a single episode.
+        self._sample_policy()
+
+        # During the first step of a new episode,
+        # use 'fake' previous action and 'intrinsic' reward for network pass
+        self._last_action = self._random_state.randint(
+            0, self._action_dim
+        )   # Initialize a_tm1 randomly
+        self._episodic_bonus_t = 0.0
+        self._lifelong_bonus_t = 0.0
+        self._ext_lstm_state, self._int_lstm_state = self._network.get_initial_hidden_state(
+            batch_size=1
+        )
+    
+    
