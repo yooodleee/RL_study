@@ -529,3 +529,38 @@ class Agent(types_lib.Agent):
             int_hidden_s=int_hidden_s,
         )
     
+    def _put_unroll_onto_queue(self, unrolled_transition):
+        """
+        Important note, store hidden states for every step in the unroll will
+            consume HUGE memory.
+        """
+        self._queue.put(unrolled_transition)
+    
+    def _sample_policy(self):
+        """
+        Sample new policy from meta collector.
+        """
+        self._policy_index = self._meta_coll.sample()
+        self._policy_beta = self._betas[self._policy_index]
+        self._policy_discount = self._gammas[self._policy_index]
+
+    def _update_actor_network(
+        self, update_embed: bool = False
+    ):
+        q_state_dict = self._shared_params['network']
+        embed_state_dict= self._shared_params['embedding_network']
+        rnd_state_dict = self._shared_params['rnd_predictor_network']
+
+        if update_embed:
+            state_net_paris = zip(
+                (q_state_dict, rnd_state_dict),
+                (self._network, self._rnd_predictor_network),
+            )
+        
+        for state_dict, network in state_net_paris:
+            if state_dict is not None:
+                if self._device != 'cpu':
+                    state_dict = {
+                        k: v.to(device=self._device) for k, v in state_dict.items()
+                    }
+                network.load_state_dict(state_dict)
