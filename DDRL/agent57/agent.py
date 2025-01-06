@@ -60,3 +60,43 @@ class Agent57Transition(NamedTuple):
     int_init_c: Optional[np.ndarray]    # nn.LSTM initial cell state, from int_q_network
 
 
+TransitionStructure = Agent57Transition(
+    s_t=None,
+    a_t=None,
+    q_t=None,
+    prob_a_t=None,
+    last_action=None,
+    ext_r_t=None,
+    int_r_t=None,
+    policy_index=None,
+    beta=None,
+    discount=None,
+    ext_init_h=None,
+    ext_init_c=None,
+    int_init_h=None,
+    int_init_c=None,
+)
+
+
+def compute_transformed_q(
+    ext_q: torch.Tensor,
+    int_q: torch.Tensor,
+    beta: torch.Tensor,
+)-> torch.Tensor:
+    """
+    Returns transformed state-action values from ext_q and int_q.
+    """
+    if not isinstance(beta, torch.Tensor):
+        beta = torch.tensor(beta).expand_as(
+            int_q
+        ).to(device=ext_q.device)
+    
+    if len(beta.shape) < len(int_q.shape):
+        beta = beta[..., None].expand_as(int_q)
+    
+    return transforms.signed_hyperbolic(
+        transforms.signed_parabolic(ext_q) \
+        + beta * transforms.signed_parabolic(int_q)
+    )
+
+
