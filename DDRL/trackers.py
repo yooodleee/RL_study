@@ -493,3 +493,25 @@ def make_learner_trackers(run_log_dir=None):
         return []
 
 
+def generate_statistics(
+    trackers: Iterable[Any],
+    timestep_action_sequence: Iterable[Tuple[Optional[replay_lib.Transition]]],
+)-> Mapping[str, Any]:
+    """
+    Generate statistics from a sequence of timestep and actions.
+    """
+    # Only reset at the start, not between episodes.
+    for tracker in trackers:
+        tracker.reset()
+    
+    for env, timestep_t, agent, a_t in timestep_action_sequence:
+        for tracker in trackers:
+            tracker.step(
+                env, timestep_t, agent, a_t
+            )
+    
+    # Merge all statistics dictionaries into one.
+    statistics_dicts = (tracker.get() for tracker in trackers)
+    return dict(
+        collections.ChainMap(*statistics_dicts)
+    )
