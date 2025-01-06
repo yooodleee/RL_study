@@ -434,4 +434,53 @@ class Agent(types_lib.Agent):
         """
         return self._choose_action(timestep)
     
+    @torch.no_grad()
+    def _choose_action(
+        self, timestep: types_lib.TimeStep
+    )-> Tuple[
+        np.ndarray,
+        types_lib.Action,
+        float,
+        HiddenState,
+        HiddenState,
+    ]:
+        """
+        Given state s_t, choose action a_t.
+        """
+        input_ = self._prepare_network_input(timestep)
+
+        output = self._network(input_)
+        ext_q_t = output.ext_q_values.squeeze()
+        int_q_t = output.int_q_values.squeeze()
+
+        q_t = compute_transformed_q(
+            ext_q_t, int_q_t, self._policy_beta
+        )
+
+        a_t = torch.argmax(q_t, dim=-1).cpu().item()
+
+        # Policy probability for a_t, the detailed equation is mentioned
+        # in Agent57 paper.
+        prob_a_t = 1 - (self._exploration_epsilon * ((self._action_dim \
+                            -1) / self._action_dim))
+        
+        # To make sure every actors generates the same amount of samples,
+        # apply e-greedy after the network pass,
+        # otherwise the actor with higher epsilons will generate more samples,
+        # while the actor with lower epsilon will generate less samples.
+        if self._random_state.rand() < self._exploration_epsilon:
+            # randint() return random integers from low (inclusive) to high (exclusive).
+            a_t = self._random_state.randint(
+                0, self._action_dim
+            )
+            prob_a_t = self._exploration_epsilon / self._action_dim
+        
+        return (
+            q_t.cpu().numpy(),
+            a_t,
+            prob_a_t,
+            output.ext_hidden_s,
+            output.int_hidden_s,
+        )
+    
     
