@@ -432,3 +432,42 @@ class TensorboardLearnerStatisticsTracker:
         }
 
 
+def make_default_trackers(
+    log_dir=None, debug_screenshots_interval=0
+):
+    """
+    Create trackers for the training/evaluation run.
+
+    Args:
+        log_dir: tensorboard runtime log directory.
+        debug_screenshots_interval: the frequeny to take screenshots and add to tensorboard,
+            default 0 no screenshots.
+    """
+    if log_dir:
+        log_dir = Path(f'runs/{log_dir}')
+
+        # Remove existing log directory.
+        if log_dir.exists() and log_dir.is_dir():
+            shutil.rmtree(log_dir)
+        
+        writer = SummaryWriter(log_dir)
+
+        trackers = [
+            TensorboardEpisodeTracker(writer),
+            TensorboardStepRateTracker(writer),
+            TensorboardAgentStatisticsTracker(writer),
+        ]
+
+        if debug_screenshots_interval > 0:
+            trackers.append(
+                TensorboardScreenshotTracker(
+                    writer, debug_screenshots_interval
+                )
+            )
+        
+        return trackers
+    
+    else:
+        return [EpisodeTracker(), StepRateTracker()]
+
+
