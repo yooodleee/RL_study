@@ -329,4 +329,58 @@ class Agent(types_lib.Agent):
 
         self._step_t = -1
     
-    
+    @torch.no_grad()
+    def step(
+        self, timestep: types_lib.TimeStep
+    )-> types_lib.Action:
+        """
+        Given timestep, return action a_t, and push transition into global queue
+        """
+        self._step_t += 1
+        self._episodic_returns += timestep.reward
+
+        if self._step_t % self._actor_update_interval == 0:
+            self._update_actor_network(False)
+        
+        q_t, a_t, prob_a_t, ext_hidden_s, int_hidden_s = self.act(timestep)
+
+        transition = Agent57Transition(
+            s_t=timestep.observation,
+            a_t=a_t,
+            q_t=q_t,
+            prob_a_t=prob_a_t,
+            last_action=self._last_action,
+            ext_r_t=timestep.reward,
+            int_r_t=self.intrinsic_reward,
+            policy_index=self._policy_index,
+            beta=self._policy_beta,
+            discount=self._policy_discount,
+            done=timestep.done,
+            ext_init_h=self._ext_lstm_state[0].squeeze(1).cpu().numpy(),    # remove batch dimension
+            ext_init_c=self._ext_lstm_state[1].squeeze(1).cpu().numpy(),
+            int_init_h=self._int_lstm_state[0].squeeze(1).cpu().numpy(),    # remove batch dimension
+            int_init_c=self._int_lstm_state[1].squeeze(1).cpu().numpy(),
+        )
+
+        unrolled_transition = self._unroll.add(
+            transition, timestep.done
+        )
+
+        s_t = torch.from_numpy(
+            timestep.observation[None, ...]
+        ).to(device=self._device, dtype=torch.float32)
+
+        # Compute lifelong intrinsic bonus
+        self._lifelong_bonus_t = self._lifelong_module.compute_bonus(s_t)
+
+        # Compute episodic intrinsic bonus
+        self._episodic_bonus_t = self._episodic_module.compute_bonus(s_t)
+
+        # Update local state
+        self._last_action, self._ext_lstm_state, self._int_lstm_state = \
+            a_t, ext_hidden_s, int_hidden_s
+        
+        if unrolled_transition is not None:
+            self._put_unroll_onto_queue(unrolled_transition)
+
+        return a_t
