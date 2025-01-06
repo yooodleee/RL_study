@@ -419,4 +419,19 @@ class Agent(types_lib.Agent):
             batch_size=1
         )
     
+    def act(
+        self,
+        timestep: types_lib.TimeStep,
+    )-> Tuple[
+        np.ndarray,
+        types_lib.Action,
+        float,
+        HiddenState,
+        HiddenState,
+    ]:
+        """
+        Given state s_t and done marks, return an action.
+        """
+        return self._choose_action(timestep)
+    
     
