@@ -570,4 +570,23 @@ class Agent(types_lib.Agent):
         """
         Returns intrinsic reward for last state s_tm1.
         """
-        
+        # Equation 1 of the NGU paper.
+        return self._episodic_bonus_t \
+                * min(max(self._lifelong_bonus_t, 1.0), 5.0)
+    
+    @property
+    def statistics(self)-> Mapping[Text, float]:
+        """
+        Returns current actor's statistics as a dictionary.
+        """
+        return {
+            # 'policy_index': self._policy_index,
+            'policy_discount': self._policy_discount,
+            'policy_beta': self._policy_beta,
+            'exploration_epsilon': self._exploration_epsilon,
+            'intrinsic_reward': self.intrinsic_reward,
+            # 'episodic_bonus': self._episodic_bonus_t,
+            # 'lifelong_bonus': self._lifelong_bonus_t,
+        }
+
+
