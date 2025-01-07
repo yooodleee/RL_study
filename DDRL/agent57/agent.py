@@ -395,7 +395,7 @@ class Agent(types_lib.Agent):
         if self._reset_episodic_memory:
             self._episodic_module.reset()
         
-        self._update_actor_networ(True)
+        self._update_actor_network(True)
 
         # Update Sliding Window UCB statistics.
         self._meta_coll.update(
@@ -1087,3 +1087,309 @@ class Learner(types_lib.Learner):
         loss = torch.sum(retrate_out, dim=0)
 
         return loss, priorities
+    
+    def _update_embed_and_rnd_predictor_networks(
+        self,
+        transitions: Agent57Transition,
+        weights: np.ndarray,
+    )-> None:
+        """
+        Use last 5 frames to update the embedding and RND predictor networks.
+        """
+        b = self._batch_size
+        weights = torch.from_numpy(
+            weights[-b:]
+        ).to(device=self._device, dtype=torch.float32)  # [B]
+        base.assert_rank_and_dtype(
+            weights, 1, torch.float32
+        )
+
+        self._intrinsic_optimizer.zero_grad()
+        # [batch_size]
+        rnd_loss = self._calc_rnd_loss(transitions)
+        embed_loss = self._calc_embed_inverse_loss(transitions)
+
+        # Multiply loss by sampling weights, averaging over batch dimension
+        loss = torch.mean(
+            (rnd_loss + embed_loss) * weights.detach()
+        )
+
+        loss.backward()
+
+        if self._clip_grad:
+            torch.nn.utils.clip_grad_norm_(
+                self._rnd_predictor_network.parameters(), self._max_grad_norm
+            )
+            torch.nn.utils.clip_grad_norm_(
+                self._embedding_network.parameters(), self._max_grad_norm
+            )
+        
+        self._intrinsic_optimizer.step()
+
+        # For logging only.
+        self._rnd_loss_t = rnd_loss.detach().mean().cpu().item()
+        self._embed_loss_t = embed_loss.detach().mean().cpu().item()
+
+    def _calc_rnd_loss(
+        self,
+        transitions: Agent57Transition,
+    )-> torch.Tensor:
+        s_t = torch.from_numpy(
+            transitions.s_t[-5:]
+        ).to(device=self._device, dtype=torch.float32)  # [5, B, state_shape]
+        # Rank and dtype checks.
+        base.assert_rank_and_dtype(
+            s_t, (3, 5), torch.float32
+        )
+        # Merge batch and time dimension.
+        s_t = torch.flatten(s_t, 0, 1)
+
+        normed_s_t = self._normalize_rnd_obs(s_t)
+
+        pred_s_t = self._rnd_predictor_network(normed_s_t)
+        with torch.no_grad():
+            target_s_t = self._rnd_target_network(normed_s_t)
+        
+        rnd_loss = torch.square(
+            pred_s_t - target_s_t
+        ).mean(dim=1)
+        # Reshape loss into [5, B].
+        rnd_loss = rnd_loss.view(5, -1)
+
+        # Sums over time dimension. shape [B]
+        loss = torch.sum(rnd_loss, dim=0)
+
+        return loss
+    
+    def _calc_embed_inverse_loss(
+        self,
+        transitions: Agent57Transition,
+    )-> torch.Tensor:
+        s_t = torch.from_numpy(
+            transitions.s_t[-6:]
+        ).to(device=self._device, dtype=torch.float32)  # [6, B, state_shape].
+        a_t = torch.from_numpy(
+            transitions.a_t[-6:]
+        ).to(device=self._device, dtype=torch.int64)    # [6, B]
+
+        # Rank and dtype checks.
+        base.assert_rank_and_dtype(
+            s_t, (3, 5), torch.float32
+        )
+        base.assert_rank_and_dtype(
+            a_t, 2, torch.long
+        )
+
+        s_tm1 = s_t[0:-1, ...]  # [5, B, state_shape]
+        s_t = s_t[1:, ...]  # [5, B, state_shape]
+        a_tm1 = a_t[:-1, ...]   # [5, B]
+
+        # Merge batch and time dimension.
+        s_tm1 = torch.flatten(s_tm1, 0, 1)
+        s_t = torch.flatten(s_t, 0, 1)
+        a_tm1 = torch.flatten(a_tm1, 0, 1)
+
+        # Compute action prediction loss.
+        embedding_s_tm1 = self._embedding_network(s_tm1)    # [5*B, latent_dim]
+        embedding_s_t = self._embedding_network(s_t)    # [5*B, latent_dim]
+        embeddings = torch.cat(
+            [embedding_s_tm1, embedding_s_t], dim=-1
+        )
+        pi_logits = self._embedding_network.inverse_prediction(embeddings)  # [5*B, action_dim]
+
+        loss = F.cross_entropy(pi_logits, a_tm1, reduction='none')  # [5*B,]
+        # Reshape loss into [5, B].
+        loss = loss.view(5, -1)
+
+        # Sums over time dimension. shape [B]
+        loss = torch.sum(loss, dim=0)
+        return loss
+    
+    @torch.no_grad()
+    def _normalize_rnd_obs(self, rnd_obs):
+        rnd_obs = rnd_obs.to(
+            device=self._device, dtype=torch.float32
+        )
+
+        normed_obs = self._rnd_obs_normalizer.normalize(rnd_obs)
+        normed_obs = normed_obs.clamp(-5, 5)
+
+        self._rnd_obs_normalizer.update(rnd_obs)
+
+        return normed_obs
+    
+    @torch.no_grad()
+    def _burn_in_unroll_q_networks(
+        self,
+        transitions: Agent57Transition,
+        network: torch.nn.Module,
+        target_network: torch.nn.Module,
+        ext_hidden_state: HiddenState,
+        int_hidden_state: HiddenState,
+    )-> Tuple[
+        HiddenState, HiddenState, HiddenState, HiddenState
+    ]:
+        """
+        Unroll both online and target q networks to generate hidden states
+            for LSTM.
+        """
+        s_t = torch.from_numpy(
+            transitions.s_t
+        ).to(device=self._device, dtype=torch.float32)  # [burn_in, B, state_shape]
+        last_action = torch.from_numpy(
+            transitions.last_action
+        ).to(device=self._device, dtype=torch.int64)    # [burn_in, B]
+        ext_r_t = torch.from_numpy(
+            transitions.ext_r_t
+        ).to(device=self._device, dtype=torch.float32)  # [burn_in, B]
+        int_r_t = torch.from_numpy(
+            transitions.int_r_t
+        ).to(device=self._device, dtype=torch.float32)  # [burn_in, B]
+        policy_index = torch.from_numpy(
+            transitions.policy_index
+        ).to(device=self._device, dtype=torch.int64)    # [burn_in, B]
+
+        # Rank and dtype checs, note have a new unroll time dimension, states may be images,   
+        # which is rank 5.
+        base.assert_rank_and_dtype(
+            s_t, (3, 5), torch.float32
+        )
+        base.assert_rank_and_dtype(
+            last_action, 2, torch.long
+        )
+        base.assert_rank_and_dtype(
+            ext_r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            int_r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            policy_index, 2, torch.long
+        )
+
+        _ext_hidden_s = tuple(
+            s.clone().to(device=self._device) for s in ext_hidden_state
+        )
+        _int_hidden_s = tuple(
+            s.clone().to(device=self._device) for s in int_hidden_state
+        )
+        _target_ext_hidden_s = tuple(
+            s.clone().to(device=self._device) for s in ext_hidden_state
+        )
+        _target_int_hidden_s = tuple(
+            s.clone().to(device=self._device) for s in int_hidden_state
+        )
+
+        # Burn in to generate hidden state for LSTM, unroll both online and target
+        # Q networks
+        output = network(
+            Agent57NetworkInputs(
+                s_t=s_t,
+                a_tm1=last_action,
+                ext_r_t=ext_r_t,
+                int_r_t=int_r_t,
+                policy_index=policy_index,
+                ext_hidden_s=_ext_hidden_s,
+                int_hidden_s=_int_hidden_s,
+            )
+        )
+
+        target_output = target_network(
+            Agent57NetworkInputs(
+                s_t=s_t,
+                a_tm1=last_action,
+                ext_r_t=ext_r_t,
+                int_r_t=int_r_t,
+                policy_index=policy_index,
+                ext_hidden_s=_target_ext_hidden_s,
+                int_hidden_s=_target_int_hidden_s,
+            )
+        )
+
+        return (
+            output.ext_hidden_s,
+            output.int_hidden_s,
+            target_output.ext_hidden_s,
+            target_output.int_hidden_s,
+        )
+    
+    def _extract_first_step_hidden_state(
+        self,
+        transitions: Agent57Transition,
+    )-> Tuple[HiddenState, HiddenState]:
+        """
+        Returns ext_hidden_state and int_hidden_state.
+        """
+        # Only need the first step hidden states in replay, shape 
+        # [batch_sze, num_lstm_layers, lstm_hidden_size].
+        ext_init_h = torch.from_numpy(
+            transitions.ext_init_h[0:1]
+        ).squeeze(0).to(device=self._device, dtype=torch.float32)
+        ext_init_c = torch.from_numpy(
+            transitions.ext_init_c[0:1]
+        ).squeeze(0).to(device=self._device, dtype=torch.float32)
+        int_init_h = torch.from_numpy(
+            transitions.int_init_h[0:1]
+        ).squeeze(0).to(device=self._device, dtype=torch.float32)
+        int_init_c = torch.from_numpy(
+            transitions.int_init_c[0:1]
+        ).squeeze(0).to(device=self._device, dtype=torch.float32)
+
+        # Rank and dtype checks.
+        base.assert_rank_and_dtype(
+            ext_init_h, 3, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            ext_init_c, 3, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            int_init_h, 3, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            int_init_c, 3, torch.float32
+        )
+
+        # Swap batch and num_lstm_layers axis.
+        ext_init_h = ext_init_h.swapaxes(0, 1)
+        ext_init_c = ext_init_c.swapaxes(0, 1)
+        int_init_h = int_init_h.swapaxes(0, 1)
+        int_init_c = int_init_c.swapaxes(0, 1)
+
+        # Batch dimension checks.
+        base.assert_batch_dimension(
+            ext_init_h, self._batch_size, 1
+        )
+        base.assert_batch_dimension(
+            ext_init_c, self._batch_size, 1
+        )
+        base.assert_batch_dimension(
+            int_init_h, self._batch_size, 1
+        )
+        base.assert_batch_dimension(
+            int_init_c, self._batch_size, 1
+        )
+
+        return (
+            (ext_init_h, ext_init_c), (int_init_h, int_init_c)
+        )
+    
+    def _update_target_network(self):
+        self._target_network.load_state_dict(
+            self._netowrk.state_dict()
+        )
+        self._target_update_t += 1
+    
+    @property
+    def statistics(self)-> Mapping[Text, float]:
+        """
+        Returns current agent statistics as a dictionary.
+        """
+        return {
+            # 'ext_lr': self._optimizer.param_groups[0]['lr'],
+            # 'int_lr': self._intrinsic_optimizer.param_groups[0]['lr']
+            'retrace_loss': self._retrace_loss_t,
+            'embed_loss': self._embed_loss_t,
+            'rnd_loss': self._rnd_loss_t,
+            'updates': self._update_t,
+            'target_updates': self._target_update_t,
+        }
