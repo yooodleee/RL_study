@@ -47,3 +47,43 @@ def initialize_weights(net: nn.Module)-> None:
                 nn.init.zeros_(module.bias)
 
 
+class NatureCnnBackboneNet(nn.Module):
+    """
+    DQN Nature paper conv2d layers backbone, returns feature representation
+        vector.
+    """
+
+    def __init__(self, state_dim: tuple)-> None:
+        super().__init__()
+
+        # Compute the output shape of final conv2d layer
+        c, h, w = calc_conv2d_output((h, w), 8, 4)
+        h, w = calc_conv2d_output((h, w), 4, 2)
+        h, w = calc_conv2d_output((h, w), 3, 1)
+
+        self.out_features = 64 * h * w
+
+        self.net = nn.Sequential(
+            nn.Conv2d(
+                in_channels=c, out_channels=32, kernel_size=8, stride=4
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=32, out_channels=64, kernel_size=4, stride=2
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=64, out_channels=64, kernel_size=3, stride=1
+            ),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+    
+    def forward(self, x: torch.Tensor)-> torch.Tensor:
+        """
+        Given raw state images, returns feature representation vector.
+        """
+        return self.net()
+    
+
+
