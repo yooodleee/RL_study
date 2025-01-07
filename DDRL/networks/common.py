@@ -133,3 +133,74 @@ class ResnetBlock(nn.Module):
         return out
     
 
+class NoisyLinear(nn.Module):
+    """
+    Factorized NoisyLinear layer with bias.
+
+    Code adapted form:
+        https://github.com/kaixhin/Rainbow/blob/master/model.py
+    """
+
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        std_init=0.5,
+    ):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.std_init = std_init
+        self.weight_mu = nn.Parameter(
+            torch.empty(out_features, in_features)
+        )
+        self.weight_sigma = nn.Parameter(
+            torch.empty(out_features, in_features)
+        )
+        self.register_buffer(
+            'weight_epsilon', torch.empty(out_features, in_features)
+        )
+        self.bias_mu = nn.Parameter(
+            torch.empty(out_features)
+        )
+        self.bias_sigma = nn.Parameter(
+            torch.empty(out_features)
+        )
+        self.register_buffer(
+            'bias_epsilon', torch.empty(out_features)
+        )
+        self.register_parameter()
+        self.reset_noise()
+    
+    def reset_parameter(self):
+        """
+        Only call this during initialization.
+        """
+        mu_range = 1 / math.sqrt(self.in_features)
+        self.weight_mu.data.uniform_(-mu_range, mu_range)
+        self.weight_sigma.data.fill_(self.std_init / math.sqrt(self.in_features))
+        self.bias_mu.data.uniform_(-mu_range, mu_range)
+        self.bias_sigma.data.fill_(self.std_init / math.sqrt(self.out_features))
+
+    def _scale_noise(self, size):
+        x = torch.randn(size, device=self.weight_mu.device)
+        return x.sign().mul_(x.abs().sqrt_())
+    
+    def reset_noise(self):
+        """
+        Should call this after doing backpropagation.
+        """
+        epsilon_in = self._scale_noise(self.in_features)
+        epsilon_out = self._scale_noise(self.out_features)
+        self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in))
+        self.bias_epsilon.copy_(epsilon_out)
+    
+    def forward(self, x):
+        if self.training:
+            weight = self.weight_mu + self.weight_sigma.mul(self.weight_epsilon)
+            bias = self.bias_mu + self.bias_sigma.mul(self.bias_epsilon)
+        else:
+            weight = self.weight_mu
+            bias = self.bias_mu
+        
+        return F.linear(x, weight, bias)
