@@ -687,7 +687,7 @@ class Learner(types_lib.Learner):
         self._rnd_predictor_network.train()
         self._intrinsic_optimizer = intrinsic_optimizer
 
-        self._rnd_target_network = rnd_predictor_network.to(
+        self._rnd_target_network = rnd_target_network.to(
             device=device
         )
         # Lazy way to create target Q networks
@@ -889,7 +889,7 @@ class Learner(types_lib.Learner):
         loss.backward()
 
         if self._clip_grad:
-            torch.nn.utils.clip_grad_norm(
+            torch.nn.utils.clip_grad_norm_(
                 self._netowrk.parameters(),
                 self._max_grad_norm,
             )
