@@ -87,3 +87,49 @@ class NatureCnnBackboneNet(nn.Module):
     
 
 
+class ResnetBlock(nn.Module):
+    """
+    Basic 3x3 residual block.
+    """
+
+    def __init__(
+        self,
+        num_planes: int,
+    )-> None:
+        super().__init__()
+
+        self.conv_block1 = nn.Sequential(
+            nn.Conv2d(
+                is_channels=num_planes,
+                out_channels=num_planes,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(num_features=num_planes),
+            nn.ReLU(),
+        )
+
+        self.conv_block2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=num_planes,
+                out_channels=num_planes,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            ),
+            nn.BatchNorm2d(num_features=num_planes),
+        )
+    
+    def forward(self, x: torch.Tensor)-> torch.Tensor:
+        residual = x
+        out = self.conv_block1(x)
+        out = self.conv_block2(out)
+        out += residual
+        out = F.relu(out)
+
+        return out
+    
+
