@@ -590,3 +590,335 @@ class Agent(types_lib.Agent):
         }
 
 
+class Learner(types_lib.Learner):
+    """
+    Agent57 learner.
+    """
+    
+    def __init__(
+        self,
+        network: nn.Module,
+        optimizer: torch.optim.Optimizer,
+        embedding_network: nn.Module,
+        rnd_target_network: nn.Module,
+        rnd_predictor_network: nn.Module,
+        intrinsic_optimizer: torch.optim.Optimizer,
+        replay: replay_lib.PrioritizedReplay,
+        target_net_update_interval: int,
+        min_replay_size: int,
+        batch_size: int,
+        unroll_length: int,
+        burn_in: int,
+        retrace_lambda: float,
+        transformed_retrace: bool,
+        priority_eta: float,
+        clip_reward: bool,
+        max_grad_norm: float,
+        device: torch.device,
+        shared_params: dict,
+    )-> None:
+        """
+        Args:
+            network: the Q network which want to train and optimize.
+            optimizer: the optimizer for Q network.
+            embedding_network: NGU action prediction network.
+            rnd_target_network: RND random network.
+            rnd_predictor_network: RND predictor network.
+            intrinsic_optimizer: the optimizer for action prediction and
+                RND predictor networks.
+            replay: prioritized recurrent experience replay.
+            target_net_update_ineterval: how often to copy online network 
+                parameters to target.
+            min_replay_size: wait till experience replay buffer this number 
+                before start to learn.
+            batch_size: sample batch_size of transitions.
+            burn_in: burn n transitions to generate initial hidden state before
+                learning.
+            unroll_length: transition sequence length.
+            retrace_lambda: coefficient of the retrace lambda.
+            transformed_retrace: if True, use transformed retrace.
+            priority_eta: coefficient to mix the max and mean absoulte TD errors.
+            clip_grad: if True, clip gradients norm.
+            max_grad_nrom: the maximum gradient norm for clip grad, only works if 
+                clip_grad is True.
+            device: pyTorch runtime device.
+            shared_params: a shared dict, so we can later update the parameters for 
+                actors.
+        """
+        if not 1 <= target_net_update_interval:
+            raise ValueError(
+                f'Expect target_net_update_interval to be positive integer, got {target_net_update_interval}'
+            )
+        if not 1 <= min_replay_size:
+            raise ValueError(
+                f'Expect min_replay_size to be integer greater than or equal to 1, got {min_replay_size}'
+            )
+        if not 1 <= batch_size <= 128:
+            raise ValueError(
+                f'Expect batch_size to in the range [1, 128], got {batch_size}'
+            )
+        if not 1 <= unroll_length:
+            raise ValueError(
+                f'Expect unroll_length to be greater than or equal to 1, got {unroll_length}'
+            )
+        if not 0 <= burn_in < unroll_length:
+            raise ValueError(
+                f'Expect burn_in length to be [0, {unroll_length}), got {burn_in}'
+            )
+        if not 0.0 <= retrace_lambda <= 1.0:
+            raise ValueError(
+                f'Expect retrace_lambda to in the range [0.0, 1.0], got {retrace_lambda}'
+            )
+        if not 0.0 <= priority_eta <= 1.0:
+            raise ValueError(
+                f'Expect priority_eta to in the range [0.0, 1.0], got {priority_eta}'
+            )
+        
+        self.agent_name = 'Agent57-learner'
+        self._device = device
+        self._netowrk = network.to(device=device)
+        self._netowrk.train()
+        self._optimizer = optimizer
+        self._embedding_network = embedding_network.to(device=device)
+        self._embedding_network.train()
+        self._rnd_predictor_network = rnd_predictor_network.to(
+            device=device
+        )
+        self._rnd_predictor_network.train()
+        self._intrinsic_optimizer = intrinsic_optimizer
+
+        self._rnd_target_network = rnd_predictor_network.to(
+            device=device
+        )
+        # Lazy way to create target Q networks
+        self._target_network = copy.deepcopy(
+            self._netowrk
+        ).to(device=device)
+
+        # Disable autograd for target Q networks, and RND target networks.
+        no_autograd(self._target_network)
+        no_autograd(self._rnd_target_network)
+
+        self._shared_params = shared_params
+
+        self._batch_size = batch_size
+        self._burn_in = burn_in
+        self._unroll_length = unroll_length
+        self._total_unroll_length = unroll_length + 1
+        self._target_net_update_interval = target_net_update_interval
+        self._clip_grad = clip_reward
+        self._max_grad_norm = max_grad_norm
+
+        # Accumulate running statistics to calculate mean and std
+        self._rnd_obs_normalizer = normalizer.TorchRnningMeanStd(
+            shape=(1, 84, 84), device=self._device
+        )
+
+        self._replay = replay
+        self._min_replay_size = min_replay_size
+        self._priority_eta = priority_eta
+
+        self._max_see_priority = 1.0    # New unroll will use this as priority
+
+        self._retrace_lambda = retrace_lambda
+        self._transformed_retrace = transformed_retrace
+
+        self._step_t = -1
+        self._update_t = 0
+        self._target_update_t = 0
+        self._retrace_loss_t = np.nan
+        self._embed_loss_t = np.nan
+    
+    def step(self)-> Iterable[Mapping[Text, float]]:
+        """
+        Increment learner step, and potentially do a update when called.
+
+        Yields:
+            learner statistics if network parameters update occurred,
+                otherwise returns None.
+        """
+        self._step_t += 1
+
+        if self._replay.size < self._min_replay_size \
+            or self._step_t % max(4, int(self._batch_size * 0.25)) != 0:
+            return
+        
+        self._learn()
+        yield self.statistics
+    
+    def reset(self)-> None:
+        """
+        Should be called at the beginning of every iteration.
+        """
+    
+    def received_item_from_queue(self, item)-> None:
+        """
+        Received item send by actors through multiprocessing queue.
+        """
+        self._replay.add(
+            item, self._max_see_priority
+        )
+    
+    def get_network_state_dict(self):
+        """
+        To keep things consistent, move the parameters to CPU.
+        """
+        return {
+            k: v.cpu() for k, v in self._netowrk.state_dict().items()
+        }
+    
+    def get_embedding_network_state_dict(self):
+        """
+        To keep things consistent, move the parameters to CPU.
+        """
+        return {
+            k: v.cpu() for k, v in self._embedding_network.state_dict().items()
+        }
+    
+    def get_rnd_predictor_network_state_dict(self):
+        """
+        To keep things consistent, move the parameters to CPU.
+        """
+        return {
+            k: v.cpu() for k, v in self._rnd_predictor_network.state_dict().items()
+        }
+    
+    def _learn(self)-> None:
+        transitions, indices, weights = self._replay.sample(self._batch_size)
+        priorities = self._update_q_network(transitions, weights)
+        self._update_embed_and_rnd_predictor_networks(
+            transitions, weights
+        )
+
+        self._update_t += 1
+
+        if priorities.shape != (self._batch_size):
+            raise RuntimeError(
+                f'Expect priorities has shape ({self._batch_size},), '
+                f'got {priorities.shape}'
+            )
+        priorities = np.abs(priorities)
+        self._max_seen_priority = np.max(
+            [self._max_seen_priority, np.max(priorities)]
+        )
+        self._replay.update_priorities(indices, priorities)
+
+        self._shared_params['network'] = self.get_network_state_dict()
+        self._shared_params['embedding_network'] = self.get_embedding_network_state_dict()
+        self._shared_params['rnd_predictor_network'] = \
+            self.get_rnd_predictor_network_state_dict()
+        
+        # Copy Q network parameters to taget Q network, every m updates
+        if self._update_t > 1 and self._update_t % self._target_net_update_interval == 0:
+            self._update_target_network()
+    
+    def _update_q_network(
+        self,
+        transitions: Agent57Transition,
+        weights: np.ndarray,
+    )-> np.ndarray:
+        weights = torch.from_numpy(weights).to(
+            device=self._device,
+            dtype=torch.float32,
+        )   # [B,]
+        base.assert_rank_and_dtype(weights, 1, torch.float32)
+
+        # Get initial hidden state for batch extrinsic and intrinsic Q networks,
+        # handle possible burn in.
+        init_ext_hidden_s, init_int_hidden_s = \
+            self._extract_first_step_hidden_state(transitions)
+        burn_transitions, learn_transitions = \
+            replay_lib.split_structure(
+                transitions, TransitionStructure, self._burn_in
+            )
+        
+        if burn_transitions is not None:
+            # Burn in for extrinsic and intrinsic Q networks.
+            init_ext_hidden_s, int_hidden_s, target_ext_hidden_s, target_int_hidden_s = \
+                self._burn_in_unroll_q_networks(
+                    burn_transitions,
+                    self._netowrk,
+                    self._target_network,
+                    init_ext_hidden_s,
+                    init_int_hidden_s,
+                )
+        else:
+            # Make copy of hidden state for extrinsic Q networks.
+            ext_hidden_s = tuple(
+                s.clone().to(device=self._device) for s in init_ext_hidden_s
+            )
+            target_ext_hidden_s = tuple(
+                s.clone().to(device=self._device) for s in init_ext_hidden_s
+            )
+            # Make copy of hidden state for intrinsic Q networks.
+            int_hidden_s = tuple(
+                s.clone().to(device=self._device) for s in init_int_hidden_s
+            )
+            target_int_hidden_s = tuple(
+                s.clone().to(device=self._device) for s in init_int_hidden_s
+            )
+        
+        # Update Q network.
+        self._optimizer.zero_grad()
+
+        # Do network pass for all four Q networks to get estimated q values.
+        ext_q_t, int_q_t = self._get_predicted_q_values(
+            learn_transitions, self._netowrk, ext_hidden_s, int_hidden_s
+        )
+
+        with torch.no_grad():
+            target_ext_q_t, target_int_q_t = self._get_predicted_q_values(
+                learn_transitions,
+                self._target_network,
+                target_ext_hidden_s,
+                target_int_hidden_s,
+            )
+        
+        ext_retrace_loss, ext_priorities = self._calc_retrace_loss(
+            learn_transitions, ext_q_t, target_ext_q_t.detach()
+        )
+        int_retrace_loss, int_priorities = self._calc_retrace_loss(
+            learn_transitions, int_q_t, target_int_q_t.detach()
+        )
+
+        # Multiply loss bt sampling weights, averaging over batch dimension
+        loss = torch.mean(
+            (ext_retrace_loss + int_retrace_loss) * weights.detach()
+        )
+
+        loss.backward()
+
+        if self._clip_grad:
+            torch.nn.utils.clip_grad_norm(
+                self._netowrk.parameters(),
+                self._max_grad_norm,
+            )
+        
+        self._optimizer.step()
+
+        priorities = 0.8 * ext_priorities + 0.2 * int_priorities
+
+        # For logging only.
+        self._retrace_loss_t = loss.detach().cpu().item()
+
+        return priorities
+    
+    def _get_predicted_q_values(
+        self,
+        transitions: Agent57Transition,
+        network: torch.nn.Module,
+        ext_hidden_state: HiddenState,
+        int_hidden_state: HiddenState,
+    )-> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Returns the predicted q values from the network for a given batch 
+            of sampled unrolls.
+
+        Args:
+            transitions: sampled batch of unrolls, this should not include
+                the burn_in part.
+            network: this could be any one of the extrinsic and intrinsic 
+                (online or target) networks.
+            ext_hidden_state: initial hidden states for the network.
+            int_hidden_state: initial hidden states for the network.
+        """
