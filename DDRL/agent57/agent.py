@@ -922,3 +922,168 @@ class Learner(types_lib.Learner):
             ext_hidden_state: initial hidden states for the network.
             int_hidden_state: initial hidden states for the network.
         """
+        s_t = torch.from_numpy(
+            transitions.s_t
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B, state_shape]
+        last_action = torch.from_numpy(
+            transitions.last_action
+        ).to(device=self._device, dtype=torch.int64)    # [T+1, B]
+        ext_r_t = torch.from_numpy(
+            transitions.ext_r_t
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        int_r_t = torch.from_numpy(
+            transitions.int_r_t
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        policy_index = torch.from_numpy(
+            transitions.policy_index
+        ).to(device=self._device, dtype=torch.int64)    # [T+1, B]
+
+        # Rank and dtype checks, note we have a new unroll time dimension, 
+        # states may be images, which is rank 5.
+        base.assert_rank_and_dtype(
+            s_t, (3, 5), torch.float32
+        )
+        base.assert_rank_and_dtype(
+            last_action, 2, torch.long
+        )
+        base.assert_rank_and_dtype(
+            ext_r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            int_r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            policy_index, 2, torch.long
+        )
+
+        # Rank and dtype checks for hidden state.
+        base.assert_rank_and_dtype(
+            ext_hidden_state[0], 3, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            ext_hidden_state[1], 3, torch.float32
+        )
+        base.assert_batch_dimension(
+            ext_hidden_state[0], self._batch_size, 1
+        )
+        base.assert_batch_dimension(
+            ext_hidden_state[1], self._batch_size, 1
+        )
+        base.assert_rank_and_dtype(
+            int_hidden_state[0], 3, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            int_hidden_state[1], 3, torch.float32
+        )
+        base.assert_batch_dimension(
+            int_hidden_state[0], self._batch_size, 1
+        )
+        base.assert_batch_dimension(
+            int_hidden_state[1], self._batch_size, 1
+        )
+
+        # Get q values from Q network,
+        output = network(
+            Agent57NetworkInputs(
+                s_t=s_t,
+                a_tm1=last_action,
+                ext_r_t=ext_r_t,
+                int_r_t=int_r_t,
+                policy_index=policy_index,
+                ext_hidden_state=ext_hidden_state,
+                int_hidden_state=int_hidden_state,
+            )
+        )
+
+        return (
+            output.ext_q_values, output.int_q_values
+        )
+    
+    def _calc_retrace_loss(
+        self,
+        transitions: Agent57Transition,
+        q_t: torch.Tensor,
+        target_q_t: torch.Tensor,
+    )-> Tuple[torch.Tensor, np.ndarray]:
+        a_t = torch.from_numpy(
+            transitions.a_t
+        ).to(device=self._device, dtype=torch.int64)    # [T+1, B]
+        behavior_prob_a_t = torch.from_numpy(
+            transitions.prob_a_t
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        ext_r_t = torch.from_numpy(
+            transitions.ext_r_t
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        int_r_t = torch.from_numpy(
+            transitions.int_r_t
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        beta = torch.from_numpy(
+            transitions.beta
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        discount = torch.from_numpy(
+            transitions.discount
+        ).to(device=self._device, dtype=torch.float32)  # [T+1, B]
+        done = torch.from_numpy(
+            transitions.done
+        ).to(device=self._device, dtype=torch.bool) # [T+1, B]
+
+        # Rank and dtype checks, note have a new unroll time dimension,
+        # states may be images, which is rank 5.
+        base.assert_rank_and_dtype(
+            behavior_prob_a_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            a_t, 2, torch.long
+        )
+        base.assert_rank_and_dtype(
+            ext_r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            int_r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            beta, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            discount, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            done, 2, torch.bool
+        )
+
+        r_t = ext_r_t + beta * int_r_t  # Augmented rewards
+        discount_t = (~done).float() * discount # (T+1, B)
+
+        # Derive target policy probabilities from q values.
+        target_policy_probs = F.softmax(
+            target_q_t, dim=-1
+        )   # [T+1, B, action_dim]
+
+        if self._transformed_retrace:
+            transform_tx_pair = nonlinear_bellman.SIGNED_HYPERBOLIC_PAIR
+        else:
+            transform_tx_pair = nonlinear_bellman.IDENTITY_PAIR # No transform
+        
+        # Compute retrace loss.
+        retrate_out = nonlinear_bellman.transformed_retrace(
+            q_tm1=q_t[:-1],
+            q_t=target_q_t[1:],
+            a_tm1=a_t[:-1],
+            a_t=a_t[1:],
+            r_t=r_t[1:],
+            discount_t=discount_t[1:],
+            pi_t=target_policy_probs[1:],
+            mu_t=behavior_prob_a_t[1:],
+            lambda_=self._retrace_lambda,
+            tx_pair=transform_tx_pair,
+        )
+
+        # Compute priority.
+        priorities = distributed.calculate_dist_priorities_from_td_error(
+            retrate_out.extra.td_error, self._priority_eta
+        )
+
+        # Sums over time dimension.
+        loss = torch.sum(retrate_out, dim=0)
+
+        return loss, priorities
