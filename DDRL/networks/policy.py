@@ -13,3 +13,9 @@ from typing import (
 
 # pylint: disable=import-error
 from networks import common
+
+
+class ActorNetworkOutputs(NamedTuple):
+    pi_logits: torch.Tensor
+
+
