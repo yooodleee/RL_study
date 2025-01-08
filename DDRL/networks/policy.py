@@ -114,3 +114,53 @@ class CriticMlpNet(nn.Module):
         return CriticNetworkOutputs(value=value)
     
 
+class ActorCriticMlpNet(nn.Module):
+    """
+    Actor-Critic MLP network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    )-> None:
+        super().__init__()
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+        )
+
+        self.policy_head = nn.Sequential(
+            # nn.Linear(64, 64),
+            # nn.ReLU(),
+            nn.Linear(64, action_dim),
+        )
+        self.baseline_head = nn.Sequential(
+            # nn.Linear(64, 64),
+            # nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> ActorCriticNetworkOutputs:
+        """
+        Given raw state x, predict the action probability distribution
+            and state-values.
+        """
+        # Extract features from raw input state.
+        features = self.body(x)
+
+        # Predict action distribution wrt policy
+        pi_logits = self.policy_head(features)
+
+        # Predict state-value
+        value = self.baseline_head(features)
+
+        return ActorCriticNetworkOutputs(
+            pi_logits=pi_logits, value=value
+        )
+
+
