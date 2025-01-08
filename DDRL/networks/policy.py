@@ -164,3 +164,58 @@ class ActorCriticMlpNet(nn.Module):
         )
 
 
+class GaussianActorMlpNet(nn.Module):
+    """
+    Gaussian Actor MLP network for continuous action space.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        hidden_size: int,
+    )-> None:
+        super().__init__()
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+        )
+
+        self.mu_head = nn.Sequential(
+            # nn.Linear(hidden_size, hidden_size),
+            # nn.Tanh(),
+            nn.Linear(hidden_size, action_dim),
+        )
+
+        # self.sigma_head = nn.Sequential(
+        #       nn.Linear(hidden_size, hidden_size)
+        #       nn.Tanh(),
+        #       nn.Linear(hidden_size, action_dim),
+        # )
+        self.logstd = nn.Parameter(
+            torch.zeros(1, action_dim)
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> Tuple[torch.Tensor]:
+        """
+        Given raw state x, predict the action probability distribution
+            and state-value.
+        """
+        features = self.body(x)
+
+        # Predict action distributions wrt policy
+        pi_mu = self.mu_head(features)
+        # pi_sigma = torch.exp(self.sigma_head(features))
+
+        logstd = self.logstd.expand_as(pi_mu)
+        pi_sigma = torch.exp(logstd)
+
+        return pi_mu, pi_sigma
+
+
