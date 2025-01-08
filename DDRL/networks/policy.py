@@ -520,3 +520,39 @@ class ActorConvNet(nn.Module):
         return ActorNetworkOutputs(pi_logits=pi_logits)
 
 
+class CriticConvNet(nn.Module):
+    """
+    Critic conv2d network.
+    """
+
+    def __init__(
+        self, state_dim: int
+    )-> None:
+        super().__init__()
+
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.baseline_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+        )
+
+        # Initialize weights
+        common.initialize_weights(self)
+
+    def forward(
+        self, x: torch.Tensor
+    )-> CriticNetworkOutputs:
+        """
+        Given raw state x, predict the state-value.
+        """
+        # Extract features from raw input state
+        x = x.float() / 255.0
+        features = self.body(x)
+
+        # Predict state-value
+        value = self.baseline_head(features)
+        return CriticNetworkOutputs(value=value)
+
+
