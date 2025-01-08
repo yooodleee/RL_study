@@ -19,3 +19,7 @@ class ActorNetworkOutputs(NamedTuple):
     pi_logits: torch.Tensor
 
 
+class CriticNetworkOutputs(NamedTuple):
+    value: torch.Tensor
+
+
