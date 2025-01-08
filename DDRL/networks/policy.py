@@ -605,3 +605,115 @@ class ActorCriticConvNet(nn.Module):
         )
 
 
+class ImpalaActorCriticConvNet(nn.Module):
+    """
+    IMPALA Actor-Critic Conv2d network, with LSTM.
+
+    Reference code from Facebook Torchbest:
+        https://github.com/facebookresearch/torchbeast/blob/0af07b051a2176a8f9fd20c36891ba2bba6bae68/torchbeast/polybeast_learner.py#L135
+    """
+
+    def __init__(
+        self,
+        state_dim: tuple,
+        action_dim: int,
+        use_lstm: bool = False,
+    )-> None:
+        super().__init__()
+
+        self.action_dim = action_dim
+        self.use_lstm = use_lstm
+
+        assert state_dim[1] == state_dim[2] == 84
+
+        self.feat_convs = []
+        self.resnet1 = []
+        self.resnet2 = []
+
+        self.convs = []
+
+        input_channels = state_dim[0]
+        for num_ch in [16, 32, 32]:
+            feats_convs = []
+            feats_convs.append(
+                nn.Conv2d(
+                    in_channels=input_channels,
+                    out_channels=num_ch,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                )
+            )
+            feats_convs.append(
+                nn.MaxPool2d(
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                )
+            )
+            self.feat_convs.append(nn.Sequential(**feats_convs))
+
+            input_channels = num_ch
+
+            for i in range(2):
+                resnet_block = []
+                resnet_block.append(nn.ReLU())
+                resnet_block.append(
+                    nn.Conv2d(
+                        in_channels=input_channels,
+                        out_channels=num_ch,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    )
+                )
+                resnet_block.append(nn.ReLU())
+                resnet_block.append(
+                    nn.Conv2d(
+                        in_channels=input_channels,
+                        out_channels=num_ch,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    )
+                )
+                if i == 0:
+                    self.resnet1.append(
+                        nn.Sequential(**resnet_block)
+                    )
+                else:
+                    self.resnet2.append(
+                        nn.Sequential(**resnet_block)
+                    )
+
+        self.feat_convs = nn.ModuleList(self.feat_convs)
+        self.resnet1 = nn.ModuleList(self.resnet1)
+        self.resnet2 = nn.ModuleList(self.resnet2)
+
+        self.fc = nn.Linear(3872, 256)
+
+        # Feature representation output size + one-hot of last action + last reward.
+        core_output_size = self.fc.out_features + self.action_dim + 1
+
+        if self.use_lstm:
+            self.lstm = nn.LSTM(
+                input_size=core_output_size,
+                hidden_size=256,
+                num_layers=1,
+            )
+            core_output_size = 256
+        
+        self.policy_head = nn.Sequential(
+            nn.Linear(core_output_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim),
+        )
+
+        self.baseline_head = nn.Sequential(
+            nn.Linear(core_output_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+        )
+
+        # Initialize weights
+        common.initialize_weights(self)
