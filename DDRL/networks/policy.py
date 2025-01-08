@@ -479,3 +479,44 @@ class RndActorCriticMlpNet(nn.Module):
         )
 
 
+# ====================================================
+# Convolutional Neural Networks
+# ====================================================
+
+
+class ActorConvNet(nn.Module):
+    """
+    Actor Conv2d network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    )-> None:
+        super().__init__()
+
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.policy_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim),
+        )
+
+        # Initialize weights
+        common.initialize_weights(self)
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> ActorNetworkOutputs:
+        """
+        Given raw state x, predict the action probability distribution.
+        """
+        # Extract features from raw input state.
+        x = x.float() / 255.0
+        features = self.body(x)
+
+        # Predict action distribution wrt policy
+        pi_logits = self.policy_head(features)
+        return ActorNetworkOutputs(pi_logits=pi_logits)
+
+
