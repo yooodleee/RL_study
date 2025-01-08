@@ -87,3 +87,30 @@ class ActorMlpNet(nn.Module):
         )
 
 
+class CriticMlpNet(nn.Module):
+    """
+    Critic MLP network.
+    """
+
+    def __init__(
+        self, state_dim: int
+    )-> None:
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> CriticNetworkOutputs:
+        """
+        Given raw state x, predict the state-value.
+        """
+        value = self.net(x)
+        return CriticNetworkOutputs(value=value)
+    
+
