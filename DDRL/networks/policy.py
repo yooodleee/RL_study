@@ -28,3 +28,9 @@ class ActorCriticNetworkOutputs(NamedTuple):
     value: torch.Tensor
 
 
+class ImpalaActorCriticNetworkOutputs(NamedTuple):
+    pi_logits: torch.Tensor
+    value: torch.Tensor
+    hidden_s: torch.Tensor
+
+
