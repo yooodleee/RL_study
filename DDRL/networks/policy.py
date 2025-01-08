@@ -57,3 +57,33 @@ class RndActorCriticNetworkOutputs(NamedTuple):
 # =====================================================
 
 
+class ActorMlpNet(nn.Module):
+    """
+    Actor MLP network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    )-> None:
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_dim),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> ActorNetworkOutputs:
+        """
+        Given raw state x, predict the action probability distribution.
+        """
+        # Predict action distribution wrt policy
+        pi_logits = self.net(x)
+
+        return ActorNetworkOutputs(
+            pi_logits=pi_logits
+        )
+
+
