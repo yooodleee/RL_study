@@ -417,3 +417,65 @@ class ImpalaActorCriticMlpNet(nn.Module):
         )
 
 
+class RndActorCriticMlpNet(nn.Module):
+    """
+    Actor-Critic MLP network with two value heads.
+
+    From the paper "Exploration by Random Network Distillation
+        https://arxiv.org/abs/1810.12894.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    )-> None:
+        super().__init__()
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+        )
+
+        self.policy_head = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_dim),
+        )
+
+        self.ext_baseline_head = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+
+        self.int_baseline_head = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> RndActorCriticNetworkOutputs:
+        """
+        Given raw state x, predict the action probability distribution,
+            and extrinsic and intrinsic value values.
+        """
+        # Extract features from raw input state
+        features = self.body(x)
+
+        # Predict action distribution wrt policy
+        pi_logits = self.policy_head(features)
+
+        # Predict state-value
+        ext_baseline = self.ext_baseline_head(features)
+        int_baseline = self.int_baseline_head(features)
+
+        return RndActorCriticNetworkOutputs(
+            pi_logits=pi_logits,
+            ext_baseline=ext_baseline,
+            int_baseline=int_baseline,
+        )
+
+
