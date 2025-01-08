@@ -556,3 +556,52 @@ class CriticConvNet(nn.Module):
         return CriticNetworkOutputs(value=value)
 
 
+class ActorCriticConvNet(nn.Module):
+    """
+    Actor-Critic Conv2d network.
+    """
+
+    def __init__(
+        self, state_dim: tuple, action_dim: int
+    )-> None:
+        super().__init__()
+
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.policy_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim),
+        )
+
+        self.baseline_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+        )
+
+        # Initialize weights
+        common.initialize_weights(self)
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> ActorCriticNetworkOutputs:
+        """
+        Given raw state x, predict the action probability distribution
+            and state-value.
+        """
+        # Extract features from raw input state
+        x = x.float() / 255.0
+        features = self.body(x)
+        
+        # Predict action distributions wrt policy
+        pi_logits = self.policy_head(features)
+
+        # Predict state-value
+        value = self.baseline_head(features)
+
+        return ActorCriticNetworkOutputs(
+            pi_logits=pi_logits, value=value
+        )
+
+
