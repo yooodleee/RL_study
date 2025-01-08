@@ -42,3 +42,18 @@ class ImpalaActorCriticNetworkInputs(NamedTuple):
     hidden_s: Optional[Tuple[torch.Tensor]]
 
 
+class RndActorCriticNetworkOutputs(NamedTuple):
+    """
+    Random Network Distillation.
+    """
+
+    pi_logits: torch.Tensor
+    int_baseline: torch.Tensor  # intrinsic value head
+    ext_baseline: torch.Tensor  # extrinsic value head
+
+
+# =====================================================
+# Fully connected Neural Networks
+# =====================================================
+
+
