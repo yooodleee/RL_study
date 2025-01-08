@@ -219,3 +219,33 @@ class GaussianActorMlpNet(nn.Module):
         return pi_mu, pi_sigma
 
 
+class GaussianCriticMlpNet(nn.Module):
+    """
+    Gaussian Critic MLP network for continuous action space.
+    """
+
+    def __init__(
+        self, state_dim: int, hidden_size: int
+    )-> None:
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> torch.Tensor:
+        """
+        Given raw state x, predict the state-value.
+        """
+
+        # Predict state-value
+        value = self.net(x)
+
+        return value
+
+
