@@ -29,3 +29,9 @@ class QRDqnNetworkOutputs(NamedTuple):
     q_dist = torch.Tensor
 
 
+class IqnNetworkOutputs(NamedTuple):
+    q_values = torch.Tensor
+    q_dist = torch.Tensor
+    taus = torch.Tensor
+
+
