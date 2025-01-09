@@ -364,3 +364,64 @@ class RainbowDqnMlpNet(nn.Module):
                 module.reset_noise()
 
 
+class QRDqnMlNet(nn.Module):
+    """
+    Quantile Regression DQN MLP network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int, 
+        action_dim: int,
+        quantiles: torch.Tensor,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear shape
+            quantile: the quantile for QR DQN
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        if len(quantiles.shape) != 1:
+            raise ValueError(
+                f'Expect quantiles to be a 1D tensor, got {quantiles.shape}'
+            )
+        
+        super().__init__()
+        self.taus = quantiles
+        self.num_taus = quantiles.size(0)
+        self.action_dim = action_dim
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim * self.num_taus),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> QRDqnNetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+        # No softmax as the model is trying to approximate the 'whole' probability 
+        # distributions
+        q_dist = self.body(x).view(
+            -1, self.num_taus, self.action_dim
+        )   # [batch_size, num_taus, action_dim]
+        q_values = torch.mean(q_dist, dim=1)
+
+        return QRDqnNetworkOutputs(
+            q_values=q_values, q_dist=q_dist
+        )
+
+
