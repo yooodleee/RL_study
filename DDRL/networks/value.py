@@ -51,3 +51,18 @@ class RnnDqnNetworkOutputs(NamedTuple):
     ]
 
 
+class NguNetworkInputs(NamedTuple):
+    """
+    Never give up agent network input.
+    """
+
+    s_t: torch.Tensor
+    a_tm1: torch.Tensor
+    ext_r_t: torch.Tensor   # extrinsic reward for (s_tm1, a_tm1), but received at current timestep.
+    int_r_t: torch.Tensor   # intrinsic reward for (s_tm1)
+    policy_index: torch.Tensor  # index for intrinsic reward scale beta and discount
+    hidden_s: Optional[
+        Tuple[torch.Tensor, torch.Tensor]
+    ]
+
+
