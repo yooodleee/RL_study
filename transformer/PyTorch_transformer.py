@@ -12,6 +12,13 @@ import torch.nn as nn
 
 
 class SelfAttention(nn.Module):
+    """
+    SelfAttention.
+
+    Args:
+        embed_size: the embedding size.
+        heads: the num_heads.
+    """
 
     def __init__(
         self, embed_size, heads
@@ -110,6 +117,15 @@ class SelfAttention(nn.Module):
 
 
 class TransformerBlock(nn.Module):
+    """
+    TransformerBlock.
+
+    Args:
+        embed_size: the embedding size.
+        heads: the num_heads.
+        dropout: the dropout.
+        forward_expansion: the forward expansion.
+    """
 
     def __init__(
         self,
@@ -154,14 +170,14 @@ class Encoder(nn.Module):
     Encoder architecture.
 
     Args:
-        src_vocab_size:
-        embed_size:
-        num_layers:
-        heads:
-        device:
-        forward_expansion:
-        dropout:
-        max_length:
+        src_vocab_size: the source vocab size.
+        embed_size: the embedding size.
+        num_layers: the num layers.
+        heads: the num_heads.
+        device: the device.
+        forward_expansion: the forward expansion.
+        dropout: the dropout.
+        max_length: the max length.
     """
 
     def __init__(
@@ -224,11 +240,11 @@ class DecoderBlock(nn.Module):
     DecoderBolock
     
     Args:
-        embed_size:
-        heads:
-        forward_expansion:
-        dropout:
-        device:
+        embed_size: the embed size.
+        heads: the num heads.
+        forward_expansion: the forward dexpansion.
+        dropout: the dropout.
+        device: the device.
     """
 
     def __init__(
@@ -274,14 +290,14 @@ class Decoder(nn.Module):
     Decoder architecture.
 
     Args:
-        trg_vocab_size:
-        embed_size:
-        num_layers:
-        heads:
-        forward_expansion:
-        dropout:
-        device:
-        max_length:
+        trg_vocab_size: the target vocab size.
+        embed_size: the embed size.
+        num_layers: the num layers.
+        heads: the num heads.
+        forward_expansion: the forward expansion.
+        dropout: the dropout.
+        device: the device.
+        max_length: the max length.
     """
 
     def __init__(
@@ -357,20 +373,24 @@ class Decoder(nn.Module):
 
 class Transformer(nn.Module):
     """
-    Transformer.
+    Desicion Transformer's hyperparameter.
+    More information for hyperparameter:
+        "Attention is all you need!"
 
     Args:
-        src_vocab_size:
-        trg_vocab_size:
-        src_pad_idx:
-        trg_pad_idx:
-        embed_size:
-        num_layers:
+        src_vocab_size: the source vocab size.
+        trg_vocab_size: the target vocab size.
+        src_pad_idx: the soruce padding index.
+        trg_pad_idx: the target padding index.
+        embed_size: desicioned input/output size. also embedding vector's channel is
+            d_model. each encoder and decoder keep this dimension when they transfer
+            to next layer's encoder and decoder.
+        num_layers: the transformer's encoder is 6 layers. And also decoder is 6 layers.
         forward_expansion:
-        heads:
-        dropout:
-        deivce:
-        max_length:
+        heads: the parallel partition num_heads
+        dropout: the dropout
+        deivce: use cpu or gpu?
+        max_length: the max length.
     """
 
     def __init__(
