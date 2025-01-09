@@ -267,3 +267,100 @@ class C51DqnMlpNet(nn.Module):
         )
 
 
+class RainbowDqnMlpNet(nn.Module):
+    """
+    Rainbow combines C51, dueling architecture, and noisy net.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        atoms: torch.Tensor,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+            atoms: the support for q value distribution, used here to turn
+                Z into Q values
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        if len(atoms.shape) != 1:
+            raise ValueError(
+                f'Expect atoms to be a 1D tensor, got {atoms.shape}'
+            )
+        
+        super().__init__()
+
+        self.action_dim = action_dim
+        self.atoms = atoms
+        self.num_atoms = atoms.size(0)
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+        )
+
+        self.advantage_head = nn.Sequential(
+            common.NoisyLinear(128, 128),
+            nn.ReLU(),
+            common.NoisyLinear(128, action_dim * self.num_atoms),
+        )
+        self.value_head = nn.Sequential(
+            common.NoisyLinear(128, 128),
+            nn.ReLU(),
+            common.NoisyLinear(128, 1 & self.num_atoms),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> C51NetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+        x = self.body(x)
+        advantages = self.advantage_head(x)
+        values = self.value_head(x)
+
+        advantages = advantages.view(
+            -1, self.action_dim, self.num_atoms
+        )
+        values = values.view(-1, 1, self.num_atoms)
+
+        q_logits = values + (
+            advantages - torch.mean(advantages, dim=1, keepdim=True)
+        )
+        q_logits = q_logits.view(
+            -1, self.action_dim, self.num_atoms
+        )   # [batch_size, action_dim, num_atoms]
+
+        q_dist = F.softmax(q_logits, dim=-1)
+        atoms = self.atoms[None, None, :].to(device=x.device)
+        q_values = torch.sum(q_dist * atoms, dim=-1)
+
+        return C51NetworkOutputs(
+            q_logits=q_logits, q_values=q_values
+        )
+    
+    def reset_noise(self)-> None:
+        """
+        Reset noisy layer.
+        """
+        # Combine two lists into one: list(chain(*zip(a, b)))
+        for module in list(chain(*zip(
+            self.advantage_head.modules(), self.value_head.modules()
+        ))):
+            if isinstance(module, common.NoisyLinear):
+                module.reset_noise()
+
+
