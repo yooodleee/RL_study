@@ -855,3 +855,102 @@ class ImpalaActorCriticConvNet(nn.Module):
         )
 
 
+class RndActorCriticConvNet(nn.Module):
+    """
+    Actor-Critic Conv2d network with two value heads.
+
+    From the paper "Exploration by Random Network Distillation"
+        https://arxiv.org/abs/1810.12894.
+    """
+
+    def __init__(
+        self, state_dim: tuple, action_dim: int
+    )-> None:
+        c, h, w = state_dim
+        h, w = common.calc_conv2d_output((h, w), 8, 4)
+        h, w = common.calc_conv2d_output((h, w), 4, 2)
+        h, w = common.calc_conv2d_output((h, w), 3, 1)
+        conv2d_out_size = 64 * h * w
+
+        self.body = nn.Sequential(
+            nn.Conv2d(
+                in_channels=c,
+                out_channels=32,
+                kernel_size=8,
+                stride=4,
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=4,
+                stride=2,
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=3,
+                stride=1,
+            ),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(conv2d_out_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 448),
+            nn.ReLU(),
+        )
+
+        self.extra_policy_fc = nn.Linear(448, 448)
+        self.extra_value_fc = nn.Linear(448, 448)
+
+        self.policy_head = nn.Linear(448, action_dim)
+        self.ext_value_head = nn.Linear(448, 1)
+        self.int_value_head = nn.Linear(448, 1)
+
+        for layer in self.body.modules():
+            if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                layer.bias.data.zero_()
+        
+        for layer in [self.extra_policy_fc, self.extra_value_fc]:
+            nn.init.orthogonal_(layer.weight, gain=np.sqrt(0.1))
+            layer.bias.data.zero_()
+
+        for layer in [
+            self.policy_head,
+            self.ext_value_head,
+            self.int_value_head,
+        ]:
+            nn.init.orthogonal_(layer.weight, gain=np.sqrt(0.01))
+            layer.bias.data.zero_()
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> RndActorCriticNetworkOutputs:
+        """
+        Given raw state x, predict the action probability distribution,
+            and extrinsic and intrinsic value values.
+        """
+        # Extract features from raw input state
+        x = x.float() / 255.0
+        features = self.body(x)
+
+        # Predict action distributions wrt policy
+        pi_features = features + F.relu(
+            self.extra_policy_fc(features)
+        )
+        pi_logits = self.policy_head(pi_features)
+
+        # Predict state-value
+        value_features = features + F.relu(
+            self.extra_policy_fc(features)
+        )
+        ext_baseline = self.ext_value_head(value_features)
+        int_baseline = self.int_value_head(value_features)
+
+        return RndActorCriticNetworkOutputs(
+            pi_logits=pi_logits,
+            ext_baseline=ext_baseline,
+            int_baseline=int_baseline,
+        )
