@@ -84,3 +84,14 @@ class Agent57NetworkInputs(NamedTuple):
     ]
 
 
+class Agent57NetworkOutputs(NamedTuple):
+    ext_q_values: torch.Tensor
+    int_q_values: torch.Tensor
+    ext_hidden_s: Optional[
+        Tuple[torch.Tensor, torch.Tensor]
+    ]
+    int_hidden_s: Optional[
+        Tuple[torch.Tensor, torch.Tensor]
+    ]
+
+
