@@ -95,3 +95,51 @@ class Agent57NetworkOutputs(NamedTuple):
     ]
 
 
+# =============================================
+# Fully connected Neural Networks
+# =============================================
+
+
+class DqnMlpNet(nn.Module):
+    """
+    MLP DQN network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        
+        super().__init__()
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> DqnNetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+
+        q_values = self.body(x) # [batch_size, action_dim]
+        return DqnNetworkOutputs(q_values=q_values)
+
+
