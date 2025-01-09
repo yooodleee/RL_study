@@ -44,3 +44,10 @@ class RnnDqnNetworkInputs(NamedTuple):
     ]
 
 
+class RnnDqnNetworkOutputs(NamedTuple):
+    q_values: torch.Tensor
+    hidden_s: Optional[
+        Tuple[torch.Tensor, torch.Tensor]
+    ]
+
+
