@@ -13,3 +13,9 @@ import torch.nn.functional as F
 
 # pylint: disable=import-error
 from networks import common
+
+
+class DqnNetworkOutputs(NamedTuple):
+    q_values = torch.Tensor
+
+
