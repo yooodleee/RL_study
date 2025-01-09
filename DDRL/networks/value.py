@@ -143,3 +143,63 @@ class DqnMlpNet(nn.Module):
         return DqnNetworkOutputs(q_values=q_values)
 
 
+class DuelingDqnMlpNet(nn.Module):
+    """
+    MLP Dueling DQN network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        
+        super().__init__()
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+        )
+
+        self.advantage_head = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
+
+        self.value_head = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> DqnNetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+
+        features = self.body(x)
+        advantages = self.advantage_head(features)  # [batch_size, action_dim]
+        values = self.value_head(features)  # [batch_size, 1]
+        q_values = values + (
+            advantages - torch.mean(advantages, dim=1, keepdim=True)
+        )   # [batch_size, action_dim]
+
+        return DqnNetworkOutputs(q_values=q_values)
+    
+
