@@ -717,3 +717,141 @@ class ImpalaActorCriticConvNet(nn.Module):
 
         # Initialize weights
         common.initialize_weights(self)
+
+        # BUG
+        # Scenario: when using nature CNN instead of above res-blocks and using a single linear layer
+        # (without activation function) for the model's output heads.
+        # Issues: after few params updates, the CNN output becomes NaNs.
+        # Things tried so far:
+        #   -using two linear layer (with relu activation function) for the model's output heads,
+        # the model still act randomly after 4*5 millions frames on Pong.
+    
+    def get_initial_hidden_state(
+        self, batch_size: int
+    )-> Tuple[torch.Tensor]:
+        """
+        Get initial LSTM hidden state, which is all zeros,
+            should call at the beginning of new episode.
+        """
+        if self.use_lstm:
+            # Shape should be num_layers, batch_size, hidden_size, not lstm expects two hidden states.
+            return tuple(
+                torch.zeros(
+                    self.lstm.num_layers,
+                    batch_size,
+                    self.lstm.hidden_size,
+                ) for _ in range(2)
+            )
+        else:
+            return tuple()
+    
+    def forward(
+        self,
+        input_: ImpalaActorCriticNetworkInputs
+    )-> ImpalaActorCriticNetworkOutputs:
+        """
+        Given state, predict the action probability distribution and state-value,
+            T refers to the time dimension ranging from 0 to T-1. B refers to the batch size
+
+            If self.use_lstm is set to True, and no hidden_s is given, will use zero start method.
+
+        Args:
+            input_: the ImpalaActorCriticNetworkInputs which contains the follow attributions:
+                s_t: timestep t environment state, shape [T, B, state_shape].
+                a_tm1: action taken in t-1 timestep, shape [T, B].
+                r_t: reward for state-action pair (smt1, a_tm1), shape [T, B].
+                done: current timestep state s_t is done state, shape [T, B].
+                hidden_s: (Optional) LSTM layer hidden state from t-1 timestep, 
+                    tuple of two tensors each shape (num_lstm_layers, B, lstm_hidden_size).
+
+        Returns:
+            ImpalaActorCriticNetworkOutputs object with the following attributes:
+                pi_logits: action probability logits.
+                value: state-value.
+                hidden_s: (Optional) hidden state from LSTM layer output.
+        """
+        s_t = input_.s_t
+        a_tm1 = input_.a_tm1
+        r_t = input_.r_t
+        done = input_.done
+        hidden_s = input_.hidden_s
+
+        T, B, *_ = s_t.shape # [T, B, state_dim].
+        x = torch.flatten(s_t, 0, 1)    # Merge time and batch.
+        x = x.float() / 255.0
+
+        # Extract features from raw input state
+        res_input = None
+        for i, fconv in enumerate(self.feat_convs):
+            x = fconv(x)
+            res_input = x
+            x = self.resnet1[i](x)
+            x += res_input
+            res_input = x
+            x = self.resnet2[i](x)
+            x += res_input
+        
+        x = F.relu(x)
+        x = x.view(T * B, -1)
+        x = F.relu(self.fc(x))
+
+        # Append clipped last reward and one hot last action.
+        one_hot_tm1 = F.one_hot(
+            a_tm1.view(T * B),
+            self.action_dim,
+        ).float().to(device=x.device)
+        rewards = torch.clamp(
+            r_t, -1, 1
+        ).view(T * B, 1)    # Clip reward [-1, 1]
+        core_input = torch.cat(
+            [x, rewards, one_hot_tm1],
+            dim=-1,
+        )
+
+        if self.use_lstm:
+            assert done.dtype == torch.bool
+
+            # Pass through RNN LSTM layer
+            core_input = core_input.view(T, B, -1)
+            lstm_output_list = []
+            notdone = (~done).float()
+
+            # Use zero start if not given
+            if hidden_s is None:
+                hidden_s = self.get_initial_hidden_state(B)
+                hidden_s = tuple(
+                    s.to(device=x.device) for s in hidden_s
+                )
+            
+            for inpt, nd in zip(
+                core_input.unbind(), notdone.unbind()
+            ):
+                # Rest core state to zero whenever an episode ended.
+                # Make `done` broadcastable with (num_layers, B, hidden_size)
+                # states:
+                nd = nd.view(1, -1, 1)
+                hidden_s = tuple(nd * s for s in hidden_s)
+                output, hidden_s = self.lstm(inpt.unsqueeze(0), hidden_s)   # LSTM takes input x and previous hidden units
+                lstm_output_list.append(output)
+            core_output = torch.flatten(
+                torch.cat(lstm_output_list), 0, 1
+            )
+        else:
+            core_output = core_input
+            hidden_s = tuple()
+        
+        # Predict action distributions wrt policy
+        pi_logits = self.policy_head(core_output)
+
+        # Predict state-value value
+        value = self.baseline_head(core_output)
+
+        # Reshape to matching original shape
+        pi_logits = pi_logits.view(T, B, self.action_dim)
+        value = value.view(T, B)
+        
+        return ImpalaActorCriticNetworkOutputs(
+            pi_logits=pi_logits, value=value, hidden_s=hidden_s
+        )
+
+
