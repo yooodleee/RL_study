@@ -24,3 +24,8 @@ class C51NetworkOutputs(NamedTuple):
     q_logits = torch.Tensor # Use logits and log_softmax() when calculate loss to avoid log() on zero cause NaN
 
 
+class QRDqnNetworkOutputs(NamedTuple):
+    q_values = torch.Tensor
+    q_dist = torch.Tensor
+
+
