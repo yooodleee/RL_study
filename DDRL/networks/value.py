@@ -203,3 +203,67 @@ class DuelingDqnMlpNet(nn.Module):
         return DqnNetworkOutputs(q_values=q_values)
     
 
+class C51DqnMlpNet(nn.Module):
+    """
+    C51 DQN MLP network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        atoms: torch.Tensor,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+            atoms: the support for q value distribution, used here to turn Z
+                into Q values
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        if len(atoms.shape) != 1:
+            raise ValueError(
+                f'Expect atoms to be a 1D tensor, got {atoms.shape}'
+            )
+        
+        super().__init__()
+        self.action_dim = action_dim
+        self.atoms = atoms
+        self.num_atoms = atoms.size(0)
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim * self.num_atoms),
+        )
+    
+    def forwarad(
+        self, x: torch.Tensor
+    )-> C51NetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+        x = self.body(x)
+
+        q_logits = x.view(
+            -1, self.action_dim, self.num_atoms
+        )   # [batch_size, action_dim, num_atoms]
+        q_dist = F.softmax(q_logits, dim=-1)
+        atoms = self.atoms[None, None, :].to(device=x.device)
+        q_values = torch.sum(q_dist * atoms, dim=-1)    # [batch_size, action_dim]
+
+        return C51NetworkOutputs(
+            q_logits=q_logits, q_values=q_values
+        )
+
+
