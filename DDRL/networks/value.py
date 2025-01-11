@@ -1207,3 +1207,70 @@ class RainbowDqnConvNet(nn.Module):
                 module.reset_noise()
 
 
+class QRDqnConvNet(nn.Module):
+    """
+    Quantile Regression DQN Conv2d network.
+    """
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        quantiles: torch.Tensor,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of untis for the output linear layer
+            quantiles: the quantiles for QR DQN
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if len(state_dim) != 3:
+            raise ValueError(
+                f'Expect state_dim to be a tuple with [C, H, W], got {state_dim}'
+            )
+        if len(quantiles.shape) != 1:
+            raise ValueError(
+                f'Expect quantiles to be a 1D tensor, got {quantiles.shape}'
+            )
+        
+        super().__init__()
+
+        self.action_dim = action_dim
+        self.taus = quantiles
+        self.num_taus = quantiles.size(0)
+
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.value_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim * self.num_taus),
+        )
+
+        # Initialize weights.
+        common.initialize_weights(self)
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> QRDqnNetworkOutputs:
+        """
+        Given state, return state-action value for all posible actions.
+        """
+        x = x.float() / 255.0
+        x = self.body(x)
+        q_dist = self.value_head(x)
+        # No softmax as the model is trying to approximate the 'whole' probability diestributions
+        q_dist = q_dist.view(
+            -1, self.num_taus, self.action_dim
+        )   # [batch_size, num_taus, action_dim]
+        q_values = torch.mean(q_dist, dim=1)
+
+        return QRDqnNetworkOutputs(
+            q_values=q_values,
+            q_dist=q_dist,
+        )
+
+
