@@ -112,3 +112,105 @@ def qlearning(
     )
 
 
+def double_qlearning(
+    q_tm1: torch.Tensor,
+    a_tm1: torch.Tensor,
+    r_t: torch.Tensor,
+    discount_t: torch.Tensor,
+    q_t_value: torch.Tensor,
+    q_t_selector: torch.Tensor,
+)-> base.LossOutput:
+    r"""
+    Implements the doulbe Q-learning loss.
+
+    The loss is 0.5 times the squared difference between 'q_tm1[a_tm1]' and
+        the target 'r_t + discount_t * q_t_value[argmax q_t_selector]'.
+    
+    See "Double Q-learning" by van Hasselt.
+        (https://papers.nips.cc/paper/3964-double-q-learning.pdf).
+
+    Args:
+        q_tm1: Tensor holding Q-values for first timestep in a batch of
+            transitions, shape [B x action_dim].
+        a_tm1: Tensor holding action indices, shape [B].
+        r_t: Tensor holding rewards, shape [B].
+        discount_t: Tensor holding discount values, shape [B].
+        q_t_value: Tensor Q-values for second timestep in a batch of transitions,
+            used to estimate the value of the best action, shape [B x action_dim].
+        q_t_selector: Tensor of Q-values for second timestep in a batch of
+            transitions used to estimate the best action, shape [B x action_dim].
+
+    Returns:
+        A namedtuple with fields:
+            * `loss`: a tensor containing the batch of losses, shape [B].
+            * `extra`: a namedtuple with fields:
+                * `target`: batch of target values for `q_tm1[a_tm1]`, shape [B].
+                * `td_error`: batch of temporal difference errors, shape [B].
+                * `best_action`: batch of greedy actions wrt `q_t_selector`, shape [B].
+    """
+    # Rank and compatibility checks.
+    base.assert_rank_and_dtype(
+        q_tm1, 2, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        a_tm1, 1, torch.long
+    )
+    base.assert_rank_and_dtype(
+        r_t, 1, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        discount_t, 1, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        q_t_value, 2, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        q_t_selector, 2, torch.float32
+    )
+
+    base.assert_batch_dimension(
+        a_tm1, q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        r_t, q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        discount_t, q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        q_t_value, q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        q_t_selector, q_tm1.shape[0]
+    )
+
+    # double Q-learning op.
+    # Build target and select head to update.
+
+    best_action = torch.argmax(
+        q_t_selector, dim=1
+    )
+    # B = q_tm1.shape[0]
+    # double_q_bootstrapped = q_t_value[torch.arange(0, B), best_action]
+    double_q_bootstrapped = base.batched_index(
+        q_t_value, best_action
+    )
+
+    with torch.no_grad():
+        target_tm1 = r_t + discount_t * double_q_bootstrapped
+    
+    # qa_tm1 = q_tm1[torch.arange(0, B), a_tm1]
+    qa_tm1 = base.batched_index(q_tm1, a_tm1)
+
+    # Temporal difference error and loss.
+    # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
+    td_error = target_tm1 - qa_tm1
+    loss = 0.5 * td_error**2
+
+    return base.LossOutput(
+        loss, DoubleQExtra(
+            target_tm1, td_error, best_action
+        )
+    )
+
+
