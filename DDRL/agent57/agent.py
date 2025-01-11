@@ -28,7 +28,11 @@ import nonlinear_bellman
 import base
 import distributed
 import bandit
-from curiosity import EpisodicBounusModule, RndLifeLongBonusModule
+from curiosity import (
+    EpisodicBounusModule, 
+    RndLifeLongBonusModule
+)
+
 from networks.value import Agent57NetworkInputs
 
 torch.autograd.set_detect_anomaly(True)
@@ -82,7 +86,7 @@ def compute_transformed_q(
     ext_q: torch.Tensor,
     int_q: torch.Tensor,
     beta: torch.Tensor,
-)-> torch.Tensor:
+) -> torch.Tensor:
     """
     Returns transformed state-action values from ext_q and int_q.
     """
@@ -143,7 +147,7 @@ class Agent(types_lib.Agent):
         actor_update_interval: int,
         device: torch.device,
         shared_params: dict,
-    )-> None:
+    ) -> None:
         """
         Args:
             rank: the rank number for the actor.
@@ -332,7 +336,7 @@ class Agent(types_lib.Agent):
     @torch.no_grad()
     def step(
         self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+    ) -> types_lib.Action:
         """
         Given timestep, return action a_t, and push transition into global queue
         """
@@ -385,7 +389,7 @@ class Agent(types_lib.Agent):
 
         return a_t
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         This method should be called at the beginning of every episode before
             take any action.
@@ -422,7 +426,7 @@ class Agent(types_lib.Agent):
     def act(
         self,
         timestep: types_lib.TimeStep,
-    )-> Tuple[
+    ) -> Tuple[
         np.ndarray,
         types_lib.Action,
         float,
@@ -437,7 +441,7 @@ class Agent(types_lib.Agent):
     @torch.no_grad()
     def _choose_action(
         self, timestep: types_lib.TimeStep
-    )-> Tuple[
+    ) -> Tuple[
         np.ndarray,
         types_lib.Action,
         float,
@@ -461,8 +465,8 @@ class Agent(types_lib.Agent):
 
         # Policy probability for a_t, the detailed equation is mentioned
         # in Agent57 paper.
-        prob_a_t = 1 - (self._exploration_epsilon * ((self._action_dim \
-                            -1) / self._action_dim))
+        prob_a_t = 1 - (self._exploration_epsilon * ((self._action_dim - 1)\
+                            / self._action_dim))
         
         # To make sure every actors generates the same amount of samples,
         # apply e-greedy after the network pass,
@@ -485,7 +489,7 @@ class Agent(types_lib.Agent):
     
     def _prepare_network_input(
         self, timestep: types_lib.TimeStep
-    )-> Agent57NetworkInputs:
+    ) -> Agent57NetworkInputs:
         # Agent57 network expect input shape [T, B, state_shape],
         # and additionally 'last_action', 'extrinsic reward for last action',
         # last intrinsic reward, and intrinsic reward scale beta index.
@@ -566,7 +570,7 @@ class Agent(types_lib.Agent):
                 network.load_state_dict(state_dict)
 
     @property
-    def intrinsic_reward(self)-> float:
+    def intrinsic_reward(self) -> float:
         """
         Returns intrinsic reward for last state s_tm1.
         """
@@ -575,7 +579,7 @@ class Agent(types_lib.Agent):
                 * min(max(self._lifelong_bonus_t, 1.0), 5.0)
     
     @property
-    def statistics(self)-> Mapping[Text, float]:
+    def statistics(self) -> Mapping[Text, float]:
         """
         Returns current actor's statistics as a dictionary.
         """
@@ -616,7 +620,7 @@ class Learner(types_lib.Learner):
         max_grad_norm: float,
         device: torch.device,
         shared_params: dict,
-    )-> None:
+    ) -> None:
         """
         Args:
             network: the Q network which want to train and optimize.
@@ -729,7 +733,7 @@ class Learner(types_lib.Learner):
         self._retrace_loss_t = np.nan
         self._embed_loss_t = np.nan
     
-    def step(self)-> Iterable[Mapping[Text, float]]:
+    def step(self) -> Iterable[Mapping[Text, float]]:
         """
         Increment learner step, and potentially do a update when called.
 
@@ -816,7 +820,7 @@ class Learner(types_lib.Learner):
         self,
         transitions: Agent57Transition,
         weights: np.ndarray,
-    )-> np.ndarray:
+    ) -> np.ndarray:
         weights = torch.from_numpy(weights).to(
             device=self._device,
             dtype=torch.float32,
@@ -909,7 +913,7 @@ class Learner(types_lib.Learner):
         network: torch.nn.Module,
         ext_hidden_state: HiddenState,
         int_hidden_state: HiddenState,
-    )-> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Returns the predicted q values from the network for a given batch 
             of sampled unrolls.
@@ -1004,7 +1008,7 @@ class Learner(types_lib.Learner):
         transitions: Agent57Transition,
         q_t: torch.Tensor,
         target_q_t: torch.Tensor,
-    )-> Tuple[torch.Tensor, np.ndarray]:
+    ) -> Tuple[torch.Tensor, np.ndarray]:
         a_t = torch.from_numpy(
             transitions.a_t
         ).to(device=self._device, dtype=torch.int64)    # [T+1, B]
@@ -1092,7 +1096,7 @@ class Learner(types_lib.Learner):
         self,
         transitions: Agent57Transition,
         weights: np.ndarray,
-    )-> None:
+    ) -> None:
         """
         Use last 5 frames to update the embedding and RND predictor networks.
         """
@@ -1133,7 +1137,7 @@ class Learner(types_lib.Learner):
     def _calc_rnd_loss(
         self,
         transitions: Agent57Transition,
-    )-> torch.Tensor:
+    ) -> torch.Tensor:
         s_t = torch.from_numpy(
             transitions.s_t[-5:]
         ).to(device=self._device, dtype=torch.float32)  # [5, B, state_shape]
@@ -1164,7 +1168,7 @@ class Learner(types_lib.Learner):
     def _calc_embed_inverse_loss(
         self,
         transitions: Agent57Transition,
-    )-> torch.Tensor:
+    ) -> torch.Tensor:
         s_t = torch.from_numpy(
             transitions.s_t[-6:]
         ).to(device=self._device, dtype=torch.float32)  # [6, B, state_shape].
@@ -1226,7 +1230,7 @@ class Learner(types_lib.Learner):
         target_network: torch.nn.Module,
         ext_hidden_state: HiddenState,
         int_hidden_state: HiddenState,
-    )-> Tuple[
+    ) -> Tuple[
         HiddenState, HiddenState, HiddenState, HiddenState
     ]:
         """
@@ -1316,7 +1320,7 @@ class Learner(types_lib.Learner):
     def _extract_first_step_hidden_state(
         self,
         transitions: Agent57Transition,
-    )-> Tuple[HiddenState, HiddenState]:
+    ) -> Tuple[HiddenState, HiddenState]:
         """
         Returns ext_hidden_state and int_hidden_state.
         """
