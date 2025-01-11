@@ -276,3 +276,26 @@ def _slice_with_actions(
     return sliced_emb
 
 
+def l2_project(
+    z_p: torch.Tensor,
+    p: torch.Tensor,
+    z_q: torch.Tensor,
+)-> torch.Tensor:
+    r"""
+    Projects distribution (z_p, p) onto support z_q under L2-metric over CDFs.
+
+    The supports z_p and z_q are speficied as tensors of distinct atoms (given
+        in ascending order).
+
+    Let kq be len(z_q) and kp be len(z_p). This projection works for any
+        support z_q, in particular kq need not be equal to kp.
+
+    Args:
+        z_p: Tensor holding support of distribution p, shape '[batch_size, kp]'.
+        p: Tensor holding probability values p(z_p[i]), shape '[batch_size, kp]'.
+        z_q: Tensor holding support to project onto, shape '[kq]'.
+
+    Returns:
+        Projection of (z_p, p) onto support z_q under Cramer distance.
+    """
+    
