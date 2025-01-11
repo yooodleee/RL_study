@@ -1037,3 +1037,72 @@ class DuelingDqnConvNet(nn.Module):
         )
 
 
+class C51DqnConvNet(nn.Module):
+    """
+    C51 DQN Conv2d network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        atoms: torch.Tensor,
+    ):
+        """
+        Args:
+            state_dim:; the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+            atoms: the support for q value distribution, used here to turn z
+                into Q values.
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be positive integer, got {action_dim}'
+            )
+        if len(state_dim) < 1:
+            raise ValueError(
+                f'Expect state_dim to be a tuple with [C, H, W], got {state_dim}'
+            )
+        if len(atoms.shape) != 1:
+            raise ValueError(
+                f'Expect atoms to be a 1D tensor, got {atoms.shape}'
+            )
+        
+        super().__init__()
+        self.action_dim = action_dim
+        self.atoms = atoms
+        self.num_atoms = atoms.size(0)
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.value_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim * self.num_atoms),
+        )
+
+        # Initialize weights.
+        common.initialize_weights(self)
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> C51NetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+        x = x.float() / 255.0
+        x = self.body(x)
+        x = self.value_head(x)
+
+        q_logits = x.view(
+            -1, self.action_dim, self.num_atoms
+        )   # [batch_size, action_dim, num_atoms]
+        q_dist = F.softmax(q_logits, dim=-1)
+        atoms = self.atoms[None, None, :].to(device=x.device)
+        q_values = torch.mean(q_dist * atoms, dim=-1)   # [batch_size, action_dim]
+
+        return C51NetworkOutputs(
+            q_logits=q_logits,
+            q_values=q_values,
+        )
+
+
