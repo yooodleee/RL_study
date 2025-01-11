@@ -861,4 +861,71 @@ class NguDqnMlpNet(nn.Module):
         hidden_s = input_.hidden_s
 
         T, B, *_ = s_t.shape    # [T, B, state_shape]
+        x = torch.flatten(s_t, 0, 1)    # Merge batch and time dimension.
+        x = self.body(x)
+        x = x.view(T * B, -1)
+
+        # Append one-hot intrinsic scale beta, one-hot last action, previous intrinsic reward,  
+        # previous extrinsic reward.
+        one_hot_beta = F.one_hot(
+            policy_index.view(T * B),
+            self.num_policies,
+        ).float().to(device=x.device)
+        one_hot_a_tm1 = F.one_hot(
+            a_tm1.view(T * B),
+            self.action_dim,
+        ).float().to(device=x.device)
+        int_reward = int_r_t.view(T * B, 1)
+        ext_reward = ext_r_t.view(T * B, 1)
+
+        core_input = torch.cat(
+            [x, ext_reward, one_hot_a_tm1, int_reward, one_hot_beta],
+            dim=-1,
+        )
+        core_input = core_input.view(T, B, -1)  # LSTM expect rank 3 tensor.
+
+        # If no hidden_s provided, use zero start strategy
+        if hidden_s is None:
+            hidden_s = self.get_initial_hidden_state(batch_size=B)
+            hidden_s = tuple(
+                s.to(device=x.device) for s in hidden_s
+            )
         
+        x, hidden_s = self.lstm(core_input, hidden_s)
+
+        x = torch.flatten(x, 0, 1)  # Merge batch and time dimension.
+        advantages = self.advantage_head(x)
+        values = self.value_head(x)
+
+        q_values = values + (
+            advantages - torch.mean(advantages, dim=1, keepdim=True)
+        )
+        q_values = q_values.view(T, B, -1)  # reshape to in the range [B, T, action_dim]
+
+        return RnnDqnNetworkOutputs(
+            q_values=q_values, hidden_s=hidden_s
+        )
+    
+    def get_initial_hidden_state(
+        self, batch_size: int
+    )-> Tuple[torch.Tensor]:
+        """
+        Get initial LSTM hidden state, which is all zeros,
+            should call at the beginning of new episode, or every training batch.
+        """
+        # Shape should be num_layers, batch_size, hddien_size,   
+        # note lstm expects two hidden states.
+        return tuple(
+            torch.zeros(
+                self.lstm.num_layers,
+                batch_size,
+                self.lstm.hidden_size
+            ) for _ in range(2)
+        )
+
+# =======================================================
+# Convolutional Neural Networks
+# =======================================================
+
+
+
