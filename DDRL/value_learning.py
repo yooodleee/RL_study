@@ -28,3 +28,7 @@ class DoubleQExtra(NamedTuple):
     best_action: torch.Tensor
 
 
+class Extra(NamedTuple):
+    target: Optional[torch.Tensor]
+
+
