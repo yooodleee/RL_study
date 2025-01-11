@@ -10,7 +10,14 @@ https://github.com/google-research/seed_rl/blob/66e8890261f09d0355e8bf5f1c5e4196
 This agent supports store hidden state (only first step in a unroll) in replay, and burn in.
 In fact, even if we use burn in, we're still going to store the hidden state (only first step in a unroll) in the replay.
 """
-from typing import Mapping, Optional, Tuple, NamedTuple, Iterable, Text
+from typing import (
+    Mapping,
+    Optional,
+    Tuple, 
+    NamedTuple, 
+    Iterable, 
+    Text,
+)
 import copy
 import multiprocessing
 import numpy
@@ -80,7 +87,7 @@ def calculate_losses_and_priorities(
     n_step: int,
     eps: float = 0.001,
     eta: float = 0.9,   
-)-> Tuple[torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     r"""Calculate loss and priority for given samples.
     
     T is the unrolled length, B the batch size, N is number of actions.
@@ -103,18 +110,36 @@ def calculate_losses_and_priorities(
         priorities: the priority for given samples, shape (B, )
     """
 
-    base.assert_rank_and_dtype(q_value, 3, torch.float32)
-    base.assert_rank_and_dtype(target_qvalue, 3, torch.float32)
-    base.assert_rank_and_dtype(reward, 2, torch.float32)
-    base.assert_rank_and_dtype(action, 2, torch.long)
-    base.assert_rank_and_dtype(target_action, 2, torch.long)
-    base.assert_rank_and_dtype(done, 2, torch.bool)
+    base.assert_rank_and_dtype(
+        q_value, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        target_qvalue, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        reward, 2, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        action, 2, torch.long
+    )
+    base.assert_rank_and_dtype(
+        target_action, 2, torch.long
+    )
+    base.assert_rank_and_dtype(
+        done, 2, torch.bool
+    )
 
-    q_value = q_value.gather(-1, action[..., None]).squeeze(-1) # [T, B]
+    q_value = q_value.gather(
+        -1, action[..., None]
+    ).squeeze(-1) # [T, B]
 
-    target_q_max = target_qvalue.gather(-1, target_action[..., None]).squeeze(-1)   # [T, B]
+    target_q_max = target_qvalue.gather(
+        -1, target_action[..., None]
+    ).squeeze(-1)   # [T, B]
     # Apply invertible value rescaling to TD target.
-    target_q_max = transforms.signed_parabolic(target_q_max, eps)
+    target_q_max = transforms.signed_parabolic(
+        target_q_max, eps
+    )
 
     # Note the input rewards into 'n_step_bellman_target' should be non-discounted, non-summed.
     target_q = multistep.n_step_bellman_target(
@@ -161,7 +186,7 @@ class Actor(types_lib.Agent):
         rank: int,
         data_queue: multiprocessing.Queue,
         network: torch.nn.Module,
-        random_state: numpy.random.RandomState, # pylint: disable=no-member
+        random_state: numpy.random.RandomState, 
         num_actors: int,
         action_dim: int,
         unroll_length: int,
@@ -169,20 +194,23 @@ class Actor(types_lib.Agent):
         actor_update_interval: int,
         device: torch.device,
         shared_params: dict,
-    )-> None:
+    ) -> None:
         """
         Args:
             rank: the rank number for the actor.
-            data_queue: a multiprocessing. Queue to send collected transitions to learner process.
+            data_queue: a multiprocessing. Queue to send collected transitions 
+                to learner process.
             network: the Q network for actor to make action choice.
             random_state: used to sample random actions for e-greedy policy.
             num_actors: the number actiors for calculating e-greedy epsilon.
             action_dim: the number of valid actions in the environment.
-            unroll_length: how many agent time step to unroll transitions before put on to queue.
+            unroll_length: how many agent time step to unroll transitions before 
+                put on to queue.
             burn_in: two conseucutive unrolls will overlap on burn_in+1 steps.
             actor_update_interval: the frequency to update actor local Q network.
             device: pyTorch runtime device.
-            shared_params: a shared dict, so we can later update the parameters for actors.
+            shared_params: a shared dict, so we can later update the parameters 
+                for actors.
         """
         if not 0 < num_actors:
             raise ValueError(
@@ -238,7 +266,9 @@ class Actor(types_lib.Agent):
         self._step_t = -1
     
     @torch.no_grad()
-    def step(self, timestep: types_lib.TimeStep)-> types_lib.Action:
+    def step(
+        self, timestep: types_lib.TimeStep
+        ) -> types_lib.Action:
         """
         Given timestep, return action a_t, and push transition into global queue
         """
@@ -249,7 +279,8 @@ class Actor(types_lib.Agent):
         
         q_t, a_t, hidden_s  = self.act(timestep)
 
-        # Note the reward is for s_tm1, a_tm1, because it's only available one agent step after,
+        # Note the reward is for s_tm1, a_tm1, because it's only available 
+        # one agent step after,
         # and the done mark is for current timestep s_t.
         transition = R2d2Transition(
             s_t=timestep.observation,
@@ -280,7 +311,9 @@ class Actor(types_lib.Agent):
     
     def act(
         self, timestep: types_lib.TimeStep
-    )-> Tuple[numpy.ndarray, types_lib.Action, Tuple[torch.Tensor]]:
+    ) -> Tuple[
+        numpy.ndarray, types_lib.Action, Tuple[torch.Tensor]
+        ]:
         """
         Given state s_t and done marks, return an action.
         """
@@ -288,8 +321,10 @@ class Actor(types_lib.Agent):
     
     @torch.no_grad()
     def _choose_action(
-        self, timestep: types_lib.TiemStep, epsilon: float
-    )-> Tuple[numpy.ndarray, types_lib.Action, Tuple[torch.Tensor]]:
+        self, timestep: types_lib.TimeStep, epsilon: float
+    ) -> Tuple[
+        numpy.ndarray, types_lib.Action, Tuple[torch.Tensor]
+        ]:
         """
         Given state s_t, choose action a_t
         """
@@ -297,28 +332,35 @@ class Actor(types_lib.Agent):
         q_t = pi_output.q_values.squeeze()
         a_t = torch.argmax(q_t, dim=-1).cpu().item()
 
-        # To make sure every actors generates the same amount of samples, we apply e-greedy after the network pass,
+        # To make sure every actors generates the same amount of samples, 
+        # apply e-greedy after the network pass,
         # otherwise the actor with higher epsilons will generate more samples,
         # while the actor with lower epsilon will generate less samples.
         if self._random_state.rand() <= epsilon:
-            # randint() return random integers from low (inclusive) to high (exclusive).
+            # randint() return random integers from low (inclusive) 
+            # to high (exclusive).
             a_t = self._random_state.randint(0, self._action_dim)
         
         return (q_t.cpu().numpy(), a_t, pi_output.hidden_s)
     
     def _prepare_network_input(
         self, timestep: types_lib.TimeStep
-    )-> RnnDqnNetworkInputs:
+    ) -> RnnDqnNetworkInputs:
         # R2D2 network expect input shape [T, B, state_shape],
-        # and additionally 'last action', 'reward for last action', and hidden state from previous timestep.
+        # and additionally 'last action', 'reward for last action', 
+        # and hidden state from previous timestep.
         s_t = torch.from_numpy(
             timestep.observation[None, ...]
         ).to(device=self._device, dtype=torch.float32)
         a_tm1 = torch.tensor(
-            self._last_action, device=self._device, dtype=torch.int64
+            self._last_action, 
+            device=self._device,
+            dtype=torch.int64,
         )
         r_t = torch.tensor(
-            timestep.reward, device=self._device, dtype=torch.float32
+            timestep.reward, 
+            device=self._device, 
+            dtype=torch.float32,
         )
         hidden_s = tuple(
             s.to(device=self._device) for s in self._lstm_state
@@ -332,7 +374,8 @@ class Actor(types_lib.Agent):
         )
     
     def _put_unroll_onto_queue(self, unrolled_transition):
-        # Important note, store hidden states for every step in the unroll will consume HUGE memory.
+        # Important note, store hidden states for every step in the unroll 
+        # will consume HUGE memory.
         self._queue.put(unrolled_transition)
 
     def _update_actor_network(self):
@@ -346,11 +389,13 @@ class Actor(types_lib.Agent):
             self._network.load_state_dict(state_dict)
     
     @property
-    def statistics(self)-> Mapping[Text, float]:
+    def statistics(self) -> Mapping[Text, float]:
         """
         Returns current actor's statistics as a dictionary.
         """
-        return {'exploration_epsilon': self._exploration_epsilon}
+        return {
+            'exploration_epsilon': self._exploration_epsilon
+            }
 
 
 
@@ -376,22 +421,26 @@ class Leaner(types_lib.Leaner):
         max_grad_norm: float,
         device: torch.device,
         shared_params: dict,
-    )-> None:
+    ) -> None:
         """
         Args:
             network: the Q network we want to train and optimize.
             optimize: the optimizer for Q network
             replay: prioritized recurrent experience replay.
-            target_net_update_interval: how often to copy online network parameters to target.
-            min_replay_size: wait till experience replay buffer this number before start to learn.
+            target_net_update_interval: how often to copy online network parameters 
+                to target.
+            min_replay_size: wait till experience replay buffer this number before 
+                start to learn.
             batch_size: sample batch_size of transitions.
             n_step: TD n-step bootstrap.
             discount: the gamma discount for future rewards.
             burn_in: burn n transitions to generate initial hidden state before learning.
             prioirty_eta: coefficient to mix the max and mean absolute TD errors.
-            rescale_epsilon: rescaling factor for n-step targets in the invertible rescaling function.
+            rescale_epsilon: rescaling factor for n-step targets in the invertible 
+                rescaling function.
             clip_grad: if True, clip gradients norm.
-            max_grad_norm: the maximum gradient norm for clip grad, only works if clip_grad is True.
+            max_grad_norm: the maximum gradient norm for clip grad, only works 
+                if clip_grad is True.
             device: PyTorch runtime device.
             shared_params: a shared dict, so we can later update the parameters for actors.
         """
@@ -464,11 +513,13 @@ class Leaner(types_lib.Leaner):
         Increment learner step, and potentially do a update when called.
 
         Yields:
-            learner statistics if network parameters update occurred, otherwise returns None.
+            learner statistics if network parameters update occurred, 
+                otherwise returns None.
         """
         self._step_t += 1
 
-        if self._replay.size < self._min_replay_size or self._step_t % max(4, int(self._batch_size * 0.25)) != 0:
+        if self._replay.size < self._min_replay_size or self._step_t \
+            % max(4, int(self._batch_size * 0.25)) != 0:
             return
         
         self._learn()
@@ -479,7 +530,7 @@ class Leaner(types_lib.Leaner):
         Should be called at the beginning of every iteration.
         """
     
-    def received_item_from_queue(self, item)-> None:
+    def received_item_from_queue(self, item) -> None:
         """
         Received from send by actors through multiprocessing queue.
         """
@@ -489,7 +540,7 @@ class Leaner(types_lib.Leaner):
         # To keep things consistent, we move the parameters to CPU.
         return {k: v.cpu() for k, v in self._network.state_dict().items()}
     
-    def _learn(self)-> None:
+    def _learn(self) -> None:
         transitions, indices, weights = self._replay.sample(self._batch_size)
         priorities = self._update(transitions, weights)
         self._update_t += 1
@@ -513,14 +564,16 @@ class Leaner(types_lib.Leaner):
     
     def _update(
         self, transitions: R2d2Transition, weights: numpy.ndarray
-    )-> numpy.ndarray:
+    ) -> numpy.ndarray:
         """
         Update online Q network.
         """
         weights = torch.from_numpy(weights).to(
             device=self._device, dtype=torch.float32
         )   # [batch_size]
-        base.assert_rank_and_dtype(weights, 1, torch.float32)
+        base.assert_rank_and_dtype(
+            weights, 1, torch.float32
+        )
 
         # Get initial hidden state, handle possible burn in.
         init_hidden_s = self._extract_first_step_hidden_state(transitions)
@@ -570,27 +623,52 @@ class Leaner(types_lib.Leaner):
         calculate loss and priorities for given unroll sequence transitions.
         """
         s_t = torch.from_numpy(
-            transitions.s_t).to(device=self._device, dtype=torch.float32)   # [T+1, B, state_shape]
+            transitions.s_t).to(
+                device=self._device, dtype=torch.float32
+                )   # [T+1, B, state_shape]
         a_t = torch.from_numpy(
-            transitions.a_t).to(device=self._device, dtype=torch.int64) # [T+1, B]
+            transitions.a_t).to(
+                device=self._device, dtype=torch.int64
+                ) # [T+1, B]
         last_action = torch.from_numpy(
-            transitions.last_action).to(device=self._device, dtype=torch.float32)   # [T+1, B]
+            transitions.last_action).to(
+                device=self._device, dtype=torch.float32
+                )   # [T+1, B]
         r_t = torch.from_numpy(
-            transitions.r_t).to(device=self._device, dtype=torch.float32)   # [T+1, B]
+            transitions.r_t).to(
+                device=self._device, dtype=torch.float32
+                )   # [T+1, B]
         done = torch.from_numpy(
-            transitions.done).to(device=self._device, dtype=torch.bool) # [T+1, B]
+            transitions.done).to(
+                device=self._device, dtype=torch.bool
+                ) # [T+1, B]
         
         # Rank and dtype checks, note we have a new unroll time dimension, 
         # states may be images, which is rank 5.
-        base.assert_rank_and_dtype(s_t, (3, 5), torch.float32)
-        base.assert_rank_and_dtype(a_t, 2, torch.long)
-        base.assert_rank_and_dtype(last_action, 2, torch.long)
-        base.assert_rank_and_dtype(r_t, 2, torch.float32)
-        base.assert_rank_and_dtype(done, 2, torch.bool)
+        base.assert_rank_and_dtype(
+            s_t, (3, 5), torch.float32
+        )
+        base.assert_rank_and_dtype(
+            a_t, 2, torch.long
+        )
+        base.assert_rank_and_dtype(
+            last_action, 2, torch.long
+        )
+        base.assert_rank_and_dtype(
+            r_t, 2, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            done, 2, torch.bool
+        )
 
         # Get q values from online Q network
         q_t = self._network(
-            RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=hidden_s)
+            RnnDqnNetworkInputs(
+                s_t=s_t,
+                a_tm1=last_action,
+                r_t=r_t,
+                hidden_s=hidden_s,
+            )
         ).q_values
 
         # Computes raw target q values, use double Q
@@ -600,7 +678,12 @@ class Leaner(types_lib.Leaner):
 
             # Get estimated q values for 's_t' from target Q network, using above best action a*.
             target_q_t = self._target_network(
-                RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=target_hidden_s)
+                RnnDqnNetworkInputs(
+                    s_t=s_t,
+                    a_tm1=last_action,
+                    r_t=r_t,
+                    hidden_s=target_hidden_s,
+                )
             ).q_values
         
         losses, priorities = calculate_losses_and_priorities(
@@ -621,21 +704,33 @@ class Leaner(types_lib.Leaner):
     @torch.no_grad()
     def _burn_in_unroll_q_networks(
         self, transitions: R2d2Transition, init_hidden_s: HiddenState
-    )-> Tuple[HiddenState, HiddenState]:
+    ) -> Tuple[HiddenState, HiddenState]:
         """
         Unroll both online and target q networks to generate hidden states for LSTM.
         """
         s_t = torch.from_numpy(
-            transitions.s_t).to(device=self._device, dtype=torch.float32)   # [burn_in, B, state_shape]
+            transitions.s_t).to(
+                device=self._device, dtype=torch.float32
+            )   # [burn_in, B, state_shape]
         last_action = torch.from_numpy(
-            transitions.s_t).to(device=self._device, dtype=torch.int64) # [burn_in, B]
+            transitions.s_t).to(
+                device=self._device, dtype=torch.int64
+            ) # [burn_in, B]
         r_t = torch.from_numpy(
-            transitions.r_t).to(device=self._device, dtype=torch.float32)   # [burn_in, B]
+            transitions.r_t).to(
+                device=self._device, dtype=torch.float32
+            )   # [burn_in, B]
         
         # Rank and dtype checks, note we have a new unroll time dimension, states may be images, which is rank 5.
-        base.assert_rank_and_dtype(s_t, (3, 5), torch.float32)
-        base.assert_rank_and_dtype(last_action, 2, torch.long)
-        base.assert_rank_and_dtype(r_t, torch.float32)
+        base.assert_rank_and_dtype(
+            s_t, (3, 5), torch.float32
+        )
+        base.assert_rank_and_dtype(
+            last_action, 2, torch.long
+        )
+        base.assert_rank_and_dtype(
+            r_t, torch.float32
+        )
 
         _hidden_s = tuple(
             s.clone().to(device=self._device) for s in init_hidden_s
@@ -646,34 +741,56 @@ class Leaner(types_lib.Leaner):
 
         # Burn in to generate hidden states for LSTM, we unroll both online and target Q networks
         hidden_s = self._network(
-            RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=hidden_s)
+            RnnDqnNetworkInputs(
+                s_t=s_t,
+                a_tm1=last_action,
+                r_t=r_t,
+                hidden_s=hidden_s,
+            )
         ).hidden_s
         target_hidden_s = self._target_network(
-            RnnDqnNetworkInputs(s_t=s_t, a_tm1=last_action, r_t=r_t, hidden_s=target_hidden_s)
+            RnnDqnNetworkInputs(
+                s_t=s_t,
+                a_tm1=last_action,
+                r_t=r_t,
+                hidden_s=target_hidden_s,
+            )
         ).hidden_s
 
         return (hidden_s, target_hidden_s)
     
     def _extract_first_step_hidden_state(
         self, transitions: R2d2Transition
-    )-> HiddenState:
+    ) -> HiddenState:
         # We only need the first step hidden states in replay, shape [batch_size, num_lstm_layers, lstm_hidden_size]
         init_h = torch.from_numpy(
-            transitions.init_h[0:1]).squeeze(0).to(device=self._device, dtype=torch.float32)
+            transitions.init_h[0:1]).squeeze(0).to(
+                device=self._device, dtype=torch.float32
+            )
         init_c = torch.from_numpy(
-            transitions.init_c[0:1]).squeeze(0).to(device=self._device, dtype=torch.float32)
+            transitions.init_c[0:1]).squeeze(0).to(
+                device=self._device, dtype=torch.float32
+            )
         
         # Randk and dtype checks.
-        base.assert_rank_and_dtype(init_h, 3, torch.float32)
-        base.assert_rank_and_dtype(init_c, 3, torch.float32)
+        base.assert_rank_and_dtype(
+            init_h, 3, torch.float32
+        )
+        base.assert_rank_and_dtype(
+            init_c, 3, torch.float32
+        )
 
         # Swap batch and num_lstm_layers axis.
         init_h = init_h.swapaxes(0, 1)
         init_c = init_c.swapaxes(0, 1)
 
         # Batch dimension checks.
-        base.assert_batch_dimension(init_h, self._batch_size, 1)
-        base.assert_batch_dimension(init_c, self._batch_size, 1)
+        base.assert_batch_dimension(
+            init_h, self._batch_size, 1
+        )
+        base.assert_batch_dimension(
+            init_c, self._batch_size, 1
+        )
 
         return (init_h, init_c)
     
@@ -682,7 +799,7 @@ class Leaner(types_lib.Leaner):
         self._target_update_t += 1
     
     @property
-    def statistics(self)-> Mapping[Text, float]:
+    def statistics(self) -> Mapping[Text, float]:
         """
         Returns current agent statistics as a dictionary.
         """
