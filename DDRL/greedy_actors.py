@@ -13,10 +13,10 @@ from networks.policy import ImpalaActorCriticNetworkInputs
 from networks.value import (
     RnnDqnNetworkInputs,
     NguNetworkInputs,
-    Agnet57NetworkInputs,
+    Agent57NetworkInputs,
 )
 from curiosity import (
-    EpisodicBonusModule, RndLifeLongBonusModule
+    EpisodicBounusModule, RndLifeLongBonusModule
 )
 from agent57.agent import compute_transformed_q
 
@@ -75,7 +75,7 @@ class EpsilonGreedyActor(types_lib.Agent):
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.Timestep
+        self, timestep: types_lib.TimeStep
     )-> types_lib.Action:
         """
         Samples action from eps-greedy policy wrt Q-values at given state.
@@ -286,7 +286,7 @@ class NguEpsilonGreedyActor(EpsilonGreedyActor):
         self._policy_beta = 0
 
         # Episodic intrinsic bonus module
-        self._episodic_module = EpisodicBonusModule(
+        self._episodic_module = EpisodicBounusModule(
             embedding_network=embedding_network,
             device=device,
             capacity=episodic_memory_capacity,
@@ -425,7 +425,7 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
         self._policy_beta = 0
 
         # Episodic intrinsic bonus module
-        self._episodic_module = EpisodicBonusModule(
+        self._episodic_module = EpisodicBounusModule(
             embedding_network=embedding_network,
             device=device,
             capacity=episodic_memory_capacity,
@@ -511,7 +511,7 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
     
     def _prepare_network_input(
         self, timestep: types_lib.TimeStep
-    )-> Agnet57NetworkInputs:
+    )-> Agent57NetworkInputs:
         """
         NGU network expect input shape [T, B, state_shape],
             and additionally 'last action', 'extrinsic reward for all action', last intrinsic reward,
@@ -539,7 +539,7 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
             s.to(device=self._device) for s in self._int_lstm_state
         )
 
-        return Agnet57NetworkInputs(
+        return Agent57NetworkInputs(
             s_t=s_t[None, ...], # [T, B, state_shape]
             a_tm1=a_tm1[None, ...], # [T, B]
             ext_r_t=ext_r_t[None, ...], # [T, B]
