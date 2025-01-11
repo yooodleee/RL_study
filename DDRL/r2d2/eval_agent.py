@@ -9,7 +9,7 @@ import torch
 # pylint: disable-import-error
 from networks.value import R2d2DqnMlpNet, R2d2DqnConvNet
 from checkpoint import PyTorchCheckpoint
-from deep_rl_zoo import main_loop, gym_env, greedy_actors
+from .. import main_loop, gym_env, greedy_actors
 
 
 FLAGS = flags.FLAGS

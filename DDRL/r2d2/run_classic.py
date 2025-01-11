@@ -18,12 +18,12 @@ import copy
 from networks.value import R2d2DqnMlpNet, RnnDqnNetworkInputs
 from r2d2 import agent
 from checkpoint import pyTorchCheckpoint
-from deep_rl_zoo import (
+from .. import (
     main_loop,
     gym_env,
     greedy_actors,
 )
-from deel_rl_zoo import replay as replay_lib
+from .. import replay as replay_lib
 
 
 FLAGS = flags.FLAGS

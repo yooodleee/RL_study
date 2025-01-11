@@ -19,8 +19,8 @@ from torch import nn
 
 # pylint: disable=import-error
 import replay as replay_lib
-import types as types_lib
-from deep_rl_zoo import (
+from .. import types as types_lib
+from .. import (
     base,
     multistep,
     distributed,
