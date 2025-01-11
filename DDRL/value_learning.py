@@ -298,4 +298,50 @@ def l2_project(
     Returns:
         Projection of (z_p, p) onto support z_q under Cramer distance.
     """
-    
+    # Broadcasting of tensors is used extensively in the code below. To avoid
+    # accidental broadcasting along unitended dimensions, tensors are defensively
+    # reshaped to have equal number of dimensions (3) throughout and intended 
+    # shapes are indicated alonside tensor definitions. To reduce verbosity,
+    # extra dimensions of size 1 are inserted by indexing with 'None' instead of
+    # 'tf.expand_dims()' (e.g., 'x[:, None, :]' reshapes a tensor of shape
+    # '[k, 1]' to one of shape '[k, 1, l]').
+
+    # Extract vmin and vmax and construct helper tensors from z_q
+    vmin, vmax = z_q[0], z_q[-1]
+    d_pos = torch.concat([z_q, vmin[None]], 0)[1:]  # 1 x kq x 1
+    d_neg = torch.concat([vmax[None], z_q], 0)[:1]  # 1 x kq x 1
+    # Clip z_q to be in new support range (vmin, vmax)
+    z_p = torch.clamp(
+        z_p, min=vmin, max=vmax
+    )[:, None, :]   # B x 1 x kp
+
+    # Get the distance between atom values in support.
+    d_pos = (d_pos - z_q)[None, :, None]    # z_q[i+1] - z_q[i]. 1 x B x 1
+    d_neg = (z_q - d_neg)[None, :, None]    # z_q[i] - z_q[i-1]. 1 x B x 1
+    z_q = z_q[None, :, None]    # 1 x kq x 1
+
+    # Ensure that do not divide by zero, in case of atoms of identical value.
+    d_neg = torch.where(
+        d_neg > 0, 1.0 / d_neg, torch.zeros_like(d_neg)
+    )   # 1 x kq x 1
+    d_pos = torch.where(
+        d_pos > 0, 1.0 / d_pos, torch.zeros_like(d_pos)
+    )   # 1 x kq x 1
+
+    delta_qp = z_p - z_q    # clip(z_q)[j] - z_q[i]. B x kq x kp
+    d_sign = (delta_qp >= 0.0).to(dtype=p.dtype)    # B x kq x lp
+
+    # Matrix of entries sgn(a_ij) * [a_ij], with a_ij = clip(z_p)[j] - z_q[i]
+    # Shape B x kq x kp
+    delta_hat = (d_sign * delta_qp * d_pos) - ((1.0 - d_sign) * delta_qp * d_neg)
+    p = p[:, None, :]   # B x 1 x kp
+
+    return torch.sum(
+        torch.clamp(
+            1.0 - delta_hat,
+            min=0.0,
+            max=1.0,
+        ) * p, 2
+    )
+
+
