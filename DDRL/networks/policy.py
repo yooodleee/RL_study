@@ -64,7 +64,7 @@ class ActorMlpNet(nn.Module):
 
     def __init__(
         self, state_dim: int, action_dim: int
-    )-> None:
+    ) -> None:
         self.net = nn.Sequential(
             nn.Linear(state_dim, 64),
             nn.ReLU(),
@@ -75,7 +75,7 @@ class ActorMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> ActorNetworkOutputs:
+    ) -> ActorNetworkOutputs:
         """
         Given raw state x, predict the action probability distribution.
         """
@@ -94,7 +94,7 @@ class CriticMlpNet(nn.Module):
 
     def __init__(
         self, state_dim: int
-    )-> None:
+    ) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim, 64),
@@ -106,7 +106,7 @@ class CriticMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> CriticNetworkOutputs:
+    ) -> CriticNetworkOutputs:
         """
         Given raw state x, predict the state-value.
         """
@@ -121,7 +121,7 @@ class ActorCriticMlpNet(nn.Module):
 
     def __init__(
         self, state_dim: int, action_dim: int
-    )-> None:
+    ) -> None:
         super().__init__()
         self.body = nn.Sequential(
             nn.Linear(state_dim, 64),
@@ -145,7 +145,7 @@ class ActorCriticMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> ActorCriticNetworkOutputs:
+    ) -> ActorCriticNetworkOutputs:
         """
         Given raw state x, predict the action probability distribution
             and state-values.
@@ -174,7 +174,7 @@ class GaussianActorMlpNet(nn.Module):
         state_dim: int,
         action_dim: int,
         hidden_size: int,
-    )-> None:
+    ) -> None:
         super().__init__()
         self.body = nn.Sequential(
             nn.Linear(state_dim, hidden_size),
@@ -202,7 +202,7 @@ class GaussianActorMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Given raw state x, predict the action probability distribution
             and state-value.
@@ -226,7 +226,7 @@ class GaussianCriticMlpNet(nn.Module):
 
     def __init__(
         self, state_dim: int, hidden_size: int
-    )-> None:
+    ) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim, hidden_size),
@@ -238,7 +238,7 @@ class GaussianCriticMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> torch.Tensor:
+    ) -> torch.Tensor:
         """
         Given raw state x, predict the state-value.
         """
@@ -259,7 +259,7 @@ class ImpalaActorCriticMlpNet(nn.Module):
         state_dim: int, 
         action_dim: int,
         use_lstm: bool = False,
-    )-> None:
+    ) -> None:
         """
         Args:
             state_dim: state space size of environment state dimension
@@ -305,7 +305,7 @@ class ImpalaActorCriticMlpNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode.
@@ -326,7 +326,7 @@ class ImpalaActorCriticMlpNet(nn.Module):
     def forward(
         self,
         input_: ImpalaActorCriticNetworkInputs
-    )-> ImpalaActorCriticNetworkOutputs:
+    ) -> ImpalaActorCriticNetworkOutputs:
         """
         Given state, predict the action probability distribution and state-value
             T refers to the time dimension ranging from 0 to T-1. B refers to the 
@@ -427,7 +427,7 @@ class RndActorCriticMlpNet(nn.Module):
 
     def __init__(
         self, state_dim: int, action_dim: int
-    )-> None:
+    ) -> None:
         super().__init__()
 
         self.body = nn.Sequential(
@@ -457,7 +457,7 @@ class RndActorCriticMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> RndActorCriticNetworkOutputs:
+    ) -> RndActorCriticNetworkOutputs:
         """
         Given raw state x, predict the action probability distribution,
             and extrinsic and intrinsic value values.
@@ -491,7 +491,7 @@ class ActorConvNet(nn.Module):
 
     def __init__(
         self, state_dim: int, action_dim: int
-    )-> None:
+    ) -> None:
         super().__init__()
 
         self.body = common.NatureCnnBackboneNet(state_dim)
@@ -507,7 +507,7 @@ class ActorConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> ActorNetworkOutputs:
+    ) -> ActorNetworkOutputs:
         """
         Given raw state x, predict the action probability distribution.
         """
@@ -527,7 +527,7 @@ class CriticConvNet(nn.Module):
 
     def __init__(
         self, state_dim: int
-    )-> None:
+    ) -> None:
         super().__init__()
 
         self.body = common.NatureCnnBackboneNet(state_dim)
@@ -543,7 +543,7 @@ class CriticConvNet(nn.Module):
 
     def forward(
         self, x: torch.Tensor
-    )-> CriticNetworkOutputs:
+    ) -> CriticNetworkOutputs:
         """
         Given raw state x, predict the state-value.
         """
@@ -563,7 +563,7 @@ class ActorCriticConvNet(nn.Module):
 
     def __init__(
         self, state_dim: tuple, action_dim: int
-    )-> None:
+    ) -> None:
         super().__init__()
 
         self.body = common.NatureCnnBackboneNet(state_dim)
@@ -585,7 +585,7 @@ class ActorCriticConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> ActorCriticNetworkOutputs:
+    ) -> ActorCriticNetworkOutputs:
         """
         Given raw state x, predict the action probability distribution
             and state-value.
@@ -618,7 +618,7 @@ class ImpalaActorCriticConvNet(nn.Module):
         state_dim: tuple,
         action_dim: int,
         use_lstm: bool = False,
-    )-> None:
+    ) -> None:
         super().__init__()
 
         self.action_dim = action_dim
@@ -728,7 +728,7 @@ class ImpalaActorCriticConvNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode.
@@ -748,7 +748,7 @@ class ImpalaActorCriticConvNet(nn.Module):
     def forward(
         self,
         input_: ImpalaActorCriticNetworkInputs
-    )-> ImpalaActorCriticNetworkOutputs:
+    ) -> ImpalaActorCriticNetworkOutputs:
         """
         Given state, predict the action probability distribution and state-value,
             T refers to the time dimension ranging from 0 to T-1. B refers to the batch size
@@ -865,7 +865,7 @@ class RndActorCriticConvNet(nn.Module):
 
     def __init__(
         self, state_dim: tuple, action_dim: int
-    )-> None:
+    ) -> None:
         c, h, w = state_dim
         h, w = common.calc_conv2d_output((h, w), 8, 4)
         h, w = common.calc_conv2d_output((h, w), 4, 2)
@@ -927,7 +927,7 @@ class RndActorCriticConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> RndActorCriticNetworkOutputs:
+    ) -> RndActorCriticNetworkOutputs:
         """
         Given raw state x, predict the action probability distribution,
             and extrinsic and intrinsic value values.
