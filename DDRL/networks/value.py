@@ -1274,3 +1274,135 @@ class QRDqnConvNet(nn.Module):
         )
 
 
+class IqnConvNet(nn.Module):
+    """
+    Implicit Quantile Conv2d network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        latent_dim: int,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+            latent_dim: the cosine embedding linear layer input shapes
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if len(state_dim) < 1:
+            raise ValueError(
+                f'Expect state_dim to be a tuple with [C, H, W], got {state_dim}'
+            )
+        if latent_dim < 1:
+            raise ValueError(
+                f'Expect latent_dim to be a positive integer, got {latent_dim}'
+            )
+        
+        super().__init__()
+
+        self.action_dim = action_dim
+        self.latent_dim = latent_dim
+
+        self.pis = torch.arange(
+            1, self.latent_dim + 1
+        ).float() * 3.141592653589793  # [latent_dim]
+
+        self.body = common.NatureCnnBackboneNet(state_dim)
+        self.embedding_layer = nn.Linear(
+            latent_dim, self.body.out_features
+        )
+
+        self.value_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim),
+        )
+
+        # Initialize weights.
+        common.initialize_weights(self)
+    
+    def sample_taus(
+        self, batch_size: int, num_taus: int
+    )-> torch.Tensor:
+        """
+        Returns sampled batch taus.
+        """
+        taus = torch.rand(
+            (batch_size, num_taus)
+        ).to(detype=torch.float32)
+        assert taus.shape == (batch_size, num_taus)
+
+        return taus
+    
+    def forward(
+        self,
+        x: torch.Tensor,
+        num_taus: int = 64,
+    )-> IqnNetworkOutputs:
+        """
+        Args:
+            state: environment state # batch x state_shape
+            taus; tau embedding samples # batch x samples
+
+        Returns:
+            q_values: # [batch_size, action_dim]
+            q_dist: # [batch_size, num_taus, action_dim]
+        """
+        batch_size = x.shape[0]
+
+        # Apply ConvDQN to embed state.
+        x = x.float() / 255.0
+        features = self.body(x)
+
+        taus = self.sample_taus(
+            batch_size, num_taus
+        ).to(device=x.device)
+
+        # Embed taus with cosine embedding + linear layer.
+        # cos(pi * i * tau) for i = 1,...,latents for each batch_element x sample.
+        # Broadcast everything to batch x num_taus x latent_dim.
+        pis = self.pis[None, None, :].to(device=x.device)
+        tua_embedding = torch.cos(
+            pis * taus[:, :, None]
+        )   # [batch_size, num_taus, latent_dim]
+
+        # Merge batch and taus dimension before input to embedding layer.
+        tau_embedding = tau_embedding.view(
+            batch_size * num_taus, -1
+        )   # [batch_size x num_taus, latent_dim]
+        tau_embedding = F.relu(
+            self.embedding_layer(tau_embedding)
+        )   # [batch_size x num_taus, embedding_layer_output]
+
+        # Reshape/boradcast both embeddings to batch x num_taus x state_dim
+        # and multiply together, before applying value head.
+        tau_embedding = tau_embedding.view(
+            batch_size, num_taus, -1
+        )
+        head_input = tau_embedding * features[:, None, :]   # [batch_size, num_taus, embedding_layer_output]
+
+        # Merge head input dimensions.
+        head_input = head_input.view(
+            -1, self.embedding_layer.out_features
+        )
+
+        # No softmax as the model is trying to approximate the 'whole' probability distributions
+        q_dist = self.value_head(head_input)    # [batch_size x num_taus, action_dim]
+        q_dist = q_dist.view(
+            batch_size, -1, self.action_dim
+        )   # [batch_size x num_taus, action_dim]
+        q_values = torch.mean(q_dist, dim=1)    # [batch_size, action_dim]
+
+        return IqnNetworkOutputs(
+            q_values=q_values,
+            q_dist=q_dist,
+            taus=taus,
+        )
+
+
