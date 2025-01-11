@@ -776,3 +776,89 @@ class R2d2DqnMlpNet(nn.Module):
         )
 
 
+class NguDqnMlpNet(nn.Module):
+    """
+    NGU DQN MLP network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        num_policies: int,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network.
+            action_dim: the number of units for the output linear layer.
+            num_policies: the number of mixtures for intrinsic reward scale betas.
+        """
+        super().__init__()
+        self.action_dim = action_dim
+        self.num_policies = num_policies
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+        )
+
+        # Core input includes:
+        # feature reprentation output size.
+        # one-hot of intrinsic reward scale beta
+        # one-hot of last action
+        # last intrinsic reward
+        # last extrinsic reward
+        core_output_size = 128 + self.num_policies + self.action_dim + 1 + 1
+
+        self.lstm = nn.LSTM(
+            input_size=core_output_size,
+            hidden_size=128,
+            num_layers=1,
+        )
+        self.advantage_head = nn.Sequential(
+            nn.Linear(self.lstm.hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
+        self.value_head = nn.Sequential(
+            nn.Linear(self.lstm.hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+        )
+    
+    def forward(
+        self, input_: NguNetworkInputs
+    )-> RnnDqnNetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        where the state is a batch (B) of length (T) states.
+        B refers to the batch size T refers to the time dimension.
+
+        Args:
+            x: the NguNetworkInputs object which contains the following attributes:
+                s_t: timestep t envrionment state, shape [T, B, state_shape].
+                a_tm1: action taken in s_tm1, shape [T, B].
+                ext_r_t: extrinsic reward for state-action pair (s_tm1, a_tm1), shape [T, B].
+                int_r_t: intrinsic reward for state s_tm1, shape [T, B].
+                policy_index: the index for the pair of intrinsic reward scale beta and
+                    discount gamma, shape [T, B].
+                hidden_s: LSTM layer hidden state from t-1 timestep, tuple of two tensors 
+                    each shape (num_lstm_layers, B, lstm_hidden_size).
+
+        Returns:
+            RnnDqnNetworkOutputs object with the fowllowing attributes:
+                q_values: state-action values.
+                hidden_s: hidden state from LSTM layer output.
+        """
+        # Expect x shape to be [T, B, state_shape]
+        s_t = input_.s_t
+        a_tm1 = input_.a_tm1
+        ext_r_t = input_.ext_r_t
+        int_r_t = input_.int_r_t
+        policy_index = input_.policy_index
+        hidden_s = input_.hidden_s
+
+        T, B, *_ = s_t.shape    # [T, B, state_shape]
+        
