@@ -14,7 +14,7 @@ import numpy as np
 import torch
 import copy
 
-# pylint: disable=import-error
+
 from networks.value import R2d2DqnConvNet, RnnDqnNetworkInputs
 from r2d2 import agent
 from checkpoint import PyTorchCheckpoint
@@ -225,7 +225,9 @@ def main(argv):
     """
     del argv
 
-    runtime_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    runtime_device = torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu'
+    )
     logging.info(f'Runs R2D2 agent on {runtime_device}')
     np.random.seed(FLAGS.seed)
     torch.manual_seed(FLAGS.seed)
@@ -234,22 +236,23 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
     
-    random_state = np.random.RandomState(FLAGS.seed)    # pylint: disable=no-member
+    random_state = np.random.RandomState(FLAGS.seed)    
 
-    # Create evaluation envrionment, like R2D2, we disable terminate-on-life-loss and clip reward.
+    # Create evaluation envrionment, like R2D2, 
+    # disable terminate-on-life-loss and clip reward.
     def environment_builder():
         return gym_env.create_atari_environment(
-            env_name = FLAGS.environment_name,
-            frame_height = FLAGS.environment_height,
-            frame_width = FLAGS.environment_width,
-            frame_skip = FLAGS.environment_frame_skip,
-            frame_stack = FLAGS.environment_frame_stack,
-            max_episode_steps = FLAGS.max_episode_steps,
-            seed = random_state.randint(1, 2**10),
-            noop_max = 30,
-            terminal_on_life_loss = True,
-            sticky_action = False,
-            clip_reward = False,
+            env_name=FLAGS.environment_name,
+            frame_height=FLAGS.environment_height,
+            frame_width=FLAGS.environment_width,
+            frame_skip=FLAGS.environment_frame_skip,
+            frame_stack=FLAGS.environment_frame_stack,
+            max_episode_steps=FLAGS.max_episode_steps,
+            seed=random_state.randint(1, 2**10),
+            noop_max=30,
+            terminal_on_life_loss=True,
+            sticky_action=False,
+            clip_reward=False,
         )
     
     eval_env = environment_builder()
@@ -270,14 +273,15 @@ def main(argv):
         FLAGS.environment_width,
     )
 
-    # Create network for learner to optimize, actor will use the same network with share memory.
+    # Create network for learner to optimize, 
+    # actor will use the same network with share memory.
     network = R2d2DqnConvNet(
         state_dim=state_dim, action_dim=action_dim
     )
     optimizer = torch.optim.Adam(
         network.parameters(),
-        lr = FLAGS.learning_rate,
-        eps = FLAGS.adam_eps,
+        lr=FLAGS.learning_rate,
+        eps=FLAGS.adam_eps,
     )
 
     # Test network output.
@@ -291,7 +295,8 @@ def main(argv):
     assert network_output.q_values.shape == (1, 1, action_dim)
     assert len(network_output.hidden_s) == 2
 
-    # Create prioritized transition replay, no importance_sampling_exponent decay
+    # Create prioritized transition replay, 
+    # no importance_sampling_exponent decay
     importance_sampling_exponent = FLAGS.importance_sampling_exponent
 
     def importance_sampling_exponent_schedule(x):
@@ -301,12 +306,12 @@ def main(argv):
 
         def encoder(transition):
             return transition._replace(
-                s_t = replay_lib.compress_array(transition.s_t),
+                s_t=replay_lib.compress_array(transition.s_t),
             )
         
         def decoder(transition):
             return transition._replace(
-                s_t = replay_lib.uncompress_array(transition.s_t),
+                s_t=replay_lib.uncompress_array(transition.s_t),
             )
     
     else:
@@ -314,15 +319,15 @@ def main(argv):
         decoder = None
     
     replay = replay_lib.Prioritizedreplay(
-        capacity = FLAGS.replay_capacity,
-        structure = agent.TransitionsStructure,
-        priority_exponent = FLAGS.priority_exponent,
-        importance_sampling_exponent = importance_sampling_exponent_schedule(),
-        normalize_weights = FLAGS.normalize_weights,
-        random_state = random_state,
-        time_major = True,
-        encode = encoder(),
-        decoder = decoder(),
+        capacity=FLAGS.replay_capacity,
+        structure=agent.TransitionsStructure,
+        priority_exponent=FLAGS.priority_exponent,
+        importance_sampling_exponent=importance_sampling_exponent_schedule(),
+        normalize_weights=FLAGS.normalize_weights,
+        random_state=random_state,
+        time_major=True,
+        encode=encoder(),
+        decoder=decoder(),
     )
 
     # Create queue to shared transitions between actors and learner
@@ -339,21 +344,21 @@ def main(argv):
 
     # Create R2D2 learner instance
     laerner_agent = agent.Learner(
-        network = network,
-        optimizer = optimizer,
-        replay = replay,
-        min_replay_size = FLAGS.min_replay_size,
-        target_net_update_interval = FLAGS.target_net_update_interval,
-        discount = FLAGS.discount,
-        burn_in = FLAGS.burn_in,
-        priority_eta = FLAGS.priority_eta,
-        rescale_epsilon = FLAGS.rescale_epsilon,
-        batch_size = FLAGS.batch_size,
-        n_step = FLAGS.n_step,
-        clip_grad = FLAGS.clip_grad,
-        max_grad_norm = FLAGS.max_grad_norm,
-        device = runtime_device,
-        shared_params = shared_params,
+        network=network,
+        optimizer=optimizer,
+        replay=replay,
+        min_replay_size=FLAGS.min_replay_size,
+        target_net_update_interval=FLAGS.target_net_update_interval,
+        discount=FLAGS.discount,
+        burn_in=FLAGS.burn_in,
+        priority_eta=FLAGS.priority_eta,
+        rescale_epsilon=FLAGS.rescale_epsilon,
+        batch_size=FLAGS.batch_size,
+        n_step=FLAGS.n_step,
+        clip_grad=FLAGS.clip_grad,
+        max_grad_norm=FLAGS.max_grad_norm,
+        device=runtime_device,
+        shared_params=shared_params,
     )
 
     # Create actor environment, actor instances.
@@ -370,57 +375,58 @@ def main(argv):
             for i in random_state(FLAGS.num_actors)
         ]
     
-    # Rank 0 is the most explorative actor, while rank N-1 is the most exploitative actor.
+    # Rank 0 is the most explorative actor, 
+    # while rank N-1 is the most exploitative actor.
     # Each actor has it's own network with different weights.
     actors = [
         agent.Actor(
-            rank = 1,
-            data_queue = data_queue,
-            network = copy.deepcopy(network),
-            random_state = np.random.RandomState(FLAGS.seed + int(i)),  # pylint: disable=no-member
-            num_actors = FLAGS.num_actors,
-            action_dim = action_dim,
-            unroll_length = FLAGS.unroll_length,
-            burn_in = FLAGS.burn_in,
-            actor_update_interval = FLAGS.actor_update_interval,
-            device = actor_diveces[i],
-            shared_params = shared_params,
+            rank=1,
+            data_queue=data_queue,
+            network=copy.deepcopy(network),
+            random_state=np.random.RandomState(FLAGS.seed + int(i)),  
+            num_actors=FLAGS.num_actors,
+            action_dim=action_dim,
+            unroll_length=FLAGS.unroll_length,
+            burn_in=FLAGS.burn_in,
+            actor_update_interval=FLAGS.actor_update_interval,
+            device=actor_diveces[i],
+            shared_params=shared_params,
         )
         for i in range(FLAGS.num_actors)
     ]
 
     # Create evaluation agent instance
     eval_agent = greedy_actors.R2d2EpsilonGreedActor(
-        network = network,
-        exploration_epsilon = FLAGS.eval_exploration_epsilon,
-        random_state = random_state,
-        device = runtime_device,
+        network=network,
+        exploration_epsilon=FLAGS.eval_exploration_epsilon,
+        random_state=random_state,
+        device=runtime_device,
     )
 
     # Setup checkpoint.
     checkpoint = PyTorchCheckpoint(
-        environment_name = FLAGS.environment_name,
-        agent_name = 'R2D2',
-        save_dir = FLAGS.checkpoint_dir,
+        environment_name=FLAGS.environment_name,
+        agent_name='R2D2',
+        save_dir=FLAGS.checkpoint_dir,
     )
     checkpoint.register_pair(('network', network))
 
     # Run parallel training iterations.
     main_loop.run_parallel_training_iterations(
-        num_iterations = FLAGS.num_iterations,
-        num_train_steps = FLAGS.num_train_steps,
-        num_eval_steps = FLAGS.num_eval_steps,
-        laerner_agent = laerner_agent,
-        eval_agent = eval_agent,
-        eval_env = eval_env,
-        actors = actors,
-        actor_envs = actor_envs,
-        data_queue = data_queue,
-        checkpoint = checkpoint,
-        csv_file = FLAGS.results_csv_path,
-        use_tensorboard = FLAGS.use_tensorboard,
-        tag = FLAGS.tag,
-        debug_screenshots_interval = FLAGS.debug_screenshots_interval,
+        num_iterations=FLAGS.num_iterations,
+        num_train_steps=FLAGS.num_train_steps,
+        num_eval_steps=FLAGS.num_eval_steps,
+        laerner_agent=laerner_agent,
+        eval_agent=eval_agent,
+        eval_env=eval_env,
+        actors=actors,
+        actor_envs=actor_envs,
+        data_queue=data_queue,
+        checkpoint=checkpoint,
+        csv_file=FLAGS.results_csv_path,
+        use_tensorboard=FLAGS.use_tensorboard,
+        tag=FLAGS.tag,
+        debug_screenshots_interval=FLAGS.debug_screenshots_interval,
     )
 
 
