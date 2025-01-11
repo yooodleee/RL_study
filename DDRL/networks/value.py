@@ -1794,3 +1794,99 @@ class NguDqnConvNet(nn.Module):
         )
 
 
+class Agent57Conv2dNet(nn.Module):
+    """
+    Agent47 DQN Conv2d network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        num_policies: int,
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network.
+            action_dim: the number of units for the output linear layer.
+            num_policies: the number of mixtures for intrinsic reward scale betas.
+        """
+
+        super().__init__()
+
+        self.ext_q = NguDqnConvNet(
+            state_dim=state_dim,
+            action_dim=action_dim,
+            num_policies=num_policies,
+        )
+        self.int_q = NguDqnConvNet(
+            state_dim=state_dim,
+            action_dim=action_dim,
+            num_policies=num_policies,
+        )
+    
+    def forward(
+        self, input_: Agent57NetworkInputs
+    )-> Agent57NetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        where the state is a batch (B) of length (T) states.
+        B refers to the batch size T refers to the time dimensions.
+
+        Args:
+            x: the NguNetworkInputs object which contains the following attributes:
+                s_t: timestep t environment state, shape [T, B, state_shape].
+                a_tm1: action taken in s_tm1, shape [T, B].
+                ext_r_t: extrinsic reward for state-action pair (s_tm1, a_tm1), shape [T, B].
+                int_r_t: intrinsic reward for state s_tm1, shape [T, B].
+                policy_indexL the index for the pair of intrinsic reward scale beta and discount gamma,
+                    shape [T, B].
+                hidden_s: LSTM layer hidden state from t-1 timestep, tuple of two tensors
+                    each shape (num_lstm_layers, B, lstm_hidden_size).
+
+        Returns:
+            Agent57NetworkOutputs objects with the following attributes:
+                q_values: state-action values.
+                ext_hidden_s: hidden state from LSTM layer output, from extrinsic Q network.
+                int_hidden_s: hidden state from LSTM layer output, from intrinsic Q network.
+        """
+        ext_input = NguNetworkInputs(
+            s_t=torch.clone(input_.s_t),
+            a_tm1=torch.clone(input_.a_tm1),
+            ext_r_t=torch.clone(input_.ext_r_t),
+            int_r_t=torch.clone(input_.int_r_t),
+            policy_index=torch.clone(input_.policy_index),
+            hidden_s=input_.ext_hidden_s,
+        )
+
+        int_input = NguNetworkInputs(
+            s_t=input_.s_t,
+            a_tm1=input_.a_tm1,
+            ext_r_t=input_.ext_r_t,
+            int_r_t=input_.int_r_t,
+            policy_index=input_.policy_index,
+            hidden_s=input_.int_hidden_s,
+        )
+
+        ext_output = self.ext_q(ext_input)
+        int_output = self.int_q(int_input)
+
+        return Agent57NetworkOutputs(
+            ext_q_values=ext_output.q_values,
+            int_q_values=int_input.q_values,
+            ext_hidden_s=ext_output.hidden_s,
+            int_hidden_s=int_input.hidden_s,
+        )
+    
+    def get_initial_hidden_state(
+        self, batch_size: int
+    )-> Tuple[torch.Tensor]:
+        """
+        Get initial LSTM hidden state, which is all zeros,
+            should call at the beginning of new episode, or every training batch.
+        """
+
+        ext_state = self.ext_q.get_initial_hidden_state(batch_size)
+        int_state = self.int_q.get_initial_hidden_state(batch_size)
+
+        return (ext_state, int_state)
