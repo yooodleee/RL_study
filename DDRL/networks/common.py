@@ -15,7 +15,7 @@ def calc_conv2d_output(
     stride: int = 1,
     pad: int = 0,
     dilation: int = 1,
-)-> Tuple[int, int]:
+) -> Tuple[int, int]:
     """
     Takes a tuple of (h, w) and returns a tuple of (h, w).
     """
@@ -32,7 +32,7 @@ def calc_conv2d_output(
     
     return (h, w)
 
-def initialize_weights(net: nn.Module)-> None:
+def initialize_weights(net: nn.Module) -> None:
     """
     Initialize weights for Conv2d and Linear layer using kaming initializer.
     """
@@ -53,7 +53,7 @@ class NatureCnnBackboneNet(nn.Module):
         vector.
     """
 
-    def __init__(self, state_dim: tuple)-> None:
+    def __init__(self, state_dim: tuple) -> None:
         super().__init__()
 
         # Compute the output shape of final conv2d layer
@@ -65,21 +65,30 @@ class NatureCnnBackboneNet(nn.Module):
 
         self.net = nn.Sequential(
             nn.Conv2d(
-                in_channels=c, out_channels=32, kernel_size=8, stride=4
+                in_channels=c, 
+                out_channels=32,
+                kernel_size=8,
+                stride=4,
             ),
             nn.ReLU(),
             nn.Conv2d(
-                in_channels=32, out_channels=64, kernel_size=4, stride=2
+                in_channels=32,
+                out_channels=64,
+                kernel_size=4,
+                stride=2,
             ),
             nn.ReLU(),
             nn.Conv2d(
-                in_channels=64, out_channels=64, kernel_size=3, stride=1
+                in_channels=64,
+                out_channels=64, 
+                kernel_size=3,
+                stride=1,
             ),
             nn.ReLU(),
             nn.Flatten(),
         )
     
-    def forward(self, x: torch.Tensor)-> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Given raw state images, returns feature representation vector.
         """
@@ -95,7 +104,7 @@ class ResnetBlock(nn.Module):
     def __init__(
         self,
         num_planes: int,
-    )-> None:
+    ) -> None:
         super().__init__()
 
         self.conv_block1 = nn.Sequential(
@@ -123,7 +132,7 @@ class ResnetBlock(nn.Module):
             nn.BatchNorm2d(num_features=num_planes),
         )
     
-    def forward(self, x: torch.Tensor)-> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
         out = self.conv_block1(x)
         out = self.conv_block2(out)
