@@ -11,7 +11,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-# pylint: disable=import-error
+
 from networks import common
 
 
@@ -134,7 +134,7 @@ class DqnMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> DqnNetworkOutputs:
+    ) -> DqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -188,7 +188,7 @@ class DuelingDqnMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> DqnNetworkOutputs:
+    ) -> DqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -249,7 +249,7 @@ class C51DqnMlpNet(nn.Module):
     
     def forwarad(
         self, x: torch.Tensor
-    )-> C51NetworkOutputs:
+    ) -> C51NetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -324,7 +324,7 @@ class RainbowDqnMlpNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> C51NetworkOutputs:
+    ) -> C51NetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -409,7 +409,7 @@ class QRDqnMlNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> QRDqnNetworkOutputs:
+    ) -> QRDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -475,7 +475,7 @@ class IqnMlpNet(nn.Module):
 
     def sample_tuas(
         self, batch_size: int, num_taus: int
-    )-> torch.Tensor:
+    ) -> torch.Tensor:
         """
         Returns sampled batch taus.
         """
@@ -488,7 +488,7 @@ class IqnMlpNet(nn.Module):
     
     def forward(
         self, x: torch.tensor, num_taus: int = 32
-    )-> IqnNetworkOutputs:
+    ) -> IqnNetworkOutputs:
         """
         Args:
             state: environment state, shape (B, state_shape)
@@ -588,7 +588,7 @@ class DrqnMlpNet(nn.Module):
 
     def forward(
         self, x: torch.Tensor, hidden_s: None
-    )-> RnnDqnNetworkOutputs:
+    ) -> RnnDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is batch (B) of length (T) states.
@@ -623,7 +623,7 @@ class DrqnMlpNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
@@ -692,7 +692,7 @@ class R2d2DqnMlpNet(nn.Module):
 
     def forward(
         self, input_: RnnDqnNetworkInputs
-    )-> RnnDqnNetworkOutputs:
+    ) -> RnnDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is a batch (B) of length (T) states.
@@ -760,7 +760,7 @@ class R2d2DqnMlpNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
@@ -830,7 +830,7 @@ class NguDqnMlpNet(nn.Module):
     
     def forward(
         self, input_: NguNetworkInputs
-    )-> RnnDqnNetworkOutputs:
+    ) -> RnnDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is a batch (B) of length (T) states.
@@ -908,7 +908,7 @@ class NguDqnMlpNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
@@ -966,7 +966,7 @@ class DqnConvNet(nn.Module):
 
     def forward(
         self, x: torch.Tensor
-    )-> DqnNetworkOutputs:
+    ) -> DqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -1017,7 +1017,7 @@ class DuelingDqnConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> DqnNetworkOutputs:
+    ) -> DqnNetworkOutputs:
         """
         Given state, return state-action value for all posible actions.
         """
@@ -1085,7 +1085,7 @@ class C51DqnConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> C51NetworkOutputs:
+    ) -> C51NetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -1161,7 +1161,7 @@ class RainbowDqnConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> C51NetworkOutputs:
+    ) -> C51NetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         """
@@ -1255,7 +1255,7 @@ class QRDqnConvNet(nn.Module):
     
     def forward(
         self, x: torch.Tensor
-    )-> QRDqnNetworkOutputs:
+    ) -> QRDqnNetworkOutputs:
         """
         Given state, return state-action value for all posible actions.
         """
@@ -1329,7 +1329,7 @@ class IqnConvNet(nn.Module):
     
     def sample_taus(
         self, batch_size: int, num_taus: int
-    )-> torch.Tensor:
+    ) -> torch.Tensor:
         """
         Returns sampled batch taus.
         """
@@ -1344,7 +1344,7 @@ class IqnConvNet(nn.Module):
         self,
         x: torch.Tensor,
         num_taus: int = 64,
-    )-> IqnNetworkOutputs:
+    ) -> IqnNetworkOutputs:
         """
         Args:
             state: environment state # batch x state_shape
@@ -1454,7 +1454,7 @@ class DrqnConvNet(nn.Module):
         self,
         x: torch.Tensor,
         hidden_s: None,
-    )-> RnnDqnNetworkOutputs:
+    ) -> RnnDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is a batch (B) of length (T) states.
@@ -1491,7 +1491,7 @@ class DrqnConvNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
@@ -1558,7 +1558,7 @@ class R2d2DqnConvNet(nn.Module):
     
     def forward(
         self, input_: RnnDqnNetworkInputs
-    )-> RnnDqnNetworkOutputs:
+    ) -> RnnDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is a batch (B) of length (T) states.
@@ -1627,7 +1627,7 @@ class R2d2DqnConvNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initail LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
@@ -1698,7 +1698,7 @@ class NguDqnConvNet(nn.Module):
     
     def forward(
         self, input_: NguNetworkInputs
-    )-> RnnDqnNetworkOutputs:
+    ) -> RnnDqnNetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is a batch (B) of length (T) states.
@@ -1778,7 +1778,7 @@ class NguDqnConvNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
@@ -1827,7 +1827,7 @@ class Agent57Conv2dNet(nn.Module):
     
     def forward(
         self, input_: Agent57NetworkInputs
-    )-> Agent57NetworkOutputs:
+    ) -> Agent57NetworkOutputs:
         """
         Given state, return state-action value for all possible actions.
         where the state is a batch (B) of length (T) states.
@@ -1880,7 +1880,7 @@ class Agent57Conv2dNet(nn.Module):
     
     def get_initial_hidden_state(
         self, batch_size: int
-    )-> Tuple[torch.Tensor]:
+    ) -> Tuple[torch.Tensor]:
         """
         Get initial LSTM hidden state, which is all zeros,
             should call at the beginning of new episode, or every training batch.
