@@ -929,3 +929,111 @@ class NguDqnMlpNet(nn.Module):
 
 
 
+class DqnConvNet(nn.Module):
+    """
+    DQN Conv2d network.
+    """
+
+    def __init__(
+        self, state_dim: tuple, action_dim: int
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if len(state_dim) < 1:
+            raise ValueError(
+                f'Expect state_dim to be a tuple with [C, H, W], got {state_dim}'
+            )
+        
+        super().__init__()
+        self.action_dim = action_dim
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.value_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim),
+        )
+
+        # Initialize weights.
+        common.initialize_weights(self)
+
+    def forward(
+        self, x: torch.Tensor
+    )-> DqnNetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        """
+        x = x.float() / 255.0
+        x = self.body(x)
+        q_values = self.value_head(x)   # [batch_size, action_dim]
+
+        return DqnNetworkOutputs(q_values=q_values)
+    
+
+class DuelingDqnConvNet(nn.Module):
+    """
+    Dueling DQN Conv2d network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    ):
+        """
+        Args:
+            state_dim: the shape of the input tensor to the neural network
+            action_dim: the number of units for the output linear layer
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        
+        super().__init__()
+        
+        self.action_dim = action_dim
+        self.body = common.NatureCnnBackboneNet(state_dim)
+
+        self.advantage_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, action_dim),
+        )
+        self.value_head = nn.Sequential(
+            nn.Linear(self.body.out_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+        )
+    
+    def forward(
+        self, x: torch.Tensor
+    )-> DqnNetworkOutputs:
+        """
+        Given state, return state-action value for all posible actions.
+        """
+
+        features = self.body(x)
+        advantages = self.advantage_head(features)  # [batch_size, action_dim]
+        values = self.value_head(features)  # [batch_size, 1]
+
+        q_values = values + (
+            advantages - torch.mean(
+                advantages, dim=1, keepdim=True
+            )
+        )   # [batch_size, action_dim]
+
+        return DqnNetworkOutputs(
+            q_values=q_values
+        )
+
+
