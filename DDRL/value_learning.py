@@ -22,3 +22,9 @@ class QExtra(NamedTuple):
     td_error: Optional[torch.Tensor]
 
 
+class DoubleQExtra(NamedTuple):
+    target: torch.Tensor
+    td_error: torch.Tensor
+    best_action: torch.Tensor
+
+
