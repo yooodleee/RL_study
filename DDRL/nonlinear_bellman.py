@@ -95,4 +95,75 @@ def transformed_retrace(
     eps: float = 1e-8,
     tx_pair: TxPair = IDENTITY_PAIR,
 )-> base.LossOutput:
+    """
+    calculates transformed Retrace errors.
+
+    See "Recurrent Experience Replay in Distributed Reinforcement Learning" by
+        Kapturowski et al. (https://openreview.net/pdf?id=r1lyTjAqYX).
     
+    Args:
+        q_tm1: Q-values at time t-1, this is from the online Q network,
+            shape [T, B, action_dim].
+        q_t: Q-values at time t, this is often from the target Q network,
+            shape [T, B, action_dim].
+        a_tm1: action index at time t-1, the action the agent took in state
+            s_tm1, shape [T, B].
+        a_t: action index at time t, the action the agent took in state s_t, 
+            shape [T, B].
+        r_t: reward at time t, shape [T, B].
+        discount_t: discount at time t, shape [T, B].
+        pi_t: target policy probs at time t, shape [T, B, action_dim].
+        mu_t: behavior policy probs at time t, shape [T, B, action_dim].
+        lambda_: scalar mixing parameter lambda.
+        eps: small value to add to mu_t for numerical sstability.
+
+    Returns:
+        Transformed retrace td errors, shape [T, B].
+    """
+
+    base.assert_rank_and_dtype(
+        q_tm1, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        q_t, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        a_tm1, 2, torch.long
+    )
+    base.assert_rank_and_dtype(
+        a_t, 2, torch.long
+    )
+    base.assert_rank_and_dtype(
+        r_t, 2, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        discount_t, 2, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        pi_t, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        mu_t, 2, torch.float32
+    )
+
+    pi_a_t = base.batched_index(pi_t, a_t)
+    c_t = torch.minimum(
+        torch.tensor(1.0),
+        pi_a_t / (mu_t + eps)
+    ) * lambda_
+
+    with torch.no_grad():
+        target_tm1 = transformed_general_off_policy_returns_from_action_values(
+            tx_pair, q_t, a_t, r_t, discount_t, c_t, pi_t
+        )
+    q_a_tm1 = base.batched_index(q_tm1, a_tm1)
+    td_error = target_tm1 - q_a_tm1
+    loss = 0.5 * td_error**2
+
+    return base.LossOutput(
+        loss,
+        value_learning.QExtra(
+            target=target_tm1,
+            td_error=td_error,
+        )
+    )
