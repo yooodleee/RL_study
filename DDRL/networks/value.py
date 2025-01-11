@@ -639,3 +639,140 @@ class DrqnMlpNet(nn.Module):
         )
 
 
+class R2d2DqnMlpNet(nn.Module):
+    """
+    R2D2 DQN MLP network.
+    """
+
+    def __init__(
+        self, state_dim: int, action_dim: int
+    ):
+        """
+        Args:
+            state_dim: the shape of the inpute tensor to the neural network
+            action_dim: the number of units for the output linear layer
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        
+        super().__init__()
+        self.action_dim = action_dim
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+        )
+
+        # Feature representation output size + oen-hot of last action + last reward.
+        core_output_size = 128 + self.action_dim + 1
+
+        self.lstm = nn.LSTM(
+            input_size=core_output_size,
+            hidden_size=128,
+            num_layers=1
+        )
+        self.advantage_head = nn.Sequential(
+            nn.Linear(self.lstm.hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
+        self.value_head = nn.Sequential(
+            nn.Linear(self.lstm.hidden_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+        )
+
+    def forward(
+        self, input_: RnnDqnNetworkInputs
+    )-> RnnDqnNetworkOutputs:
+        """
+        Given state, return state-action value for all possible actions.
+        where the state is a batch (B) of length (T) states.
+        B refers to the batch size T refert to the time dimension.
+
+        Args:
+            x: the RnnDqnNetworkInputs object which contains the following attributes:
+                s_t: timestep t environment state, shape [T, B, state_shape].
+                a_tim1: action taken in t-1 timestep, shape [T, B].
+                r_t: reward for state-action pair (s_tm1, a_tm1), shape [T, B].
+                hidden_s: LSTM layer hidden state from t-1 timestep, tuple of two tenwors
+                    each shape (num_lstm_layers, B, lstm_hidden_size).
+
+        Returns:
+            RnnDqnNetworkOutputs object which the following attributes:
+                q_values: state-action values.
+                hidden_s: hidden state from LSTM layer output, tuple of two tensors each shape
+                    (num_lstm_layer, B, lstm_hidden_size).
+        """
+        # Expect X shape to be [T, B, state_shape]
+        s_t = input_.s_t
+        a_tm1 = input_.a_tm1
+        r_t = input_.r_t
+        hidden_s = input_.hidden_s
+
+        T, B, *_ = s_t.shape    # [T, B, state_shape]
+        x = torch.flatten(s_t, 0, 1)    # Merge batch and time dimension.
+
+        x = self.body(x)
+        x = x.view(T * B, -1)
+
+        # Append rewrad and one hot last action.
+        one_hot_a_tm1 = F.one_hot(
+            a_tm1.view(T * B), self.action_dim
+        ).float().to(device=x.device)
+
+        reward = r_t.view(T * B, 1)
+        core_input = torch.cat(
+            [x, reward, one_hot_a_tm1],
+            dim=-1
+        )
+        core_input = core_input.view(T, B, -1)  # LSTM expect rank 3 tensor.
+
+        # If no hidden_s provided, use zero start strategy
+        if hidden_s is None:
+            hidden_s = self.get_initial_hidden_state(batch_size=B)
+            hidden_s = tuple(
+                s.to(device=x.device) for s in hidden_s
+            )
+        
+        x, hidden_s = self.lstm(core_input, hidden_s)
+
+        x = torch.flatten(x, 0, 1)  # Merge batch and time dimension.
+        advantages = self.advantage_head(x) # [T*B, action_dim]
+        values = self.value_head(x) # [T*B, 1]
+
+        q_values = values + (
+            advantages - torch.mean(advantages, dim=1, keepdim=True)
+        )
+        q_values = q_values.view(T, B, -1)  # reshape to in the range [B, T, action_dim]
+
+        return RnnDqnNetworkOutputs(
+            q_values=q_values, hidden_s=hidden_s
+        )
+    
+    def get_initial_hidden_state(
+        self, batch_size: int
+    )-> Tuple[torch.Tensor]:
+        """
+        Get initial LSTM hidden state, which is all zeros,
+            should call at the beginning of new episode, or every training batch.
+        """
+        # Shape should be num_layers, batch_size, hidden_size, 
+        # note lstm expects two hidden states.
+        return tuple(
+            torch.zeros(
+                self.lstm.num_layers,
+                batch_size,
+                self.lstm.hidden_size,
+            ) for _ in range(2)
+        )
+
+
