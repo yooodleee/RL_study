@@ -214,3 +214,65 @@ def double_qlearning(
     )
 
 
+def _slice_with_actions(
+    embeddings: torch.Tensor,
+    actions: torch.Tensor,
+)-> torch.Tensor:
+    """
+    Slice a Tensor.
+
+    Take embeddings of the form [batch_size, action_dim, embed_dim]
+        and actions of the form [batch_size, 1], and return the sliced embeddings
+        like embeddings[:, actions, :].
+
+    Args:
+        embeddings: Tensor of embeddings to index.
+        actions: int Tensor to use as index into embeddings.
+
+    Returns:
+        Tensor of embeddings indexed by actions.
+    """
+
+    batch_size, action_dim = embeddings.shape[:2]
+
+    # Values are the 'values' in a sparse tensor we will be setting
+    act_idx = actions[:, None]
+
+    values = torch.reshape(
+        torch.ones(
+            actions.shape,
+            dtype=torch.int8,
+            device=actions.device,
+        ),
+        [-1],
+    )
+
+    # Create a range for each index into the batch
+    act_range = torch.arange(
+        0, batch_size, dtype=torch.int64
+    )[:, None].to(
+        device=actions.device
+    )
+    # Combine this into coordings with the action indices
+    indices = torch.concat(
+        [act_range, act_idx], 1
+    )
+
+    # Needs transpose indices before adding to torch.sparse_coo_tensor.
+    actions_mask = torch.sparse_coo_tensor(
+        indices.t(),
+        values,
+        [batch_size, action_dim]
+    )
+    with torch.no_grad():
+        actions_mask = actions_mask.to_dense().bool()
+    
+    sliced_emb = torch.masked_select(
+        embeddings, actions_mask[..., None]
+    )
+    # Make sure shape is the same as embeddings
+    sliced_emb = sliced_emb.reshape(embeddings.shape[0], -1)
+
+    return sliced_emb
+
+
