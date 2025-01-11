@@ -345,3 +345,119 @@ def l2_project(
     )
 
 
+def categorial_dist_qlearning(
+    atoms_tm1: torch.Tensor,
+    logits_q_tm1: torch.Tensor,
+    a_tm1: torch.Tensor,
+    r_t: torch.Tensor,
+    discount_t: torch.Tensor,
+    atoms_t: torch.Tensor,
+    logits_q_t: torch.Tensor,
+)-> base.LossOutput:
+    """
+    Implements Distributional Q-learning as TensorFlow ops.
+
+    The function assumes categorial value distributions parameterized by logits.
+
+    See "A Distributional Perspective on Reinforcement Learning" by bellemare,
+        Debney and Munos. (https://arxiv.org/abs/1707.06887).
+
+    Args:
+        atoms_tm1: 1-D tensor containng atom values for first timestep,
+            shape [num_atoms].
+        logits_q_tm1: Tensor holding logits for first timestep in a batch of
+            transitions, shape [B, action_dim, num_atoms].
+        a_tm1: Tensor holding action indices, shape [B].
+        r_t : Tensor holding rewards, shape [B].
+        discount_t: Tensor holding discount value, shape [B].
+        atoms_t: 1-D tensor containing atom values for second timestep,
+            shape [num_atoms].
+        logits_q_t: Tensor holding logits for second timestep in a batch of
+            transitions, shape [B, action_dim, num_atoms].
+
+    Returns:
+        A namedtuple with fields:
+            * `loss`: a tensor containing the batch of losses, shape [B].
+            * `extra`: a namedtuple with fields:
+                * `target`: a tensor containing the values that q_tm1 at actions
+                    `a_tm1` are regressed towards, shape [B, num_atoms].
+
+    Raises:
+        ValueError: If the tensors do not have the correct rank or compatibility.
+    """
+    # Rank and compatibility checks.
+    base.assert_rank_and_dtype(
+        logits_q_tm1, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        a_tm1, 1, torch.long
+    )
+    base.assert_rank_and_dtype(
+        r_t, 1, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        discount_t, 1, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        logits_q_t, 3, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        atoms_tm1, 1, torch.float32
+    )
+    base.assert_rank_and_dtype(
+        atoms_t, 1, torch.float32
+    )
+
+    base.assert_batch_dimension(
+        a_tm1, logits_q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        r_t, logits_q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        discount_t, logits_q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        logits_q_t, logits_q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        atoms_tm1, logits_q_tm1.shape[0]
+    )
+    base.assert_batch_dimension(
+        atoms_t, logits_q_tm1.shape[0]
+    )
+
+    # Categorical distributional Q-learning op.
+    # Scale and shift time-t distribution atoms by discount and reward.
+    target_z = r_t[:, None] + discount_t[:, None] * atoms_t[None, :]
+
+    # Convert logits to distribution, then find greedy action in state s_t.
+    q_t_probs = F.softmax(logits_q_t, dim=-1)
+    q_t_mean = torch.sum(q_t_probs * atoms_t, 2)
+    pi_t = torch.argmax(q_t_mean, 1)
+
+    # Compute distribution for greedy action.
+    p_target_z = _slice_with_actions(
+        q_t_probs, pi_t
+    )
+
+    # Project using the Cramer distance
+    with torch.no_grad():
+        target_tm1 = l2_project(
+            target_z, p_target_z, atoms_tm1
+        )
+    
+    logit_qa_tm1 = _slice_with_actions(
+        logits_q_tm1, a_tm1
+    )
+    loss = F.cross_entropy(
+        input=logit_qa_tm1,
+        target=target_tm1,
+        reduction='none',
+    )
+
+    return base.LossOutput(
+        loss, Extra(target_tm1)
+    )
+
+
