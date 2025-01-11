@@ -14,10 +14,10 @@ import numpy as np
 import torch
 import copy
 
-# pylint: disable=import-error
+
 from networks.value import R2d2DqnMlpNet, RnnDqnNetworkInputs
 from r2d2 import agent
-from checkpoint import pyTorchCheckpoint
+from checkpoint import PyTorchCheckpoint
 from .. import (
     main_loop,
     gym_env,
@@ -195,7 +195,9 @@ def main(argv):
     """
     del argv
 
-    runtime_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    runtime_device = torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu'
+    )
     logging.info(f'Run R2D2 agent on {runtime_device}')
     np.random.seed(FLAGS.seed)
     torch.manual_seed(FLAGS.seed)
@@ -204,13 +206,13 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
     
-    random_state = np.random.RandomState(FLAGS.seed)    # pylint: disable=no-member
+    random_state = np.random.RandomState(FLAGS.seed)    
 
     # Create environment.
     def environment_builder():
         return gym_env.create_classic_environment(
-            env_name = FLAGS.environment_name,
-            seed = random_state.randint(1, 2**10),
+            env_name=FLAGS.environment_name,
+            seed=random_state.randint(1, 2**10),
         )
 
     eval_env = environment_builder()
@@ -222,21 +224,22 @@ def main(argv):
     logging.info('Action spec: %s', action_dim)
     logging.info('Observation spec: %s', state_dim)
 
-    # Create network for learner to optimize, actor will use the same network with share memory.
-    network = R2d2DqnMlpNet(state_dim = state_dim, action_dim = action_dim)
+    # Create network for learner to optimize, 
+    # actor will use the same network with share memory.
+    network = R2d2DqnMlpNet(state_dim=state_dim, action_dim=action_dim)
     optimizer = torch.optim.Adam(
         network.parameters(),
-        lr = FLAGS.learning_rate,
-        eps = FLAGS.adam_eps,
+        lr=FLAGS.learning_rate,
+        eps=FLAGS.adam_eps,
     )
 
     # Test network output.
     obs = eval_env.reset()
     x = RnnDqnNetworkInputs(
-        s_t = torch.from_numpy(obs[None, None, ...]).float(),
-        a_tm1 = torch.zeros(1, 1).long(),
-        r_t = torch.zeros(1, 1).float(),
-        hidden_s = network.get_initial_hidden_state(1),
+        s_t=torch.from_numpy(obs[None, None, ...]).float(),
+        a_tm1=torch.zeros(1, 1).long(),
+        r_t=torch.zeros(1, 1).float(),
+        hidden_s=network.get_initial_hidden_state(1),
     )
     network_output = network(x)
     assert network_output.q_values.shape == (1, 1, action_dim)
@@ -249,13 +252,13 @@ def main(argv):
         return importance_sampling_exponent
     
     replay = replay_lib.PrioritizedReplay(
-        capacity = FLAGS.replay_capacity,
-        structure = agent.TransitionStructure,
-        priority_exponent = FLAGS.priority_exponent,
-        importance_sampling_exponent = importance_sampling_exponent,
-        normalize_weights = FLAGS.normalize_weights,
-        random_state = random_state,
-        time_major = True,
+        capacity=FLAGS.replay_capacity,
+        structure=agent.TransitionStructure,
+        priority_exponent=FLAGS.priority_exponent,
+        importance_sampling_exponent=importance_sampling_exponent,
+        normalize_weights=FLAGS.normalize_weights,
+        random_state=random_state,
+        time_major=True,
     )
 
     # Create queue to shared transitions between actors and learner
@@ -270,21 +273,21 @@ def main(argv):
 
     # Create R2D2 learner instance
     learner_agent = agent.Leaner(
-        network = network,
-        optimizer = optimizer,
-        replay = replay,
-        min_replay_size = FLAGS.min_replay_size,
-        target_net_update_interval = FLAGS.target_net_update_interval,
-        discount = FLAGS.discout,
-        burn_in = FLAGS.burn_in,
-        priority_eta = FLAGS.priority_eta,
-        rescale_epsilon = FLAGS.rescale_epsilon,
-        batch_size = FLAGS.batch_size,
-        n_step = FLAGS.n_step,
-        clip_grad = FLAGS.clip_grad,
-        max_grad_norm = FLAGS.max_grad_norm,
-        device = runtime_device,
-        shared_params = shared_params,
+        network=network,
+        optimizer=optimizer,
+        replay=replay,
+        min_replay_size=FLAGS.min_replay_size,
+        target_net_update_interval=FLAGS.target_net_update_interval,
+        discount=FLAGS.discout,
+        burn_in=FLAGS.burn_in,
+        priority_eta=FLAGS.priority_eta,
+        rescale_epsilon=FLAGS.rescale_epsilon,
+        batch_size=FLAGS.batch_size,
+        n_step=FLAGS.n_step,
+        clip_grad=FLAGS.clip_grad,
+        max_grad_norm=FLAGS.max_grad_norm,
+        device=runtime_device,
+        shared_params=shared_params,
     )
 
     # Create actor environments, actor instances.
@@ -299,57 +302,58 @@ def main(argv):
         actor_devices = [torch.device(
             f'cuda:{i % num_gpus}') for i in range(FLAGS.num_actors)]
 
-    # Rank 0 is the most explorative actor, while rank N-1 is the most exploitative actor.
+    # Rank 0 is the most explorative actor, 
+    # while rank N-1 is the most exploitative actor.
     # Each actor has it's own network with different weights.
     actors = [
         agent.Actor(
-            rank= i,
-            data_queue = data_queue,
-            network = copy.deepcopy(network),
-            random_state = np.random.RandomState(FLAGS.seed + int(i)),
-            num_actors = FLAGS.num_actors,
-            action_dim = action_dim,
-            unroll_length = FLAGS.unroll_length,
-            burn_in = FLAGS.burn_in,
-            actor_update_interval = FLAGS.actor_update_ineterval,
-            device = actor_devices[i],
-            shared_params = shared_params,
+            rank=i,
+            data_queue=data_queue,
+            network=copy.deepcopy(network),
+            random_state=np.random.RandomState(FLAGS.seed + int(i)),
+            num_actors=FLAGS.num_actors,
+            action_dim=action_dim,
+            unroll_length=FLAGS.unroll_length,
+            burn_in=FLAGS.burn_in,
+            actor_update_interval=FLAGS.actor_update_ineterval,
+            device=actor_devices[i],
+            shared_params=shared_params,
         )
         for i in range(FLAGS.num_actors)
     ]
 
     # Create evaluation agent instance
     eval_agent = greedy_actors.R2d2EpsilonGreedActor(
-        network = network,
-        exploration_epsilon = FLAGS.eval_exploration_epsilon,
-        random_state = random_state,
-        device = runtime_device,
+        network=network,
+        exploration_epsilon=FLAGS.eval_exploration_epsilon,
+        random_state=random_state,
+        device=runtime_device,
     )
 
     # Setup checkpoint.
-    checkpoint = pyTorchCheckpoint(
-        environment_name = FLAGS.environment_name,
-        agent_name = 'R2D2',
-        save_dir = FLAGS.checkpoint_dir
+    checkpoint = PyTorchCheckpoint(
+        environment_name=FLAGS.environment_name,
+        agent_name='R2D2',
+        save_dir=FLAGS.checkpoint_dir
     )
     checkpoint.register_pair(('network', network))
 
     # Run parallel training N iterations.
     main_loop.run_parallel_training_iterations(
-        unm_iterations = FLAGS.num_iterations,
-        num_train_steps = FLAGS.num_train_steps,
-        num_eval_steps = FLAGS.num_eval_steps,
-        learner_agent = learner_agent,
-        eval_agent = eval_agent,
-        eval_env = eval_env,
-        actors = actors,
-        actor_env = actor_envs,
-        data_queue = data_queue,
-        checkpoint = checkpoint,
-        csv_file = FLAGS.results_csv_path,
-        use_tensorboard = FLAGS.use_tensorboard,
-        tag = FLAGS.tag,
-        debug_screenshots_interval = FLAGS.debug_screenshots_interval,
+        unm_iterations=FLAGS.num_iterations,
+        num_train_steps=FLAGS.num_train_steps,
+        num_eval_steps=FLAGS.num_eval_steps,
+        learner_agent=learner_agent,
+        eval_agent=eval_agent,
+        eval_env=eval_env,
+        actors=actors,
+        actor_env=actor_envs,
+        data_queue=data_queue,
+        checkpoint=checkpoint,
+        csv_file=FLAGS.results_csv_path,
+        use_tensorboard=FLAGS.use_tensorboard,
+        tag=FLAGS.tag,
+        debug_screenshots_interval=FLAGS.debug_screenshots_interval,
     )
 
 
