@@ -425,3 +425,122 @@ class QRDqnMlNet(nn.Module):
         )
 
 
+class IqnMlpNet(nn.Module):
+    """
+    Implicity Quantiel MLP network.
+    """
+
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        latent_dim: int,
+    ):
+        """
+        Args:
+            state_dim: the shape of the inpute tensor to the nueral network
+            action_dim: the number of units for the output linear layer
+            latent_dim: the cos embedding linear layer input shapes
+        """
+        if action_dim < 1:
+            raise ValueError(
+                f'Expect action_dim to be a positive integer, got {action_dim}'
+            )
+        if state_dim < 1:
+            raise ValueError(
+                f'Expect state_dim to be a positive integer, got {state_dim}'
+            )
+        if latent_dim < 1:
+            raise ValueError(
+                f'Expect latent_dim to be a positieve integer, got {latent_dim}'
+            )
+        
+        super().__init__()
+        self.action_dim = action_dim
+        self.latent_dim = latent_dim
+
+        self.pis = torch.arange(
+            1, self.latent_dim + 1
+        ).float() * 3.141592653589793  # [latent_dim]
+
+        self.body = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 128),
+            nn.ReLU(),
+        )
+
+        self.embedding_layer = nn.Linear(latent_dim, 128)
+        self.value_head = nn.Linear(128, action_dim)
+
+    def sample_tuas(
+        self, batch_size: int, num_taus: int
+    )-> torch.Tensor:
+        """
+        Returns sampled batch taus.
+        """
+        taus = torch.rand(
+            (batch_size, num_taus)
+        ).to(dtype=torch.float32)
+
+        assert taus.shape == (batch_size, num_taus)
+        return taus
+    
+    def forward(
+        self, x: torch.tensor, num_taus: int = 32
+    )-> IqnNetworkOutputs:
+        """
+        Args:
+            state: environment state, shape (B, state_shape)
+            taus: tau embedding samples, shape (B, num_taus)
+
+        Returns:
+            q_values: # [batch_size, action_dim]
+            q_dist: # [batch_size, action_dim, num_taus]
+        """
+        batch_size = x.shape[0]
+        # Apply DQN to embed state.
+        features = self.body(x)
+
+        taus = self.sample_tuas(
+            batch_size, num_taus
+        ).to(device=x.device)
+
+        # Embed taus with cosine embedding + linear layer.
+        # cos(pi * i * tua) for i = 1,...,latents for each batch_element x sample.
+        # Broadcast everything to batch x num_taus x latent_dim.
+        pis = self.pis[None, None, :].to(device=x.device)
+        tau_embedding = torch.cos(pis * taus[:, :, None])   # [batch_size, num_tuas, latent_dim]
+
+        # Merge batch and taus dimension before input to embedding layer.
+        tau_embedding = tau_embedding.view(
+            batch_size * num_taus, -1
+        )   # [batch_size x num_taus, latent_dim]
+        tau_embedding = F.relu(
+            self.embedding_layer(tau_embedding)
+        )   # [batch_size x num_taus, embedding_layerlayer]
+
+        # Reshape/broadcast both embeddings to batch x num_taus x state_dim
+        # and multiply together, before applying value head.
+        tau_embedding = tau_embedding.view(
+            batch_size, num_taus, -1
+        )
+        head_input = tau_embedding * features[:, None, :]   # [batch_size, num_taus, embedding_layerlayer_output]
+
+        # Merge head input dimensions.
+        head_input = head_input.view(
+            -1, self.embedding_layer.out_features
+        )
+
+        # No softmax as the model is trying to approximate the 'whole' probability distributions
+        q_dist = self.value_head(head_input)    # [batch_size x num_taus, action_dim]
+        q_dist = q_dist.view(
+            batch_size, -1, self.action_dim
+        )   # [batch_size, num_taus, action_dim]
+        q_values = torch.mean(q_dist, dim=1)    # [batch_size, action_dim]
+
+        return IqnNetworkOutputs(
+            q_values=q_values, q_dist=q_dist, taus=taus
+        )
+    
+
