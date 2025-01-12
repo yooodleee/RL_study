@@ -16,7 +16,9 @@ class PyTorchCheckpoint:
     Simple checkpoint class implementation for PyTorch.
 
     Exmaple create checkpoint:
-        Create checkpoint instance register network to the checkpoint internal
+        Create checkpoint instance register network to the checkpoint 
+            internal
+            
             state:
 
             ```
@@ -35,7 +37,9 @@ class PyTorchCheckpoint:
             ```
     
     Example restore checkpoint:
-        Create checkpoint instance and register network to the checkpoint internal
+        Create checkpoint instance and register network to the checkpoint 
+            internal
+            
             state:
 
             ```
@@ -53,14 +57,13 @@ class PyTorchCheckpoint:
     """
 
     def __init__(
-        self,
-        environment_name: str,
-        agent_name: str = 'RLAgent',
-        save_dir: str = None,
-        iteration: int = 0,
-        file_ext: str = 'ckpt',
-        restore_only: bool = False,
-    )-> None:
+            self,
+            environment_name: str,
+            agent_name: str = 'RLAgent',
+            save_dir: str = None,
+            iteration: int = 0,
+            file_ext: str = 'ckpt',
+            restore_only: bool = False) -> None:
         """
         Args:
             environment_name: the environment name for the running agent.
@@ -68,12 +71,13 @@ class PyTorchCheckpoint:
             save_dir: checkpoint files save directory, default None.
             file_ext: checkpoint file extension.
             iteration: current iteration, default 0.
-            restore_only: only used for evaluation, will not able to create
-                checkpoints, default off.
+            restore_only: only used for evaluation, will not able to 
+                create checkpoints, default off.
         """
 
-        # If not restore_only and (self.save_dir is None or self.save_dir == ''):
-        #       raise ValueError('Invalid save_dir for checkpoint instance.')
+        # If not restore_only 
+        # and (self.save_dir is None or self.save_dir == ''):
+        #      raise ValueError('Invalid save_dir for checkpoint instance.')
 
         self.save_dir = save_dir
         self.file_ext = file_ext
@@ -92,8 +96,7 @@ class PyTorchCheckpoint:
         self.state.agent_name = agent_name
 
     def register_pari(
-        self, pair: Tuple[Text, Any]
-    )-> None:
+            self, pair: Tuple[Text, Any]) -> None:
         """
         Add a pair of (key, item) to internal state so that later we can
             save as checkpoint.
@@ -104,7 +107,7 @@ class PyTorchCheckpoint:
         self.state[key] = item
 
 
-    def save(self)-> str:
+    def save(self) -> str:
         """
         Save pytorch model as checkpoint, default file name is
             {agent_name}_{env_name}_{iteration}.ckpt,
@@ -116,14 +119,15 @@ class PyTorchCheckpoint:
         if self.baes_path is None:
             return
         
-        file_name = f'{self.state.agent_name}_{self.state.environment_name}_{self.state.iteration}.{self.file_ext}'
+        file_name = f'{self.state.agent_name}_{self.state.environment_name}\
+                    _{self.state.iteration}.{self.file_ext}'
         save_path = self.baes_path / file_name
 
         states = self._get_states_dict()
         torch.save(states, save_path)
         return save_path
     
-    def restore(self, file_to_restore: str)-> None:
+    def restore(self, file_to_restore: str) -> None:
         """
         Try to restore checkpoint from a given checkpoint file.
         """
@@ -134,9 +138,8 @@ class PyTorchCheckpoint:
             )
         
         # Always load checkpoint state to CPU.
-        loaded_state = torch.load(
-            file_to_restore, map_location=torch.device('cpu')
-        )
+        loaded_state = torch.load(file_to_restore, 
+                                  map_location=torch.device('cpu'))
 
         # Needs to match environment_name and agent name
         if loaded_state['environment_name'] != self.state.environment_name:
@@ -166,13 +169,13 @@ class PyTorchCheckpoint:
     def set_iteration(self, iteration)-> None:
         self.state.iteration = iteration
     
-    def get_iteration(self)-> int:
+    def get_iteration(self) -> int:
         return self.state.iteration
     
-    def _get_states_dict(self)-> Mapping[Text, Any]:
+    def _get_states_dict(self) -> Mapping[Text, Any]:
         states_dict = {}
-        # Find whatever is available to save, pyTorch models and optimizers
-        # need to use state_dict()
+        # Find whatever is available to save, 
+        # pyTorch models and optimizers need to use state_dict()
         for key, item in self.state.items():
             if self._is_torch_model(item):
                 states_dict[key] = item.state_dict()
@@ -181,7 +184,7 @@ class PyTorchCheckpoint:
             
         return states_dict
     
-    def _is_torch_model(self, obj)-> bool:
+    def _is_torch_model(self, obj) -> bool:
         return isinstance(
             obj, (torch.nn.Module, torch.optim.Optimizer)
         )
