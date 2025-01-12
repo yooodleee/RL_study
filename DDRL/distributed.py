@@ -6,25 +6,24 @@ import numpy as np
 import torch
 
 
-def get_actor_exploration_epsilon(n: int)-> List[float]:
+def get_actor_exploration_epsilon(n: int) -> List[float]:
     """
-    Returns exploration epsilon for actor. This follows the Ape-x, R2D2 papers.
+    Returns exploration epsilon for actor. This follows the Ape-x, 
+        R2D2 papers.
 
     Example for 4 actors: 
         [0.4, 0.04715560318259695, 0.005559127278786369, 0.0006553600000000003]
     """
     assert 1 <= n
-    return np.power(
-        0.4, np.linspace(1.0, 8.0, num=n)
-    ).flatten().tolist()
+    return np.power(0.4, np.linspace(1.0, 8.0, num=n)).flatten().tolist()
 
 
 def calculate_dist_priorities_from_td_error(
-    td_errors: torch.Tensor,
-    eta: float
-)-> np.ndarray:
+        td_errors: torch.Tensor,
+        eta: float) -> np.ndarray:
     """
-    Calculate priorities for distributed experience replay, follow Ape-x and R2D2 papers.
+    Calculate priorities for distributed experience replay, follow Ape-x 
+        and R2D2 papers.
     """
 
     td_errors = torch.clone(td_errors).detach()
@@ -43,9 +42,8 @@ def sigmoid(x):
 
 
 def get_ngu_policy_betas(
-    n: int,
-    beta: float = 0.3,
-):
+        n: int,
+        beta: float = 0.3):
     """
     Returns list of intrainsic reward scale betas, following the 'Distributed training'
         in the paper at Appendix. This is used in Never Give up and Agent57.
@@ -58,16 +56,14 @@ def get_ngu_policy_betas(
             results.append(beta)
         else:
             _beta_i = beta * sigmoid(
-                10 * ((2 * i - (n - 2)) / (n - 2))
-            )
+                10 * ((2 * i - (n - 2)) / (n - 2)))
             results.append(_beta_i)
     
     return results
 
 
 def get_ngu_discount_gammas(
-    n: int, gamma_max: float, gamma_min: float
-)-> float:
+        n: int, gamma_max: float, gamma_min: float) -> float:
     """
     Return list of discount gammas, following Equation 4. in Appendix.
     This is used in Never Give Up and Agent57.
@@ -86,27 +82,22 @@ def get_ngu_discount_gammas(
 
 
 def get_ngu_polic_betas_and_discounts(
-    num_policies: int,
-    beta: float = 0.3,
-    gamma_min: float = 0.99,
-    gamma_max: float = 0.997,
-)-> Tuple[List[float], List[float]]:
+        num_policies: int,
+        beta: float = 0.3,
+        gamma_min: float = 0.99,
+        gamma_max: float = 0.997) -> Tuple[List[float], List[float]]:
     """
-    Returns intrinsic reward scale beta index, reward scale beta, discount gamma, 
-        and e-greedy exploration epsilon.
+    Returns intrinsic reward scale beta index, reward scale beta, discount 
+        gamma, and e-greedy exploration epsilon.
     This is used in Never Give Up and Agent57.
 
     Specifics:
-        * i = 0 is the most exploitative actor (beta=0), while i = N-1 is the most explorative
-            actor (beta=beta_max).
+        * i = 0 is the most exploitative actor (beta=0), while i = N-1 is the 
+            most explorative actor (beta=beta_max).
         * small values of beta_i is associated with high values of gamma_i
         * high values of beta_i is associated with small values of gamma_i
     """
-    beta_list = get_ngu_policy_betas(
-        num_policies, beta
-    )
-    gamma_list = get_ngu_discount_gammas(
-        num_policies, gamma_max, gamma_min
-    )
+    beta_list = get_ngu_policy_betas(num_policies, beta)
+    gamma_list = get_ngu_discount_gammas(num_policies, gamma_max, gamma_min)
 
     return (beta_list, gamma_list)
