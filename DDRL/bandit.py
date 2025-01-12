@@ -25,7 +25,7 @@ class SimplifiedSlidingWindowUCB:
         random_state: np.random.RandomState,
         beta: float = 1.0,
         epsilon: float = 0.5,
-    )-> None:
+    ) -> None:
         
         self.num_arms = num_arms
         self.window_size = window_size
@@ -42,7 +42,7 @@ class SimplifiedSlidingWindowUCB:
     
     def update(
         self, current_arm: int, reward: float
-    )-> None:
+    ) -> None:
         """
         Update statistics.
         """
@@ -52,7 +52,7 @@ class SimplifiedSlidingWindowUCB:
         self._rewards[index, current_arm] = reward
         self.t += 1
     
-    def sample(self)-> int:
+    def sample(self) -> int:
         """
         Sample an arm to play.
         """
@@ -62,7 +62,8 @@ class SimplifiedSlidingWindowUCB:
         elif self._random_state.rand() <= self._epsilon:
             a_t = self._random_state.randint(0, self.num_arms)
         else:
-            # Use whatever data we've got to calculate mean rewards for each arm.
+            # Use whatever data 
+            # to calculate mean rewards for each arm.
             i = min(self.t, self.window_size)
             rewards_sum = np.sum(self._rewards[:i], axis=0)
             count = np.sum(self._count[:i], axis=0)
