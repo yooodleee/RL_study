@@ -20,7 +20,6 @@ from gym.spaces import Box
 from collections import deque
 from pathlib import Path
 
-# pylint: disable=import-error
 from . import types as types_lib
 
 
@@ -29,8 +28,7 @@ CLASSIC_ENV_NAMES = [
     'CartPole-v1',
     'LunarLander-v2',
     'MontainCar-v0',
-    'Acrobot-v1',
-]
+    'Acrobot-v1']
 
 
 def unwrap(env):
@@ -51,8 +49,7 @@ class NoopReset(gym.Wrapper):
     """
 
     def __init__(
-        self, env, noop_max=30
-    ):
+        self, env, noop_max=30):
         gym.Wrapper.__init__(self, env)
         self.noop_max = noop_max
         self.override_num_noops = None
@@ -68,8 +65,7 @@ class NoopReset(gym.Wrapper):
             noops = self.override_num_noops
         else:
             noops = self.unwrapped.np_random.integers(
-                1, self.noop_max + 1
-            )   # pylint: disable=E1101
+                1, self.noop_max + 1)   
         assert noops > 0
         obs = None
         for _ in range(noops):
@@ -150,9 +146,9 @@ class LifeLoss(gym.Wrapper):
         lives = self.env.unwrapped.ale.lives()
 
         if lives < self.lives and lives > 0:
-            # for Qbert somtimes we stay in lives == 0 condition for a few frames
-            # so it's important to keep lives > 0, so that we only reset once
-            # the environment advertises done.
+            # for Qbert somtimes we stay in lives == 0 condition for a few 
+            # frames so it's important to keep lives > 0, so that we only reset 
+            # once the environment advertises done.
             info['loss_life'] = True
         else:
             info['loss_life'] = False
@@ -183,9 +179,8 @@ class MaxAndSkip(gym.Wrapper):
     def __init__(self, env, skip=4):
         gym.Wrapper.__init__(self, env)
         # Most recent raw observations (for max pooling across time steps)
-        self._obs_buffer = np.zeros(
-            (2,) + env.observation_space.shape, dtype=np.uint8
-        )
+        self._obs_buffer = np.zeros((2,) 
+                                    + env.observation_space.shape, dtype=np.uint8)
         self._skip = skip
     
     def step(self, action):
@@ -221,12 +216,11 @@ class ResizeAndGrayscaleFrame(gym.ObservationWrapper):
     """
 
     def __init__(
-        self,
-        env, 
-        width=84,
-        height=84,
-        grayscale=True,
-    ):
+            self,
+            env, 
+            width=84,
+            height=84,
+            grayscale=True):
         super().__init__(env)
 
         assert self.observation_space.dtype \
@@ -239,23 +233,19 @@ class ResizeAndGrayscaleFrame(gym.ObservationWrapper):
         num_channels = 1 if self.grayscale else 3
 
         self.observation_space = Box(
-            low=0,
-            high=255,
-            shape=(self.frame_height, self.frame_width, num_channels),
-            dtype=np.unit8,
-        )
+                                    low=0,
+                                    high=255,
+                                    shape=(self.frame_height, 
+                                           self.frame_width, num_channels),
+                                    dtype=np.unit8)
     
     def observation(self, obs):
-        # pylint: disable=no-member
 
         if self.grayscale:
             obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-        obs = cv2.resize(
-            obs,
-            (self.frame_width, self.frame_height),
-            interpolation=cv2.INTER_AREA, 
-        )
-        # pylint: disable=no-member
+        obs = cv2.resize(obs,
+                (self.frame_width, self.frame_height),
+                interpolation=cv2.INTER_AREA)
 
         if self.grayscale:
             obs = np.expand_dims(obs, -1)
@@ -279,11 +269,10 @@ class FrameStack(gym.Wrapper):
         self.frames = deque([], maxlen=k)
         shape = env.observation_space.shape
         self.observation_space = Box(
-            low=0,
-            high=255,
-            shape=(shape[:-1] + (shape[-1] * k)),
-            dtype=env.observation_space.dtype,
-        )
+                                    low=0,
+                                    high=255,
+                                    shape=(shape[:-1] + (shape[-1] * k)),
+                                    dtype=env.observation_space.dtype)
     
     def reset(self, **kwargs):
         obs = self.env.reset(**kwargs)
@@ -315,8 +304,7 @@ class LazyFrames(object):
         self.shape = (
             frames[0].shape[0],
             frames[0].shape[1],
-            len(frames)
-        )
+            len(frames))
         self._frames = frames
         self._out = None
 
@@ -354,11 +342,10 @@ class ScaleFrame(gym.ObservationWrapper):
     def __init__(self, env):
         gym.ObservationWrapper.__init__(self, env)
         self.observation_space = gym.spaces.Box(
-            low=0.0,
-            high=1.0,
-            shape=env.observation_space.shape,
-            dtype=np.float32,
-        )
+                                    low=0.0,
+                                    high=1.0,
+                                    shape=env.observation_space.shape,
+                                    dtype=np.float32)
     
     def observation(self, obs):
         # Carefull! This undoes the memory optimization, use
@@ -403,15 +390,13 @@ class ObscureObservation(gym.ObservationWrapper):
         if not 0.0 <= epsilon < 1.0:
             raise ValueError(
                 f'Expect obscure epsilon should be between [0.0, 1), '
-                f'got {epsilon}'
-            )
+                f'got {epsilon}')
         self._eps = epsilon
     
     def observation(self, obs):
         if self.env.unwrapped.np_random.random() <= self._eps:
             obs = np.zeros_like(
-                obs, dtype=self.observation_space.dtype
-            )
+                    obs, dtype=self.observation_space.dtype)
         return obs
 
 
@@ -437,31 +422,25 @@ class ObservationChannelFirst(gym.ObservationWrapper):
     def __init__(self, env, scale_obs):
         super().__init__(env)
         old_shape = env.observation_space.shape
-        new_shape = (
-            old_shape[-1], old_shape[0], old_shape[1]
-        )
+        new_shape = (old_shape[-1], old_shape[0], old_shape[1])
         _low, _high = (0.0, 255) if not scale_obs else (0.0, 1.0)
         new_dtype = env.observation_space.dtype \
                     if not scale_obs else np.float32
         self.observation_space = Box(
-            low=_low,
-            high=_high,
-            shape=new_shape,
-            dtype=new_dtype,
-        )
+                                    low=_low,
+                                    high=_high,
+                                    shape=new_shape,
+                                    dtype=new_dtype)
     
     def observation(self, obs):
         # Permute [H, W, C] array to in the range [C, H, W]
         # return np.transpose(
         #   observation, axes=(2, 0, 1)
         # ).astype(self.observation_space.dtype)
-        obs = np.asarray(
-            obs, dtype=self.observation_space.dtype
-        ).transpose(2, 0, 1)
+        obs = np.asarray(obs, dtype=self.observation_space.dtype).\
+                transpose(2, 0, 1)
         # Make sure it's C-contiguous for compress state
-        return np.ascontiguousarray(
-            obs, dtype=self.observation_space.dtype
-        )
+        return np.ascontiguousarray(obs, dtype=self.observation_space.dtype)
 
 
 class ObservationToNumpy(gym.ObservationWrapper):
@@ -470,9 +449,7 @@ class ObservationToNumpy(gym.ObservationWrapper):
     """
 
     def observation(self, obs):
-        return np.asarray(
-            obs, dtype=self.observation_space.dtype
-        )
+        return np.asarray(obs, dtype=self.observation_space.dtype)
 
 
 class ClipObservationWithBound(gym.ObservationWrapper):
@@ -480,16 +457,12 @@ class ClipObservationWithBound(gym.ObservationWrapper):
     Make the observation into [-max_abs_value, max_abs_value].
     """
 
-    def __init__(
-        self, env, max_abs_value
-    ):
+    def __init__(self, env, max_abs_value):
         super().__init__(env)
         self._max_abs_value = max_abs_value
     
     def observation(self, obs):
-        return np.clip(
-            obs, -self._max_abs_value, self._max_abs_value
-        )
+        return np.clip(obs, -self._max_abs_value, self._max_abs_value)
 
 
 class RecordRawReward(gym.Wrapper):
@@ -509,21 +482,20 @@ class RecordRawReward(gym.Wrapper):
 
 
 def create_atari_environment(
-    env_name: str,
-    seed: int = 1,
-    frame_skip: int = 4,
-    frame_stack: int = 4,
-    frame_height: int = 84,
-    frame_width: int = 84,
-    noop_max: int = 30,
-    max_episode_steps: int = 108000,
-    obscure_epsilon: float = 0.0,
-    terminal_on_life_loss: bool = False,
-    clip_reward: bool = True,
-    sticky_action: bool = True,
-    scale_obs: bool = False,
-    channel_first: bool = True,
-)-> gym.Env:
+        env_name: str,
+        seed: int = 1,
+        frame_skip: int = 4,
+        frame_stack: int = 4,
+        frame_height: int = 84,
+        frame_width: int = 84,
+        noop_max: int = 30,
+        max_episode_steps: int = 108000,
+        obscure_epsilon: float = 0.0,
+        terminal_on_life_loss: bool = False,
+        clip_reward: bool = True,
+        sticky_action: bool = True,
+        scale_obs: bool = False,
+        channel_first: bool = True) -> gym.Env:
     """
     Process gym env for Atari games according to the Nature DQN paper.
 
@@ -541,14 +513,15 @@ def create_atari_environment(
         max_episode_steps: maximum steps for an episode.
         obscure_epsilon: with epsilon probability [0.0, 1.0), obscure the state 
             to make it POMDP.
-        terminal_on_life_loss: if True, mark end of game when loss a life, default off.
+        terminal_on_life_loss: if True, mark end of game when loss a life, 
+            default off.
         clip_reward: clip reward in the range of [-1, 1], default on.
-        sticky_action: if True, randomly re-use last action with 0.25 probability,
-            default on.
-        scale_on: scale the frame by divide 255, turn this on may require 4-5x more RAM 
-            when using experience replay, default off.
-        channel_first: if True, change observation image from shape [H, W, C] to in the range [C, H, W],
-            this is for PyTorch only, default on. 
+        sticky_action: if True, randomly re-use last action with 0.25 
+            probability, default on.
+        scale_on: scale the frame by divide 255, turn this on may require 4-5x 
+            more RAM when using experience replay, default off.
+        channel_first: if True, change observation image from shape [H, W, C] 
+            to in the range [C, H, W], this is for PyTorch only, default on. 
     
     Returns:
         preprocessed gym.Env for Atari games.
@@ -565,8 +538,9 @@ def create_atari_environment(
     # Change TimeLimit wrapper to 108,000 steps (30 min) as default in the
     # literature instead of OpenAI Gym's default of 100,000 steps.
     env = gym.wrappers.TimeLimit(
-        env.env, max_episode_steps=None if max_episode_steps <= 0 else max_episode_steps
-    )
+            env.env, 
+            max_episode_steps=None if max_episode_steps <= 0 
+                                else max_episode_steps)
 
     if noop_max > 0:
         env = NoopReset(env, noop_max=noop_max)
@@ -582,8 +556,7 @@ def create_atari_environment(
         env = LifeLoss(env)
     
     env = ResizeAndGrayscaleFrame(
-        env, width=frame_width, height=frame_height
-    )
+        env, width=frame_width, height=frame_height)
 
     if scale_obs:
         env = ScaleFrame(env)
@@ -602,26 +575,25 @@ def create_atari_environment(
     
     if 'Montezuma' in env_name or 'pitfall' in env_name:
         env = VisitedRoomInfo(
-            env, room_address=3 if 'Montezuma' in env_name else 1
-        )
+                env, room_address=3 if 'Montezuma' in env_name else 1)
 
     return env
 
 
 def create_classic_environment(
-    env_name: str,
-    seed: int = 1,
-    max_abs_reward: int = None,
-    obscure_epsilon: float = 0.0,
-)-> gym.Env:
+        env_name: str,
+        seed: int = 1,
+        max_abs_reward: int = None,
+        obscure_epsilon: float = 0.0) -> gym.Env:
     """
-    Process gym env for classic control tasks like CartPole, Lunarlander, MountainCar
+    Process gym env for classic control tasks like CartPole, Lunarlander, 
+        MountainCar
 
     Args:
         env_name: the environment name with version attached.
         seed: seed the runtime.
-        max_abs_reward: clip reward in the range of [-max_abs_reward, max_abs_reward],
-            default off.
+        max_abs_reward: clip reward in the range of [-max_abs_reward, 
+            max_abs_reward], default off.
         obscure_epsilon: with epsilon probability [0.0, 1.0) obscure the state 
             to make it POMDP.
 
@@ -644,21 +616,20 @@ def create_classic_environment(
 
 
 def create_continuous_environment(
-    env_name: str,
-    seed: int = 1,
-    max_abs_obs: int = 10,
-    max_abs_reward: int = 10,
-)-> gym.Env:
+        env_name: str,
+        seed: int = 1,
+        max_abs_obs: int = 10,
+        max_abs_reward: int = 10) -> gym.Env:
     """
     Process gym env for classic robotic control tasks like Humanoid, Ant.
 
     Args:
         env_name: the environment name with version attached.
         seed: seed the runtime.
-        max_abs_obs: clip observation in the range of [-max_abs_obs, max_abs_obs],
-            defualt 10.
-        max_abs_reward: clip reward in the range of [-max_abs_reward, max_abs_reward],
-            default 10.
+        max_abs_obs: clip observation in the range of [-max_abs_obs, 
+            max_abs_obs], defualt 10.
+        max_abs_reward: clip reward in the range of [-max_abs_reward, 
+            max_abs_reward], default 10.
 
     Returns:
         gym.Env for classic roboric control tasks.
@@ -675,7 +646,7 @@ def create_continuous_environment(
     #           env, lambda reward: np.clip(obs, -max_abs_obs, max_abs_obs)
     # )
     # env = gym.wrappers.TransformReward(
-    #           env, lambda reward: np.clip(reward, -max_abs_reward, max_abs_reward)
+    #      env, lambda reward: np.clip(reward, -max_abs_reward, max_abs_reward)
     # )
     env = ClipObservationWithBound(env, max_abs_obs)
     env = ClipRewardWithBound(env, max_abs_reward)
@@ -688,10 +659,9 @@ def create_continuous_environment(
 
 
 def play_and_record_video(
-    agent: types_lib.Agent,
-    env: gym.Env,
-    save_dir: str = './recordings',
-)-> None:
+        agent: types_lib.Agent,
+        env: gym.Env,
+        save_dir: str = './recordings') -> None:
     """
     Self-play and record a video for a single game.
 
@@ -708,25 +678,22 @@ def play_and_record_video(
 
     if not isinstance(agent, types_lib.Agent):
         raise RuntimeError(
-            'Expect agent to have a callable step() method.'
-        )
+            'Expect agent to have a callable step() method.')
     
     # Create dir if needed
     if save_dir is not None and save_dir != '' \
-        and not os.path.exists(save_dir):
-        _dir = Path(save_dir)
-        _dir.mkdir(parents=True, exist_ok=False)
+                                            and not os.path.exists(save_dir):
+                                            _dir = Path(save_dir)
+                                            _dir.mkdir(parents=True, 
+                                                       exist_ok=False)
     
     assert os.path.exists(save_dir) and os.path.isdir(save_dir)
 
     # Create a sub folder with name env.id + timestamp
     ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     full_save_dir = os.path.join(
-        save_dir, f'{agent.agent_name}_{env.spec.id}_{ts}'
-    )
-    logging.info(
-        f'Recording self-play video at "{full_save_dir}'
-    )
+        save_dir, f'{agent.agent_name}_{env.spec.id}_{ts}')
+    logging.info(f'Recording self-play video at "{full_save_dir}')
 
     env = gym.wrappers.RecordVideo(env, full_save_dir)
 
@@ -745,8 +712,8 @@ def play_and_record_video(
             reward=reward,
             done=done,
             first=first_step,
-            info=None,  # No tracking here
-        )
+            info=None)  # No tracking here
+
         a_t = agent.step(timestep_t)
         observation, reward, done, _ = env.step(a_t)
         t += 1
