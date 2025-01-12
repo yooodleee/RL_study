@@ -9,26 +9,26 @@ import base
 
 
 def categorical_distribution(
-    logits: torch.Tensor
-)-> torch.distributions.Categorical:
+        logits: torch.Tensor) -> torch.distributions.Categorical:
     """
-    Returns categorical distribution that support sample(), entropy(), and log_prob().
+    Returns categorical distribution that support sample(), entropy(), and 
+        log_prob().
     """
-    return categorical(logits = logits)
+    return categorical(logits=logits)
 
 
 def normal_distribution(
-    mu: torch.Tensor, sigma: torch.Tensor
-)-> torch.distributions.Normal:
+        mu: torch.Tensor, sigma: torch.Tensor) -> torch.distributions.Normal:
     """
-    Returns normal distribution that support sample(), entropy(), and log_prob().
+    Returns normal distribution that support sample(), entropy(), and 
+        log_prob().
     """
     return Normal(mu, sigma)
 
 
 def categorical_importance_sampling_ratios(
-    pi_logits_t: torch.Tensor, mu_logits_t: torch.Tensor, a_t: torch.Tensor
-)-> torch.Tensor:
+        pi_logits_t: torch.Tensor, mu_logits_t: torch.Tensor, 
+        a_t: torch.Tensor) -> torch.Tensor:
     """
     Compute importance sampling ratios from logits.
 
@@ -44,15 +44,9 @@ def categorical_importance_sampling_ratios(
     """
 
     # Rank and compatibility checks.
-    base.assert_rank_and_dtype(
-        pi_logits_t, (2, 3), torch.float32
-    )
-    base.assert_rank_and_dtype(
-        mu_logits_t, (2, 3), torch.float32
-    )
-    base.assert_rank_and_dtype(
-        a_t, (1, 2), torch.long
-    )
+    base.assert_rank_and_dtype(pi_logits_t, (2, 3), torch.float32)
+    base.assert_rank_and_dtype(mu_logits_t, (2, 3), torch.float32)
+    base.assert_rank_and_dtype(a_t, (1, 2), torch.long)
 
     pi_m = categorical(logits = pi_logits_t)
     mu_m = categorical(logits = mu_logits_t)
