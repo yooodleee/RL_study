@@ -27,10 +27,11 @@ def assert_rank_and_dtype(
 
     Args:
         tensor: tensor.
-        rank: A scalar or tuple of scalars specifying the rank that the tensors passed 
+        rank: A scalar or tuple of scalars specifying the rank 
+            that the tensors passed 
             need to have, if is a tuple, 'OR' condition is checked.
-        dtype: A single torch tensor dtype or tuple of dtypes. If is a tuple, 'OR' condition 
-            is checked.
+        dtype: A single torch tensor dtype or tuple of dtypes. 
+            If is a tuple, 'OR' condition is checked.
 
     Raises:
         ValueError: If the tensor is empty or fail the rank and dtype checks.
@@ -43,14 +44,15 @@ def assert_rank_and_dtype(
 def assert_rank(
     tensor: torch.Tensor,
     rank: Union[int, Tuple[int, Tuple[int]]],
-)-> None:
+) -> None:
     """
     Asserts that the tensor have the correct rank.
 
     Args:
         tensor: tensor.
-        rank: A scalar or tuple of scalars specifying the rank that the tensors
-            passed need to have, if is a tuple, 'OR' condition is checked.
+        rank: A scalar or tuple of scalars specifying the rank 
+            that the tensors passed need to have, if is a tuple, 
+                'OR' condition is checked.
 
     Raises:
         ValueError: If the tensor is empty or fail the rank checks.
@@ -75,14 +77,14 @@ def assert_rank(
 def assert_dtype(
     tensor: torch.Tensor,
     dtype: Union[torch.dtype, Tuple[torch.dtype]],
-)-> None:
+) -> None:
     """
     Asserts that the tensor have the correct dtype.
 
     Args:
         tensor: tensor.
-        dtype: A single torch tensor dtype or tuple of dtypes. If is a tuple, 'OR' condition
-            is checked.
+        dtype: A single torch tensor dtype or tuple of dtypes. If is a tuple, 
+            'OR' condition is checked.
 
     Raises:
         ValueError: If the list of tensors is empty or fail the dtype checks.
@@ -108,7 +110,7 @@ def assert_batch_dimension(
     tensor: torch.Tensor,
     batch_size: int,
     dim: int = 0,
-)-> None:
+) -> None:
     """
     Asserts that the tensor have the correct rank.
 
@@ -118,7 +120,8 @@ def assert_batch_dimension(
         dim: A scalar specifying which dimension to perform the check.
 
     Raises:
-        ValueError: If the list of tensors is empty or fail the batch dimension checks.
+        ValueError: If the list of tensors is empty or fail the batch 
+            dimension checks.
     """
 
     if not isinstance(tensor, torch.Tensor):
@@ -138,7 +141,7 @@ def batched_index(
     indices: torch.Tensor,
     dim: int = -1,
     keepdims: bool = False,
-)-> torch.Tensor:
+) -> torch.Tensor:
     """
     Equivalent to `values[:, indices]`.
 
