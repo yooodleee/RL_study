@@ -34,7 +34,8 @@ def assert_rank_and_dtype(
             If is a tuple, 'OR' condition is checked.
 
     Raises:
-        ValueError: If the tensor is empty or fail the rank and dtype checks.
+        ValueError: If the tensor is empty or fail the rank and dtype 
+            checks.
     """
     assert_rank(tensor, rank)
     assert_dtype(tensor, rank)
@@ -60,7 +61,8 @@ def assert_rank(
 
     if not isinstance(tensor, torch.Tensor):
         raise ValueError(
-            'Error in rank and/or compatibility check. The input tensor should be a valid torch.Tensor.'
+            'Error in rank and/or compatibility check.' 
+            'The input tensor should be a valid torch.Tensor.'
         )
     supported_rank = []
     if isinstance(rank, tuple):
@@ -69,7 +71,8 @@ def assert_rank(
         supported_rank.append(rank)
     if len(tensor.shape) not in supported_rank:
         raise ValueError(
-            f'Error in rank and/or compatibility check. The input tensor should be rank {rank} torch.Tensor, '
+            f'Error in rank and/or compatibility check.'
+            f'The input tensor should be rank {rank} torch.Tensor, '
             f'got {tensor.shape}.'
         )
 
@@ -83,16 +86,18 @@ def assert_dtype(
 
     Args:
         tensor: tensor.
-        dtype: A single torch tensor dtype or tuple of dtypes. If is a tuple, 
-            'OR' condition is checked.
+        dtype: A single torch tensor dtype or tuple of dtypes. If is a 
+            tuple,'OR' condition is checked.
 
     Raises:
-        ValueError: If the list of tensors is empty or fail the dtype checks.
+        ValueError: If the list of tensors is empty or fail the dtype 
+            checks.
     """
 
     if not isinstance(tensor, torch.Tensor):
         raise ValueError(
-            'Error in rank and/or compatibility check. The input tensor should be a valid torch.Tensor.'
+            'Error in rank and/or compatibility check. The input tensor'
+            'should be a valid torch.Tensor.'
         )
     supported_dtype = []
     if isinstance(dtype, tuple):
@@ -101,8 +106,8 @@ def assert_dtype(
         supported_dtype.append(dtype)
     if tensor.dtype not in supported_dtype:
         raise ValueError(
-            f'Error in rank and/or compatibility check. The input tensor should be {dtype}, '
-            f'got {tensor.dtype}.'
+            f'Error in rank and/or compatibility check.'
+            f'The input tensor should be {dtype}, got {tensor.dtype}.'
         )
 
 
@@ -116,7 +121,8 @@ def assert_batch_dimension(
 
     Args:
         tensor: tensor.
-        batch_size: A scalar specifying the batch size that the tensors passed need to have.
+        batch_size: A scalar specifying the batch size that the tensors 
+            passed need to have.
         dim: A scalar specifying which dimension to perform the check.
 
     Raises:
@@ -126,12 +132,14 @@ def assert_batch_dimension(
 
     if not isinstance(tensor, torch.Tensor):
         raise ValueError(
-            'Error in rank and/or compatibility check. The input tensor should be a valid torch.Tensor.'
+            'Error in rank and/or compatibility check. The input tensor' 
+            'should be a valid torch.Tensor.'
         )
     
     if tensor.shape[dim] != batch_size:
         raise ValueError(
-            f'Error in rank and/or compatibility check. The input tensor should have {batch_size} '
+            f'Error in rank and/or compatibility check. The input tensor'
+            f'should have {batch_size} '
             f'entry on batch dimension {dim}, got {tensor.shape}.'
         )
 
@@ -152,16 +160,17 @@ def batched_index(
         values: tensor of shape `[B, num_values]` or `[T, B, num_values]`
         indices: tensor of shape `[B]` or `[T, B]` containing indices.
         dim: indexing dimension to perform the selection, default -1.
-        keepdims: If `True`, the returned tensor will have an added 1 dimension at
-            the end (e.g. `[B, 1]` or `[T, B, 1]`).
+        keepdims: If `True`, the returned tensor will have an added 1 
+            dimension at the end (e.g. `[B, 1]` or `[T, B, 1]`).
 
     Returns:
-        Tensor of shape `[B]` or `[T, B]` containing values for the given indices.
+        Tensor of shape `[B]` or `[T, B]` containing values for the given 
+            indices.
 
     Rasies:
         ValueError if values and indices have sizes that are known
-            statiscally (i.e. during graph construction), and those sizes are not
-            compatible (see shape description in Args list above).
+            statiscally (i.e. during graph construction), and those sizes 
+                are not compatible (see shape description in Args list above).
     """
 
     assert_rank(values, (2, 3))
