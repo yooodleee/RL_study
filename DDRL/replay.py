@@ -13,8 +13,8 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
-    Union,
-)
+    Union)
+
 import collections
 import itertools
 import copy
@@ -23,7 +23,6 @@ import torch
 import snappy
 
 
-# pylint: disable=import-error
 from . import types as types_lib
 
 
@@ -31,9 +30,7 @@ CompressedArray = Tuple[bytes, Tuple, np.dtype]
 
 
 # Generic replay structure: Any flat named tuple.
-ReplayStructure = TypeVar(
-    'ReplayStructure', bound=Tuple[Any, ...]
-)
+ReplayStructure = TypeVar('ReplayStructure', bound=Tuple[Any, ...])
 
 
 class Transition(NamedTuple):
@@ -49,11 +46,10 @@ class Transition(NamedTuple):
 
 
 TransitionStructure = Transition(
-    s_tm1 = None, 
-    a_tm1 = None, 
-    r_t = None, 
-    done = None,
-)
+                        s_tm1 = None, 
+                        a_tm1 = None, 
+                        r_t = None, 
+                        done = None)
 
 
 class UniformReplay(Generic[ReplayStructure]):
@@ -62,18 +58,17 @@ class UniformReplay(Generic[ReplayStructure]):
     """
 
     def __init__(
-        self,
-        capacity: int,
-        structure: ReplayStructure,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        time_major: bool = False,
-        encoder: Optional[Callable[[ReplayStructure], Any]] = None,
-        decoder: Optional[Callable[[Any], ReplayStructure]] = None,
-    ):
+            self,
+            capacity: int,
+            structure: ReplayStructure,
+            random_state: np.random.RandomState,    
+            time_major: bool = False,
+            encoder: Optional[Callable[[ReplayStructure], Any]] = None,
+            decoder: Optional[Callable[[Any], ReplayStructure]] = None):
+        
         if capacity <= 0:
             raise ValueError(
-                f'Expect capacity to be a positive integer, got {capacity}'
-            )
+                f'Expect capacity to be a positive integer, got {capacity}')
         self.structure = structure
         self._capacity = capacity
         self._random_state = random_state
@@ -85,45 +80,36 @@ class UniformReplay(Generic[ReplayStructure]):
         self._encoder = encoder or (lambda s: s)
         self._decoder = decoder or (lambda s: s)
     
-    def add(self, item: ReplayStructure)-> None:
+    def add(self, item: ReplayStructure) -> None:
         """
         Adds single item to replay.
         """
-        self._storage[
-            self._num_added % self._capacity
-        ] = self._encoder(item)
+        self._storage[self._num_added % self._capacity] = self._encoder(item)
 
         self._num_added += 1
     
-    def get(
-        self, indices: Sequence[int]
-    )-> List[ReplayStructure]:
+    def get(self, indices: Sequence[int]) -> List[ReplayStructure]:
         """
         Retrieves items by indices.
         """
-        return [
-            self._decoder(self._storage[i]) for i in indices
-        ]
+        return [self._decoder(self._storage[i]) for i in indices]
     
-    def sample(
-        self, batch_size: int
-    )-> ReplayStructure:
+    def sample(self, batch_size: int) -> ReplayStructure:
         """
         Sample batch if items replay uniformly, with replacement.
         """
         if self.size < batch_size:
             raise RuntimeError(
-                f'Replay only have {self.size} samples, got sample batch size {batch_size}'
-            )
+                f'Replay only have {self.size} samples, got sample batch size 
+                {batch_size}')
         
         indices = self._random_state.randint(self.size, size=batch_size)
         samples = self.get(indices)
         return np_stack_list_of_transitions(
-            samples, self.structure, self.stack_dim
-        )
+            samples, self.structure, self.stack_dim)
     
     @property
-    def stack_dim(self)-> int:
+    def stack_dim(self) -> int:
         """
         Stack dimension, for RNN we may need to make the tensor time major
         by stacking on second dimension [T, B, ...].
@@ -134,29 +120,30 @@ class UniformReplay(Generic[ReplayStructure]):
             return 0
     
     @property
-    def size(self)-> int:
+    def size(self) -> int:
         """
         Number of items currently contained in replay.
         """
         return min(self._num_added, self._capacity)
     
     @property
-    def capacity(self)-> int:
+    def capacity(self) -> int:
         """
         Total capacity of replay (max number of items stored at any one time).
         """
         return self._capacity
     
     @property
-    def num_added(self)-> int:
+    def num_added(self) -> int:
         """
         Total number of sample added to the replay.
         """
         return self._num_added
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
-        Reset the state of replay, should be called aat the beggining of every episode
+        Reset the state of replay, should be called aat the beggining of every 
+            episode
         """
         self._num_added = 0
 
@@ -169,21 +156,20 @@ class PrioritizedReplay:
     """
 
     def __init__(
-        self,
-        capacity: int,
-        structure: ReplayStructure,
-        priority_exponent: float,
-        importance_sampling_exponent: float,
-        random_state: np.random.RandomState,
-        normalize_weights: bool = True,
-        time_major: bool = False,
-        encoder: Optional[Callable[[ReplayStructure], Any]] = None,
-        decoder: Optional[Callable[[Any], ReplayStructure]] = None,
-    ):
+            self,
+            capacity: int,
+            structure: ReplayStructure,
+            priority_exponent: float,
+            importance_sampling_exponent: float,
+            random_state: np.random.RandomState,
+            normalize_weights: bool = True,
+            time_major: bool = False,
+            encoder: Optional[Callable[[ReplayStructure], Any]] = None,
+            decoder: Optional[Callable[[Any], ReplayStructure]] = None):
+        
         if capacity <= 0:
             raise ValueError(
-                f'Expect capacity to be a positive integer, got {capacity}'
-            )
+                f'Expect capacity to be a positive integer, got {capacity}')
         self.structure = structure
         self._capacity = capacity
         self._random_state = random_state
@@ -195,19 +181,13 @@ class PrioritizedReplay:
 
         self._time_major = time_major
 
-        self._priorities = np.ones(
-            (capacity,), dtype=np.float32
-        )
+        self._priorities = np.ones((capacity,), dtype=np.float32)
         self._priority_exponent = priority_exponent
         self._importance_sampling_exponent = importance_sampling_exponent
 
         self._normalize_weights = normalize_weights
     
-    def add(
-        self,
-        item: ReplayStructure,
-        priority: float
-    )-> None:
+    def add(self, item: ReplayStructure, priority: float) -> None:
         """
         Adds a single item with a given priority to the replay buffer.
         """
@@ -219,33 +199,26 @@ class PrioritizedReplay:
         self._storage[index] = self._encoder(item)
         self._num_added += 1
 
-    def get(
-        self,
-        indices: Sequence[int]
-    )-> Iterable[ReplayStructure]:
+    def get(self, indices: Sequence[int]) -> Iterable[ReplayStructure]:
         """
         retrieves transitions by indicies.
         """
-        return [
-            self._decoder(self._storage[i]) for i in indices
-        ]
+        return [self._decoder(self._storage[i]) for i in indices]
     
     def sample(
-        self,
-        size: int
-    )-> Tuple[ReplayStructure, np.ndarray, np.ndarray]:
+            self, 
+            size: int) -> Tuple[ReplayStructure, np.ndarray, np.ndarray]:
         """
         Samples a batch of transitions.
         """
         if self.size < size:
             raise RuntimeError(
-                f'Replay only have {self.size} samples, got sample size {size}'
-            )
+                f'Replay only have {self.size} samples, got sample size 
+                {size}')
         
         if self._priority_exponent == 0:
-            indices = self._random_state.uniform(
-                0, self.size, size=size
-            ).astype(np.float32)
+            indices = self._random_state.uniform(0, self.size, size=size)\
+                .astype(np.float32)
             weights = np.ones_like(indices, dtype=np.float32)
         else:
             # code copied from seed_rl
@@ -254,8 +227,7 @@ class PrioritizedReplay:
             
             probs = priorities / np.sum(priorities)
             indices = self._random_state.choice(
-                np.arange(probs.shape[0]), size=size, replace=True, p=probs
-            )
+                np.arange(probs.shape[0]), size=size, replace=True, p=probs)
 
             # Importance weights.
             weights = ((1.0 / self.size) / np.take(probs, indices)) \
@@ -266,13 +238,11 @@ class PrioritizedReplay:
 
         samples = self.get(indices)
         stacked = np_stack_list_of_transitions(
-            samples, self.structure, self.stack_dim
-        )
+            samples, self.structure, self.stack_dim)
         return stacked, indices, weights
     
     def update_priorities(
-        self, indices: Sequence[int], priorities: Sequence[float]
-    )-> None:
+        self, indices: Sequence[int], priorities: Sequence[float]) -> None:
         """
         Updates indices with given priorities.
         """
@@ -284,7 +254,7 @@ class PrioritizedReplay:
             self._priorities[index] = priority
     
     @property
-    def stack_dim(self)-> int:
+    def stack_dim(self) -> int:
         """
         Stack dimension, for RNN we may need to make the tensor time major 
         by stacking on second dimension as [T, B, ...].
@@ -295,14 +265,14 @@ class PrioritizedReplay:
             return 0
     
     @property
-    def size(self)-> None:
+    def size(self) -> None:
         """
         Number of elements currently contained in replay.
         """
         return min(self._num_added, self._capacity)
     
     @property
-    def capacity(self)-> None:
+    def capacity(self) -> None:
         """
         Total capacity of replay (maximum number of items that can be stored.)
         """
@@ -323,15 +293,14 @@ class GradientReplay(Generic[ReplayStructure]):
     """
 
     def __init__(
-        self,
-        capacity: int,
-        network: torch.nn.Module,
-        compress: bool,
-    )-> None:
+            self,
+            capacity: int,
+            network: torch.nn.Module,
+            compress: bool) -> None:
+            
         if capacity <= 0:
             raise ValueError(
-                f'Expect capacity to be a positive integer, got {capacity}'
-            )
+                f'Expect capacity to be a positive integer, got {capacity}')
         super().__init__()
         self._capacity = capacity
         self._decode = uncompress_array if compress else lambda s: s
@@ -345,13 +314,10 @@ class GradientReplay(Generic[ReplayStructure]):
 
         # Create a list of lists (for each layer) to store gradients
         # with outer list size num_layers, inner list size maxsize
-        self._gradients = [
-            [None] * self._capacity for _ in range(self._num_layers)
-        ]
+        self._gradients = [[None] 
+                           * self._capacity for _ in range(self._num_layers)]
     
-    def add(
-        self, gradients: List[np.ndarray]
-    )-> None:
+    def add(self, gradients: List[np.ndarray]) -> None:
         """
         Store extracted gradients with [param.grad.data.cpu().numpy()
         for param net.parameters()]
@@ -371,29 +337,28 @@ class GradientReplay(Generic[ReplayStructure]):
         gradients = []
 
         for batch_grad_layer_i in self._gradients:
-            grad_array = np.stack(
-                batch_grad_layer_i, axis=0
-            ).astype(np.float32)    # [batch_size, layer_shape]
+            grad_array = np.stack(batch_grad_layer_i, axis=0)\
+                            .astype(np.float32)    # [batch_size, layer_shape]
             gradients.append(grad_array)
         
         self.reset()
         return gradients
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Reset size counter is enough.
         """
         self._num_added = 0
     
     @property
-    def num_layers(self)-> int:
+    def num_layers(self) -> int:
         """
         Returns number of layers in the network.
         """
         return self._num_layers
     
     @property
-    def size(self)-> int:
+    def size(self) -> int:
         """
         Returns added samples.
         """
@@ -409,18 +374,16 @@ class TransitionAccumulator:
         self._timestep_tm1 = None
         self._a_tm1 = None
 
-    def step(
-        self,
-        timestep_t: types_lib.TimeStep,
-        a_t: int
-    )-> Iterable[Transition]:
+    def step(self, timestep_t: types_lib.TimeStep, 
+             a_t: int)-> Iterable[Transition]:
         """
         Accumulates timestep and resulting action, maybe yield a transition.
 
         We only need the s_t, r_t, and done flag for a given timestep_t
         the first timestep yield nothing since we don't have a full transition
 
-        if the given timestep_t transition is terminal state, we need to reset the state of the accumulator,
+        if the given timestep_t transition is terminal state, we need to reset 
+            the state of the accumulator,
         so the next timestep which is the start of a new episode yields nothing
         """
         if timestep_t.first:
@@ -429,24 +392,22 @@ class TransitionAccumulator:
         if self._timestep_tm1 is None:
             if not timestep_t.first:
                 raise ValueError(
-                    f'Expected first timestep, got {str(timestep_t)}'
-                )
+                    f'Expected first timestep, got {str(timestep_t)}')
             self._timestep_tm1 = timestep_t
             self._a_tm1 = a_t
             return  # Empty iterable.
 
         transition = Transition(
-            s_tm1 = self._timestep_tm1.observation,
-            a_tm1 = self.a_tm1,
-            r_t = timestep_t.reward,
-            s_t = timestep_t.observation,
-            done = timestep_t.done,
-        )
+                        s_tm1=self._timestep_tm1.observation,
+                        a_tm1=self.a_tm1,
+                        r_t=timestep_t.reward,
+                        s_t=timestep_t.observation,
+                        done=timestep_t.done)
         self._timestep_tm1 = timestep_t
         self._a_tm1 = a_t
         yield transition
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Rests the accumulator.
         Following timestep is expected to be 'FIRST'.
@@ -456,9 +417,8 @@ class TransitionAccumulator:
 
 
 def _build_n_step_transition(
-    transitions: Iterable[Transition],
-    discount: float,
-)-> Transition:
+        transitions: Iterable[Transition],
+        discount: float) -> Transition:
     """
     Builds a single n-step transition from n 1-step transitions.
     """
@@ -482,27 +442,25 @@ class NStepTransitionAccumulator:
     Accumulates timesteps to form n-step transitions.
 
     Let `t` be the index of timestep within an episode and `T` be the index of
-    the final timestep within an episode. Then given the step type of the timestep
-    passed into `step()` the accumulator will:
+        the final timestep within an episode. Then given the step type of the 
+        timestep passed into `step()` the accumulator will:
     *   `FIRST`: yield nothing.
     *   `MID`: if `t < n`, yield nothing, else yield one n-step transition
         `s_{t - n} -> s_t`.
-    *   `LAST`: yield all transitions that end at `s_t = s_T` from up to n steps
-        away, specifically, `s_{T - min(n, T)} -> s_T, ..., s_{T - 1} -> s_T`.
-        These are `min(n, T)`-step, ..., `1`-step transitions.
+    *   `LAST`: yield all transitions that end at `s_t = s_T` from up to n 
+        steps away, specifically, `s_{T - min(n, T)} -> s_T, ..., s_{T - 1} 
+        -> s_T`. These are `min(n, T)`-step, ..., `1`-step transitions.
     """
 
     def __init__(self, n, discount):
         self._discount = discount
-        self._transitions = collections.deque(maxlen=n) # Store 1-step transitions.
+        # Store 1-step transitions.
+        self._transitions = collections.deque(maxlen=n) 
         self._timestep_tm1 = None
         self._a_tm1 = None
 
-    def step(
-        self,
-        timestep_t: types_lib.TimeStep,
-        a_t: int
-    )-> Iterable[Transition]:
+    def step(self, timestep_t: types_lib.TimeStep, 
+             a_t: int)-> Iterable[Transition]:
         """
         Accumulates timestep and resulting action, yields transitions.
         """
@@ -514,31 +472,27 @@ class NStepTransitionAccumulator:
             assert self._a_tm1 is None
             if not timestep_t.first:
                 raise ValueError(
-                    f'Expected first timestep, got {str(timestep_t)}'
-                )
+                    f'Expected first timestep, got {str(timestep_t)}')
             self._timestep_tm1 = timestep_t
             self._a_tm1 = a_t
             return  # Empty iterable.
         
-        self._transitions.append(
-            Transition(
-                s_tm1 = self._timestep_tm1.observation,
-                a_tm1 = self._a_tm1,
-                r_t = timestep_t.reward,
-                s_t = timestep_t.observation,
-                done = timestep_t.done,
-            )
-        )
+        self._transitions.append(Transition(
+                                    s_tm1 = self._timestep_tm1.observation,
+                                    a_tm1 = self._a_tm1,
+                                    r_t = timestep_t.reward,
+                                    s_t = timestep_t.observation,
+                                    done = timestep_t.done))
 
         self._timestep_tm1 = timestep_t
         self._a_tm1 = a_t
 
         if timestep_t.done:
-            # Yield any remaining n, n-1, ..., 1-step transitions at episode end.
+            # Yield any remaining n, n-1, ..., 1-step transitions at episode 
+            # end.
             while self._transitions:
-                yield _build_n_step_transition(
-                    self._transitions, self._discount
-                )
+                yield _build_n_step_transition(self._transitions, 
+                                               self._discount)
                 self._transitions.popleft()
         else:
             # Wait for n transitions before yielding anything.
@@ -548,11 +502,9 @@ class NStepTransitionAccumulator:
             assert len(self._transitions) == self._transitions.maxlen
 
             # This is the typical case, yield a single n-step transition.
-            yield _build_n_step_transition(
-                self._transitions, self._discount
-            )
+            yield _build_n_step_transition(self._transitions, self._discount)
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Resets the accumulator.
         Following timestep is expected to be FIRST.
@@ -569,12 +521,11 @@ class Unroll:
     """
 
     def __init__(
-        self,
-        unroll_length: int,
-        overlap: int,
-        structure: ReplayStructure,
-        cross_episode: bool = True
-    )-> None:
+            self,
+            unroll_length: int,
+            overlap: int,
+            structure: ReplayStructure,
+            cross_episode: bool = True) -> None:
         """
         Args:
             unroll_weight: the unroll length
@@ -590,18 +541,16 @@ class Unroll:
         self._full_unroll_length = unroll_length + overlap
         self._cross_episode = cross_episode
 
-        self._storage = collections.deque(
-            maxlen=self._full_unroll_length
-        )
+        self._storage = collections.deque(maxlen=self._full_unroll_length)
 
         # Persist last unrolled transitions incase not cross episode.
         # Sometimes the episode ends without reaching a full 'unroll length',
-        # we will reuse some transition from last unroll to try to make a 'full length unroll'.
+        # we will reuse some transition from last unroll to try to make a 
+        # 'full length unroll'.
         self._last_unroll = None
 
-    def add(
-        self, transition: Any, done: bool
-    )-> Union[ReplayStructure, None]:
+    def add(self, transition: Any, 
+            done: bool) -> Union[ReplayStructure, None]:
         """
         Add new transition into storage.
         """
@@ -614,8 +563,7 @@ class Unroll:
         return None
     
     def _pack_unroll_into_single_transition(
-        self
-    )-> Union[ReplayStructure, None]:
+            self)-> Union[ReplayStructure, None]:
         """
         Return a single transition object with transitions stacked with
         the unroll structure.
@@ -634,9 +582,7 @@ class Unroll:
                 self._storage.append(transition)
         return self._stack_unroll(_sequence)
     
-    def _handle_episode_end(
-        self
-    )-> Union[ReplayStructure, None]:
+    def _handle_episode_end(self) -> Union[ReplayStructure, None]:
         """
         Handle episode end, incase no cross episodes, try to build a full
         unroll if last unroll is available.
@@ -645,8 +591,8 @@ class Unroll:
             return None
         if self.size > 0 and self._last_unroll is not None:
             # Incase episode ends without reaching a full 'unroll length'
-            # Use whatever we got from current unroll, fill in the missing ones 
-            # from previous sequence
+            # Use whatever we got from current unroll, fill in the missing 
+            # ones from previous sequence
             _suffix = list(self._storage)
             _prefix_indices = self._full_unroll_length - len(_suffix)
             _prefix = self._last_unroll[-_prefix_indices]
@@ -665,8 +611,8 @@ class Unroll:
     def _stack_unroll(self, sequence):
         if len(sequence) != self._full_unroll_length:
             raise RuntimeError(
-                f'Expect sequence length to be {self._full_unroll_length}, got {len(sequence)}'
-            )
+                f'Expect sequence length to be {self._full_unroll_length}, got
+                  {len(sequence)}')
         return np_stack_list_of_transitions(sequence, self.structure)
     
     @property
@@ -684,44 +630,35 @@ class Unroll:
         return len(self._storage) == self._storage.maxlen
 
 
-def stack_list_of_transitions(
-    transitions, structure, dim=0
-):
+def stack_list_of_transitions(transitions, structure, dim=0):
     """
     Stack list of transition objects into one transition object with lists
     of tensors on a given dimension (default 0)
     """
 
     transposed = zip(*transitions)
-    stacked = [
-        torch.stack(xs, dim=dim) for xs in transposed
-    ]
+    stacked = [torch.stack(xs, dim=dim) for xs in transposed]
     return type(structure)(*stacked)
 
 
 
-def np_stack_list_of_transitions(
-    transitions, structure, axis=0
-):
+def np_stack_list_of_transitions(transitions, structure, axis=0):
     """
     Stack list of transition objects into one transition object with lists 
     of tensors on a given dimension (default 0)
     """
 
     transposed = zip(*transitions)
-    stacked = [
-        np.stack(xs, axis=axis) for xs in transposed
-    ]
+    stacked = [np.stack(xs, axis=axis) for xs in transposed]
     return type(structure)(*stacked)
 
 
 
 def split_structure(
-    input_,
-    structure,
-    prefix_length: int,
-    axis: int = 0,
-)-> Tuple[ReplayStructure]:
+        input_,
+        structure,
+        prefix_length: int,
+        axis: int = 0) -> Tuple[ReplayStructure]:
     """
     Splits a structure of np.array along the axis, default 0.
     """
@@ -731,33 +668,27 @@ def split_structure(
         for v in input_:
             if v.shape[axis] < prefix_length:
                 raise ValueError(
-                    f'Expect prefix_length to be less or equal to {v.shape[axis]}, got {prefix_length}'
-                )
+                    f'Expect prefix_length to be less or equal to 
+                    {v.shape[axis]}, got {prefix_length}')
     
     if prefix_length == 0:
         return (None, input_)
     else:
-        split = [
-            np.split(
-                xs,
-                [prefix_length, xs.shape[axis]],    # for torch.split() [prefix_length, xs.shape[axis] - prefix_length],
-                axis=axis,
-            )
-            for xs in input_
-        ]
+        split = [np.split(
+                    xs,
+                    # for torch.split() [prefix_length, xs.shape[axis] - 
+                    # prefix_length],
+                    [prefix_length, xs.shape[axis]],    
+                    axis=axis) for xs in input_]
 
         _prefix = [pair[0] for pair in split]
         _suffix = [pair[1] for pair in split]
 
-        return (
-            type(structure)(*_prefix), type(structure)(*_suffix)
-        )
+        return (type(structure)(*_prefix), type(structure)(*_suffix))
     
 
 
-def compress_array(
-    array: np.ndarray
-)-> CompressedArray:
+def compress_array(array: np.ndarray) -> CompressedArray:
     """
     Compresses a numpy array with snappy.
     """
@@ -765,14 +696,10 @@ def compress_array(
 
 
 
-def uncompress_array(
-    compressed: CompressedArray
-)-> np.ndarray:
+def uncompress_array(compressed: CompressedArray) -> np.ndarray:
     """
     Uncompresses a numpy array with snappy given its shape and dtype.
     """
     compressed_array, shape, dtype = compressed
     byte_string = snappy.uncompress(compress_array)
-    return np.frombuffer(
-        byte_string, dtype=dtype
-    ).reshape(shape)
+    return np.frombuffer(byte_string, dtype=dtype).reshape(shape)
