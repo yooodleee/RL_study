@@ -25,10 +25,9 @@ HiddenState = Tuple[torch.Tensor, torch.Tensor]
 
 
 def apply_egreedy_policy(
-    q_values: torch.Tensor,
-    epsilon: float,
-    random_state: np.random.RandomState,    # pylint: disable=no-member
-)-> types_lib.Action:
+        q_values: torch.Tensor,
+        epsilon: float,
+        random_state: np.random.RandomState)-> types_lib.Action:
     """
     Apply e-greedy policy.
     """
@@ -46,13 +45,12 @@ class EpsilonGreedyActor(types_lib.Agent):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        exploration_epsilon: float,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        device: torch.device,
-        name: str = 'DQN-greedy',
-    ):
+            self,
+            network: torch.nn.Module,
+            exploration_epsilon: float,
+            random_state: np.random.RandomState,    
+            device: torch.device,
+            name: str = 'DQN-greedy'):
         self.agent_name = name
         self._device = device
         self._network = network.to(device=device)
@@ -60,43 +58,39 @@ class EpsilonGreedyActor(types_lib.Agent):
         self._random_state = random_state
 
     def step(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Given current timestep, return best action.
         """
         return self._select_action(timestep)
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
-        Resets the agent's episodic state such as frame stack and action repeat.
+        Resets the agent's episodic state such as frame stack and action 
+            repeat.
         This method should be called at the beginning of every episode.
         """
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep)-> types_lib.Action:
         """
         Samples action from eps-greedy policy wrt Q-values at given state.
         """
         s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+                timestep.observation[None, ...]).to(device=self._device, \
+                                                    dtype=torch.float32)
         q_t = self._network(s_t).q_values
         
         return apply_egreedy_policy(
-            q_t, self._exploration_epsilon, self._random_state
-        )
+            q_t, self._exploration_epsilon, self._random_state)
     
     @property
-    def statistics(self)-> Mapping[Text, float]:
+    def statistics(self) -> Mapping[Text, float]:
         """
         Returns current agent statistics as a dictionary.
         """
-        return {
-            'exploration_epsilon': self._exploration_epsilon,
-        }
+        return {'exploration_epsilon': self._exploration_epsilon}
 
 
 
@@ -106,37 +100,33 @@ class IqnEpsilonGreedyActor(EpsilonGreedyActor):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        exploration_epsilon: float,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        device: torch.device,
-        tau_samples: int,
-    ):
+            self,
+            network: torch.nn.Module,
+            exploration_epsilon: float,
+            random_state: np.random.RandomState,    
+            device: torch.device,
+            tau_samples: int):
         super().__init__(
             network,
             exploration_epsilon,
             random_state,
             device,
-            'IQN-greedy',
-        )
+            'IQN-greedy')
         self._tau_samples = tau_samples
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Samples action from eps-greedy policy wrt Q-values at given state.
         """
         s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+            timestep.observation[None, ...])\
+                .to(device=self._device, dtype=torch.float32)
         q_t = self._network(s_t, self._tau_samples).q_values
 
         return apply_egreedy_policy(
-            q_t, self._exploration_epsilon, self._random_state
-        )
+            q_t, self._exploration_epsilon, self._random_state)
     
 
 class DrqnEpsilonGreedyActor(EpsilonGreedyActor):
@@ -145,41 +135,37 @@ class DrqnEpsilonGreedyActor(EpsilonGreedyActor):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        exploration_epsilon: float,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        device: torch.device,
-    ):
+            self,
+            network: torch.nn.Module,
+            exploration_epsilon: float,
+            random_state: np.random.RandomState,    
+            device: torch.device):
         super().__init__(
             network,
             exploration_epsilon,
             random_state,
             device,
-            'DRQN-greedy',
-        )
+            'DRQN-greedy')
         self._lstm_state = None
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+        self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Samples action from eps-greedy policy wrt Q-values at given state.
         """
         s_t = torch.tensor(
-            timestep.observation[None, None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+            timestep.observation[None, None, ...])\
+                .to(device=self._device, dtype=torch.float32)
         hidden_s = tuple(s.to(device=self._device) for s in self._lstm_state)
         network_output = self._network(s_t, hidden_s)
         q_t = network_output.q_values
         self._lstm_state = network_output.hidden_s
         
         return apply_egreedy_policy(
-            q_t, self._exploration_epsilon, self._random_state
-        )
+            q_t, self._exploration_epsilon, self._random_state)
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Reset hidden state to zeros at new episodes.
         """
@@ -192,65 +178,56 @@ class R2d2EpsilonGreedyActor(EpsilonGreedyActor):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        exploration_epsilon: float,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        device: torch.device,
-    ):
+            self,
+            network: torch.nn.Module,
+            exploration_epsilon: float,
+            random_state: np.random.RandomState,    
+            device: torch.device):
         super().__init__(
             network,
             exploration_epsilon,
             random_state,
             device,
-            'R2D2-greedy',
-        )
+            'R2D2-greedy')
         self._last_action = None
         self._lstm_state = None
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Samples action from eps-greedy policy wrt Q-values at given state.
         """
-        s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
-        a_tm1 = torch.tensor(
-            self._last_action
-        ).to(device=self._device, dtype=torch.float64)
-        r_t = torch.tensor(
-            timestep.reward
-        ).to(device=self._device, dtype=torch.float32)
-        hidden_s = tuple(
-            s.to(device=self._device) for s in self._lstm_state
-        )
+        s_t = torch.tensor(timestep.observation[None, ...])\
+            .to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(self._last_action)\
+            .to(device=self._device, dtype=torch.float64)
+        r_t = torch.tensor(timestep.reward)\
+            .to(device=self._device, dtype=torch.float32)
+        hidden_s = tuple(s.to(device=self._device) for s in self._lstm_state)
 
         network_output = self._network(
             RnnDqnNetworkInputs(
                 s_t=s_t[None, ...],
                 a_tm1=a_tm1[None, ...],
                 r_t=r_t[None, ...],
-                hidden_s=hidden_s[None, ...],
-            )
-        )
+                hidden_s=hidden_s[None, ...]))
         q_t = network_output.q_values
         self._lstm_state = network_output.hidden_s
 
         a_t = apply_egreedy_policy(
-            q_t, self._exploration_epsilon, self._random_state
-        )
+            q_t, self._exploration_epsilon, self._random_state)
         self._last_action = a_t
         
         return a_t
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Reset hidden state to zeros at new episodes.
         """
-        self._last_action = 0   # During the first step of a new episode, use 'fake' previous action from network pass
+        # During the first step of a new episode, use 'fake' previous action 
+        # from network pass
+        self._last_action = 0   
         self._lstm_state = self._network.get_initial_hidden_state(batch_size=1)
 
 
@@ -260,49 +237,45 @@ class NguEpsilonGreedyActor(EpsilonGreedyActor):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        embedding_network: torch.nn.Module,
-        rnd_target_network: torch.nn.Module,
-        rnd_predictor_network: torch.nn.Module,
-        episodic_memory_capacity: int,
-        num_neibors: int,
-        cluster_distance: float,
-        kernel_epsilon: float,
-        max_similarity: float,
-        exploration_epsilon: float,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        device: torch.device,
-    ):
+            self,
+            network: torch.nn.Module,
+            embedding_network: torch.nn.Module,
+            rnd_target_network: torch.nn.Module,
+            rnd_predictor_network: torch.nn.Module,
+            episodic_memory_capacity: int,
+            num_neibors: int,
+            cluster_distance: float,
+            kernel_epsilon: float,
+            max_similarity: float,
+            exploration_epsilon: float,
+            random_state: np.random.RandomState,
+            device: torch.device):
         super().__init__(
             network,
             exploration_epsilon,
             random_state,
             device,
-            'NGU-greedy',
-        )
+            'NGU-greedy')
 
         self._policy_index = 0
         self._policy_beta = 0
 
         # Episodic intrinsic bonus module
         self._episodic_module = EpisodicBounusModule(
-            embedding_network=embedding_network,
-            device=device,
-            capacity=episodic_memory_capacity,
-            num_neibors=num_neibors,
-            kernel_epsilon=kernel_epsilon,
-            cluster_distance=cluster_distance,
-            max_similarity=max_similarity,
-        )
+                                    embedding_network=embedding_network,
+                                    device=device,
+                                    capacity=episodic_memory_capacity,
+                                    num_neibors=num_neibors,
+                                    kernel_epsilon=kernel_epsilon,
+                                    cluster_distance=cluster_distance,
+                                    max_similarity=max_similarity)
 
         # Lifelong intrinsic bonus module
         self._lifelong_module = RndLifeLongBonusModule(
-            target_network=rnd_target_network,
-            predictor_network=rnd_predictor_network,
-            device=device,
-            discount=0.99,
-        )
+                                    target_network=rnd_target_network,
+                                    predictor_network=rnd_predictor_network,
+                                    device=device,
+                                    discount=0.99)
 
         self._last_action = None
         self._episodic_bonus_t = None
@@ -311,15 +284,14 @@ class NguEpsilonGreedyActor(EpsilonGreedyActor):
 
     @torch.no_grad()
     def step(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Give current timestep, return best action.
         """
         a_t = self._select_action(timestep)
         s_t = torch.from_numpy(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+                timestep.observation[None, ...])\
+                    .to(device=self._device, dtype=torch.float32)
 
         # Compute lifelong intrinsic bonus
         self._lifelong_bonus_t = self._lifelong_module.compute_bonus(s_t)
@@ -330,52 +302,41 @@ class NguEpsilonGreedyActor(EpsilonGreedyActor):
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Samples action from eps-greedy wrt Q-values at given state.
         """
-        s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
-        a_tm1 = torch.tensor(
-            self._last_action
-        ).to(device=self._device, dtype=torch.float64)
-        ext_r_t = torch.tensor(
-            timestep.reward
-        ).to(device=self._device, dtype=torch.float32)
-        int_r_t = torch.tensor(
-            self.intrinsic_reward
-        ).to(device=self._device, dtype=torch.float32)
-        policy_index = torch.tensor(
-            self._policy_index
-        ).to(device=self._device, dtype=torch.int64)
-        hidden_s = tuple(
-            s.to(device=self._device) for s in self._lstm_state
-        )
+        s_t = torch.tensor(timestep.observation[None, ...])\
+                .to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(self._last_action)\
+                .to(device=self._device, dtype=torch.float64)
+        ext_r_t = torch.tensor(timestep.reward)\
+                .to(device=self._device, dtype=torch.float32)
+        int_r_t = torch.tensor(self.intrinsic_reward)\
+                .to(device=self._device, dtype=torch.float32)
+        policy_index = torch.tensor(self._policy_index)\
+                .to(device=self._device, dtype=torch.int64)
+        hidden_s = tuple(s.to(device=self._device) for s in self._lstm_state)
 
         pi_output = self._network(
-            NguNetworkInputs(
-                s_t=s_t[None, ...], # [T, B, state_shape]
-                a_tm1=a_tm1[None, ...], # [T, B]
-                ext_r_t=ext_r_t[None, ...], # [T, B]
-                int_r_t=int_r_t[None, ...], # [T, B]
-                policy_index=policy_index[None, ...],   # [T, B]
-                hidden_s=hidden_s,
-            )
-        )
+                        NguNetworkInputs(
+                            s_t=s_t[None, ...], # [T, B, state_shape]
+                            a_tm1=a_tm1[None, ...], # [T, B]
+                            ext_r_t=ext_r_t[None, ...], # [T, B]
+                            int_r_t=int_r_t[None, ...], # [T, B]
+                            policy_index=policy_index[None, ...],   # [T, B]
+                            hidden_s=hidden_s))
 
         q_t = pi_output.q_values
         self._lstm_state = pi_output.hidden_s
 
         a_t = apply_egreedy_policy(
-            q_t, self._exploration_epsilon, self._random_state
-        )
+            q_t, self._exploration_epsilon, self._random_state)
         self._last_action = a_t
 
         return a_t
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Reset hidden state to zeros at new episodes.
         """
@@ -386,12 +347,13 @@ class NguEpsilonGreedyActor(EpsilonGreedyActor):
         self._episodic_module.reset()
     
     @property
-    def intrinsic_reward(self)-> float:
+    def intrinsic_reward(self) -> float:
         """
         Returns intrinsic reward for last state s_tm1.
         """
         # Equation 1 of the NGU paper.
-        return self._episodic_bonus_t * min(max(self._lifelong_bonus_t, 1.0), 5.0)
+        return self._episodic_bonus_t \
+                * min(max(self._lifelong_bonus_t, 1.0), 5.0)
 
 
 class Agent57EpsilonGreedyActor(types_lib.Agent):
@@ -400,20 +362,19 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        embedding_network: torch.nn.Module,
-        rnd_target_network: torch.nn.Module,
-        rnd_predictor_network: torch.nn.Module,
-        episodic_memory_capacity: int,
-        num_neighbors: int,
-        cluster_distance: float,
-        kernel_epsilon: float,
-        max_similarity: float,
-        exploration_epsilon: float,
-        random_state: np.random.RandomState,    # pylint: disable=no-member
-        device: torch.device,
-    ):
+            self,
+            network: torch.nn.Module,
+            embedding_network: torch.nn.Module,
+            rnd_target_network: torch.nn.Module,
+            rnd_predictor_network: torch.nn.Module,
+            episodic_memory_capacity: int,
+            num_neighbors: int,
+            cluster_distance: float,
+            kernel_epsilon: float,
+            max_similarity: float,
+            exploration_epsilon: float,
+            random_state: np.random.RandomState,    
+            device: torch.device):
         self.agent_name = 'Agent57-greedy'
         self._network = network.to(device=device)
         self._device = device
@@ -426,41 +387,40 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
 
         # Episodic intrinsic bonus module
         self._episodic_module = EpisodicBounusModule(
-            embedding_network=embedding_network,
-            device=device,
-            capacity=episodic_memory_capacity,
-            num_neighbors=num_neighbors,
-            kernel_epsilon=kernel_epsilon,
-            cluster_distance=cluster_distance,
-            max_similarity=max_similarity,
-        )
+                                    embedding_network=embedding_network,
+                                    device=device,
+                                    capacity=episodic_memory_capacity,
+                                    num_neighbors=num_neighbors,
+                                    kernel_epsilon=kernel_epsilon,
+                                    cluster_distance=cluster_distance,
+                                    max_similarity=max_similarity)
 
         # Lifelong intrinsic bonus module
         self._lifelong_module = RndLifeLongBonusModule(
-            target_network=rnd_target_network,
-            predictor_network=rnd_predictor_network,
-            device=device,
-            discount=0.99,
-        )
+                                    target_network=rnd_target_network,
+                                    predictor_network=rnd_predictor_network,
+                                    device=device,
+                                    discount=0.99)
 
         self._last_action = None
         self._episodic_bonus_t = None
         self._lifelong_bonus_t = None
-        self._ext_lstm_state = None # Stores nn.LSTM hidden state and cell state. for extrinsic Q network
-        self._int_lstm_state = None # Stores nn.LSTM hidden state and cell state. for intrinsic Q network
+        # Stores nn.LSTM hidden state and cell state. for extrinsic Q network
+        self._ext_lstm_state = None
+        # Stores nn.LSTM hidden state and cell state. for intrinsic Q network 
+        self._int_lstm_state = None 
 
     @torch.no_grad()
     def step(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Give current timestep, return best action
         """
         a_t = self._select_action(timestep)
 
         s_t = torch.from_numpy(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+                timestep.observation[None, ...])\
+                    .to(device=self._device, dtype=torch.float32)
 
         # Compute lifelong intrinsic bonus
         self._lifelong_bonus_t = self._lifelong_module.compute_bonus(s_t)
@@ -470,7 +430,7 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
 
         return a_t
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Reset hidden state to zeros at new episodes.
         """
@@ -484,8 +444,7 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
     
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Samples action from eps-greedy policy wrt Q-values at given state.
         """
@@ -495,62 +454,50 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
         ext_q_t = output.ext_q_values.squeeze()
         int_q_t = output.int_q_values.squeeze()
 
-        q_t = compute_transformed_q(
-            ext_q_t, int_q_t, self._policy_beta
-        )
+        q_t = compute_transformed_q(ext_q_t, int_q_t, self._policy_beta)
 
         self._ext_lstm_state = output.ext_hidden_s
         self._int_lstm_state = output.int_hidden_s
 
         a_t = apply_egreedy_policy(
-            q_t, self._exploration_epsilon, self._random_state
-        )
+            q_t, self._exploration_epsilon, self._random_state)
         self._last_action = a_t
 
         return a_t
     
     def _prepare_network_input(
-        self, timestep: types_lib.TimeStep
-    )-> Agent57NetworkInputs:
+            self, timestep: types_lib.TimeStep) -> Agent57NetworkInputs:
         """
         NGU network expect input shape [T, B, state_shape],
-            and additionally 'last action', 'extrinsic reward for all action', last intrinsic reward,
-            and intrinsic reward scale beta index.
+            and additionally 'last action', 'extrinsic reward for all action', 
+            last intrinsic reward, and intrinsic reward scale beta index.
         """
-        s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
-        a_tm1 = torch.tensor(
-            self._last_action
-        ).to(device=self._device, dtype=torch.int64)
-        ext_r_t = torch.tensor(
-            timestep.reward
-        ).to(device=self._device, dtype=torch.float32)
-        int_r_t = torch.tensor(
-            self.intrinsic_reward
-        ).to(device=self._device, dtype=torch.float32)
-        policy_index = torch.tensor(
-            self._policy_index
-        ).to(device=self._device, dtype=torch.int64)
-        ext_hidden_s = tuple(
-            s.to(device=self._device) for s in self._ext_lstm_state
-        )
-        int_hidden_s = tuple(
-            s.to(device=self._device) for s in self._int_lstm_state
-        )
+        s_t = torch.tensor(timestep.observation[None, ...])\
+                .to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(self._last_action)\
+                .to(device=self._device, dtype=torch.int64)
+        ext_r_t = torch.tensor(timestep.reward)\
+                    .to(device=self._device, dtype=torch.float32)
+        int_r_t = torch.tensor(self.intrinsic_reward)\
+                    .to(device=self._device, dtype=torch.float32)
+        policy_index = torch.tensor(self._policy_index)\
+                        .to(device=self._device, dtype=torch.int64)
+        ext_hidden_s = tuple(s.to(device=self._device) \
+                             for s in self._ext_lstm_state)
+        int_hidden_s = tuple(s.to(device=self._device) \
+                             for s in self._int_lstm_state)
 
         return Agent57NetworkInputs(
-            s_t=s_t[None, ...], # [T, B, state_shape]
-            a_tm1=a_tm1[None, ...], # [T, B]
-            ext_r_t=ext_r_t[None, ...], # [T, B]
-            int_r_t=int_r_t[None, ...], # [T, B]
-            policy_index=policy_index[None, ...], # [T, B]
-            ext_hidden_s=ext_hidden_s,
-            int_hidden_s=int_hidden_s,
-        )
+                    s_t=s_t[None, ...], # [T, B, state_shape]
+                    a_tm1=a_tm1[None, ...], # [T, B]
+                    ext_r_t=ext_r_t[None, ...], # [T, B]
+                    int_r_t=int_r_t[None, ...], # [T, B]
+                    policy_index=policy_index[None, ...], # [T, B]
+                    ext_hidden_s=ext_hidden_s,
+                    int_hidden_s=int_hidden_s)
 
     @property
-    def intrinsic_reward(self)-> float:
+    def intrinsic_reward(self) -> float:
         """
         Returns intrinsic reward for last state s_tm1.
         """
@@ -563,9 +510,7 @@ class Agent57EpsilonGreedyActor(types_lib.Agent):
         """
         Returns current agent statistics as a dictionary.
         """
-        return {
-            'exploration_epsilon': self._exploration_epsilon,
-        }
+        return {'exploration_epsilon': self._exploration_epsilon}
 
 
 class PolicyGreedyActor(types_lib.Agent):
@@ -574,32 +519,29 @@ class PolicyGreedyActor(types_lib.Agent):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        device: torch.device,
-        name: str = '',
-    ):
+            self,
+            network: torch.nn.Module,
+            device: torch.device,
+            name: str = ''):
         self.agent_name = name
         self._device = device
         self._network = network.to(device=device)
     
     def step(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Given current timestep, return best action.
         """
         return self.act(timestep)
     
     def act(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Selects action given a timestep.
         """
         return self._select_action(timestep)
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         Resets the agent's episodic state such as frame stack and action repeat.
         This method should be called at the beginning of every episode.
@@ -607,14 +549,13 @@ class PolicyGreedyActor(types_lib.Agent):
 
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Samples action from policy at given state.
         """
         s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+                timestep.observation[None, ...])\
+                    .to(device=self._device, dtype=torch.float32)
         pi_logits_t = self._network(s_t).pi_logits
 
         # Sample an action
@@ -627,7 +568,7 @@ class PolicyGreedyActor(types_lib.Agent):
         return a_t.cpu().item()
     
     @property
-    def statistics(self)-> Mapping[Text, float]:
+    def statistics(self) -> Mapping[Text, float]:
         """
         Empty statistics.
         """
@@ -640,23 +581,20 @@ class ImpalaGreedyActor(PolicyGreedyActor):
     """
 
     def __init__(
-        self,
-        network: torch.nn.Module,
-        device: torch.device,
-    )-> None:
+            self,
+            network: torch.nn.Module,
+            device: torch.device) -> None:
         
         super().__init__(
             network,
             device,
-            'IMPALA',
-        )
+            'IMPALA')
 
         self._last_action = None
         self._hidden_s = self._network.get_initial_hidden_state(batch_size=1)
     
     def step(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Given timestep, return action a_t
         """
@@ -668,15 +606,14 @@ class ImpalaGreedyActor(PolicyGreedyActor):
         return a_t
     
     def act(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Given state s_t and done marks, return an action.
         """
         a_t = self._choose_action(timestep)
         return a_t
     
-    def reset(self)-> None:
+    def reset(self) -> None:
         """
         This method should be called at the beginning of every episode before take any action.
         """
@@ -685,40 +622,33 @@ class ImpalaGreedyActor(PolicyGreedyActor):
 
     @torch.no_grad()
     def _choose_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+        self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Given state s_t, choose action a_t.
         """
         # IMPALA network requires more than just the state input, but also action, 
         # and reward for last action opionally the last hidden state from LSTM
         # and done mask if using LSTM
-        s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
-        a_tm1 = torch.tensor(
-            self._last_action
-        ).to(device=self._device, dtype=torch.int64)
-        r_t = torch.tensor(
-            timestep.reward
-        ).to(device=self._device, dtype=torch.float32)
-        done = torch.tensor(
-            timestep.done
-        ).to(device=self._device, dtype=torch.bool)
+        s_t = torch.tensor(timestep.observation[None, ...])\
+                .to(device=self._device, dtype=torch.float32)
+        a_tm1 = torch.tensor(self._last_action)\
+                .to(device=self._device, dtype=torch.int64)
+        r_t = torch.tensor(timestep.reward)\
+                .to(device=self._device, dtype=torch.float32)
+        done = torch.tensor(timestep.done)\
+                .to(device=self._device, dtype=torch.bool)
 
         hidden_s = tuple(
             s.to(device=self._device) for s in self._hidden_s
         )
 
         network_output = self._network(
-            ImpalaActorCriticNetworkInputs(
-                s_t=s_t[None, ...],
-                a_tm1=a_tm1[None, ...],
-                r_t=r_t[None, ...],
-                done=done[None, ...],
-                hidden_s=hidden_s,
-            )
-        )
+                            ImpalaActorCriticNetworkInputs(
+                                s_t=s_t[None, ...],
+                                a_tm1=a_tm1[None, ...],
+                                r_t=r_t[None, ...],
+                                done=done[None, ...],
+                                hidden_s=hidden_s))
         pi_logits_t = network_output.pi_logits.squeeze(0)   # Remove T dimension
 
         # Sample an action
@@ -732,7 +662,7 @@ class ImpalaGreedyActor(PolicyGreedyActor):
         return a_t.cpu().item()
     
     @property
-    def statistics(self)-> Mapping[Text, float]:
+    def statistics(self) -> Mapping[Text, float]:
         """
         Returns current actor's statistics as a dictionary.
         """
@@ -746,18 +676,15 @@ class GaussianPolicyGreedyActor(PolicyGreedyActor):
 
     @torch.no_grad()
     def _select_action(
-        self, timestep: types_lib.TimeStep
-    )-> types_lib.Action:
+            self, timestep: types_lib.TimeStep) -> types_lib.Action:
         """
         Sample action from policy at given state.
         """
         s_t = torch.tensor(
-            timestep.observation[None, ...]
-        ).to(device=self._device, dtype=torch.float32)
+                timestep.observation[None, ...])\
+                    .to(device=self._device, dtype=torch.float32)
         pi_mu, pi_sigma = self._network(s_t)
         # Sample an action
-        a_t = distributions.normal_distribution(
-            pi_mu, pi_sigma
-        ).sample()
+        a_t = distributions.normal_distribution(pi_mu, pi_sigma).sample()
 
         return a_t.squeeze(0).cpu().numpy()
