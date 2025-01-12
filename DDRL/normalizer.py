@@ -10,16 +10,12 @@ class TorchRnningMeanStd:
     For RND networks.
     """
 
-    def __init__(
-        self, shape=(), device='cpu'
-    ):
+    def __init__(self, shape=(), device='cpu'):
         self.device = device
         self.mean = torch.zeros(
-            shape, dtype=torch.float32, device=self.device
-        )
+            shape, dtype=torch.float32, device=self.device)
         self.var = torch.ones(
-            shape, dtype=torch.float32, device=self.device
-        )
+            shape, dtype=torch.float32, device=self.device)
         self.count = 0
 
         self.deltas = []
@@ -53,9 +49,7 @@ class TorchRnningMeanStd:
     
     @torch.no_grad()
     def normalize(self, x):
-        return (
-            (x.to(self.device) - self.mean) / torch.sqrt(self.var + 1e-8)
-        )
+        return ((x.to(self.device) - self.mean) / torch.sqrt(self.var + 1e-8))
 
 
 class RunningMeanStd:
