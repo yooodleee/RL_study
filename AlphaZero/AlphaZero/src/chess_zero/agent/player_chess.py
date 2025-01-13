@@ -31,11 +31,12 @@ class ActionStats:
 class ChessPlayer:
     # dot = False
     def __init__(
-        self,
-        config: Config,
-        pipes = None,
-        play_config = None,
-        dummy = False):
+            self,
+            config: Config,
+            pipes = None,
+            play_config = None,
+            dummy = False):
+        
         self.moves = []
 
         self.config = config
@@ -43,7 +44,9 @@ class ChessPlayer:
         self.labels_n = config.n_labels
         self.labels = config.labels
         self.move_lookup = {
-            chess.Move.from_uci(move): i for move, i in zip(self.labels, range(self.labels_n))}
+            chess.Move.from_uci(move): i for move, 
+                                        i in zip(self.labels, 
+                                                 range(self.labels_n))}
         if dummy:
             return
         
@@ -72,7 +75,7 @@ class ChessPlayer:
                   f'q: {s[2]:7.3f} '
                   f'p: {s[3]:7.5f} ')
     
-    def action(self, env, can_stop = True)-> str:
+    def action(self, env, can_stop = True) -> str:
         self.reset()
 
         # for tl in range(self.play_config.thinking_loop):
@@ -80,35 +83,42 @@ class ChessPlayer:
         policy = self.calc_policy(env)
         my_action = int(
             np.random.choice(range(self.labels_n),
-                             p = self.apply_temperature(policy, env.num_halfmoves)))
+                             p = self.apply_temperature(policy, 
+                                                        env.num_halfmoves)))
         # print(naked_value)
         # self.deboog(env)
-        if can_stop and self.play_config.resign_threshold is not None and \
-                                        root_value <= self.play_config.resign_threshold \
-                                        and env.num_halfmoves > self.play_config.min_resign_turn:
+        if can_stop and \
+            self.play_config.resign_threshold is not None and \
+                root_value <= self.play_config.resign_threshold \
+                                        and env.num_halfmoves \
+                                            >self.play_config.min_resign_turn:
             # noinspection PyTypeChecker
             return None
         else:
             self.moves.append([env.observation, list(policy)])
             return self.config.labels[my_action]
     
-    def search_moves(self, env)-> Union[float, float]:
+    def search_moves(self, env) -> Union[float, float]:
         # if ChessPlayer.dot == False:
         #       import stacktracer:
         #       stacktracer.trace_start("trace.html")
         #       ChessPlayer.dot = True
 
         futures = []
-        with ThreadPoolExecutor(max_workers=self.play_config.search_threads) as executor:
-            for _ in range(self.play_config.simulation_num_per_move):
-                futures.append(executor.submit(self.search_moves, env=env.copy(), is_root_node=True))
+        with ThreadPoolExecutor(max_workers=self.play_config.search_threads) \
+            as executor:
+                for _ in range(self.play_config.simulation_num_per_move):
+                    futures.append(executor.submit(self.search_moves, 
+                                                   env=env.copy(), 
+                                                   is_root_node=True))
         
         vals = [f.result() for f in futures]
-        # vals=[self.search_my_move(env.copy(), True) for _ in range(self.play_config.simulation_num_per_move)]
+        # vals=[self.search_my_move(env.copy(), True) for _ in 
+        # range(self.play_config.simulation_num_per_move)]
 
         return np.max(vals), vals[0]    # vals[0] is kind of racy
 
-    def search_my_move(self, env: ChessEnv, is_root_node=False)-> float:
+    def search_my_move(self, env: ChessEnv, is_root_node=False) -> float:
         """
         Q, V is value for this Player(always white).
         P is value for the player of next_player (black or white)
@@ -171,8 +181,10 @@ class ChessPlayer:
         # these are canonical policy and value (i.e. side to move is "white")
 
         if not env.white_to_move:
-            leaf_p = Config.flip_policy(leaf_p) # get it back to python-chess form
-        # np.testing.assert_array_equal(Config.flip_policy(Config.flip_policy(leaf_p)), leaf_p)
+            # get it back to python-chess form
+            leaf_p = Config.flip_policy(leaf_p) 
+        # np.testing.assert_array_equal
+        # (Config.flip_policy(Config.flip_policy(leaf_p)), leaf_p)
 
         return leaf_p, leaf_v
     
@@ -184,7 +196,7 @@ class ChessPlayer:
         return ret
     
     #@profile
-    def select_action_q_and_u(self, env, is_root_node)-> chess.Move:
+    def select_action_q_and_u(self, env, is_root_node) -> chess.Move:
         # this method is called with state locked
         state = state_key(env)
 
@@ -200,7 +212,8 @@ class ChessPlayer:
                 a_s.p /= top_p
             my_visitstats.p = None
         
-        xx_ = np.sqrt(my_visitstats.sum_n + 1)  # sqrt of sum(N(s, b); for all b)
+        # sqrt of sum(N(s, b); for all b)
+        xx_ = np.sqrt(my_visitstats.sum_n + 1)  
 
         e = self.play_config.noise_eps
         c_puct = self.play_config.c_puct
@@ -262,7 +275,8 @@ class ChessPlayer:
             lose=-1, 
             draw=0
         """
-        for move in self.moves: # add this game winner result to all past moves.
+        # add this game winner result to all past moves.
+        for move in self.moves: 
             move += [z]
 
 
