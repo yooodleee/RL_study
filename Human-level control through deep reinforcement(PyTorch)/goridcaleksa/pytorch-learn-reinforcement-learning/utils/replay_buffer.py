@@ -93,7 +93,7 @@ class ReplayBuffer:
                             for i in random_unique_indices], 0))
         # shape = (B, C, H, W)
         next_states = self._postprocess_state(
-            np.concatenate([self._fetch_state(i+2) 
+                        np.concatenate([self._fetch_state(i+2) 
                             for i in random_unique_indices], 0))
         # Long is needed because actions are used for indexing of tensors 
         # (PyTorch constraint)
@@ -111,8 +111,8 @@ class ReplayBuffer:
     def fatch_last_state(self):
         # shape = (1, C, H, W) where C - number of past frames, 4 for Atari
         return self._postprocess_state(
-            self._fetch_state((self.current_free_slot_index - 1) \
-                              % self.max_buffer_size))
+                    self._fetch_state((self.current_free_slot_index - 1) \
+                                        % self.max_buffer_size))
     
     def get_current_size(self):
         return self.current_buffer_size
@@ -158,7 +158,7 @@ class ReplayBuffer:
             # If there are missing frames, because of the above handled 
             # edge-cases, fill them with black frames as per
             # original DeepMind Lua imp: 
-            # https://github.com/deepmind/dqn/blob/master/dqn/TransitionTable.lua#171
+        # https://github.com/deepmind/dqn/blob/master/dqn/TransitionTable.lua#171
             state=[np.zeros_like(self.frames[0]) 
                    for _ in range(num_of_missing_frames)]
 
@@ -215,15 +215,20 @@ class ReplayBuffer:
             return f'{memory_in_bytes / 2**30:.2f} GBs'
         
         available_memory = psutil.virtual_memory().available
-        required_memory = self.frames.nbytes + self.actions.nbytes + self.rewards.nbytes
+        required_memory = self.frames.nbytes + self.actions.nbytes \
+                            + self.rewards.nbytes
         print(f'required memory = {to_GBs(required_memory)} GBs, available 
               memory = {to_GBs(available_memory)} GB')
 
         if required_memory > available_memory:
-            message=f"Not enough memory to store the complete replay buffer! \n" \
-                    f"required: {to_GBs(required_memory)} > available: {to_GBs(available_memory)} \n" \
-                    f"Page swapping will make your training super slow once hit your RAM limit." \
-                    f"You can either modify replay_buffer_size argument or set crash_if_no_mem to False to ignore it."
+            message=f"Not enough memory to store the complete replay 
+                        buffer! \n" \
+                    f"required: {to_GBs(required_memory)} > available: 
+                        {to_GBs(available_memory)} \n" \
+                    f"Page swapping will make your training super slow once 
+                        hit your RAM limit." \
+                    f"You can either modify replay_buffer_size argument or set 
+                        crash_if_no_mem to False to ignore it."
             if crash_if_no_mem:
                 raise Exception(message)
             else:
@@ -266,7 +271,8 @@ if __name__ == "__main__":
             env.reset()
     
     # Step 2: Fetch states from the buffer
-    states, actions, rewards, next_states, dones = replay_buffer.fetch_random_states(batch_size)
+    states, actions, rewards, \
+        next_states, dones = replay_buffer.fetch_random_states(batch_size)
 
-    print(states.shape, next_states.shape, actions.shape, rewards.shape, 
-          dones.shape)
+    print(states.shape, next_states.shape, 
+            actions.shape, rewards.shape, dones.shape)
