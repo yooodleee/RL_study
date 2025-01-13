@@ -14,8 +14,8 @@ class ChessModelAPI:
         self.pipes = []
     
     def start(self):
-        prediction_worker = Thread(
-            target=self.predict_batch_worker, name="prediction_worker")
+        prediction_worker = Thread(target=self.predict_batch_worker, 
+                                   name="prediction_worker")
         prediction_worker.daemon = True
         prediction_worker.start()
     
@@ -36,6 +36,7 @@ class ChessModelAPI:
                     result_pipes.append(pipe)
             # print(f"predicting {len(result_pipes)} items")
             data = np.asarray(data, dtype=np.float32)
-            policy_ary, value_ary = self.agent_model.model.predict_on_batch(data)
+            policy_ary, value_ary = self.agent_model.model.\
+                                        predict_on_batch(data)
             for pipe, p, v in zip(result_pipes, policy_ary, value_ary):
                 pipe.send((p, float(v)))
