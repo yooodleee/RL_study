@@ -36,14 +36,20 @@ class SupervisedLearningWorker:
         start_time = time()
         with ProcessPoolExecutor(max_workers=7) as executor:
             games = self.get_games_from_all_files()
-            for res in as_completed([executor.submit(get_buffer, self.config, game) for game in games]):    # poisned reference (memleak)
+            # poisned reference (memleak)
+            for res in as_completed([executor.submit(get_buffer, \
+                                                     self.config, game)
+                                                       for game in games]):    
                 self.idx += 1
                 env, data = res.result()
                 self.save_data(data)
                 end_time = time()
-                logger.debug(f"game {self.idx:4} time={(end_time - start_time):.3f}s "
-                             f"halfmoves={env.num_halfmoves:3} {env.winner:12}"
-                             f"{' by resign ' if env.resigned else '            '}"
+                logger.debug(f"game {self.idx:4} 
+                             time={(end_time - start_time):.3f}s "
+                             f"halfmoves={env.num_halfmoves:3} 
+                             {env.winner:12}"
+                             f"{' by resign ' if env.resigned 
+                                else '            '}"
                              f"{env.observation.split(' ')[0]}")
                 start_time = end_time
             
@@ -67,9 +73,11 @@ class SupervisedLearningWorker:
     def flush_buffer(self):
         rc = self.config.resource
         game_id = datetime.now().strftime("%Y%m%d-%H%M%S.%f")
-        path = os.path.join(rc.play_data_dir, rc.play_data_filename_tmpl % game_id)
+        path = os.path.join(rc.play_data_dir, 
+                            rc.play_data_filename_tmpl % game_id)
         logger.info(f"save play data to {path}")
-        thread = Thread(target=write_game_data_to_file(), args=(path, self.buffer))
+        thread = Thread(target=write_game_data_to_file(), 
+                        args=(path, self.buffer))
         thread.start()
         self.buffer = []
 
@@ -87,7 +95,8 @@ def get_games_from_file(filename):
 
 
 def clip_elo_policy(config, elo):
-    return min(1, max(0, elo - config.play_data.min_elo_policy) / config.play_data.max_elo_policy)
+    return min(1, max(0, elo - config.play_data.min_elo_policy) \
+               / config.play_data.max_elo_policy)
 # 0 until min_elo, 1 after max_elo, linear in between
 
 
@@ -96,7 +105,8 @@ def get_buffer(config, game)-> Union[ChessEnv, list]:
     white = ChessPlayer(config, dummy=True)
     black = ChessPlayer(config, dummy=True)
     result = game.headers["Result"]
-    white_elo, black_elo = int(game.headers["WhiteElo"]), int(game.headers["BlackElo"])
+    white_elo, black_elo = int(game.headers["WhiteElo"]), \
+                            int(game.headers["BlackElo"])
     white_weight = clip_elo_policy(config, white_elo)
     black_weight = clip_elo_policy(config, black_elo)
 
@@ -107,9 +117,13 @@ def get_buffer(config, game)-> Union[ChessEnv, list]:
     k = 0
     while not env.done and k < len(actions):
         if env.white_to_move:
-            action = white.sl_action(env.observation, actions[k], weight=white_weight)  # ignore=True
+            action = white.sl_action(env.observation, 
+                                     actions[k], 
+                                     weight=white_weight)  # ignore=True
         else:
-            action = black.sl_action(env.observation, actions[k], weight=black_weight)  # ignore=True
+            action = black.sl_action(env.observation, 
+                                     actions[k], 
+                                     weight=black_weight)  # ignore=True
         
         env.step(action, False)
         k += 1
