@@ -7,7 +7,8 @@ class EvaluateConfig:
         self.play_config.simulation_num_per_move = 200
         self.play_config.thinking_loop = 1
         self.play_config.c_puct = 1 # lower = prefer mean action value
-        self.play_config.tau_decay_rate = 0.6   # need a better distribution...
+        # need a better distribution...
+        self.play_config.tau_decay_rate = 0.6   
         self.play_config.noise_eps = 0
         self.evaluate_latest_first = True
         self.max_game_length = 1000
@@ -51,7 +52,8 @@ class TrainerConfig:
         self.start_total_steps = 0
         self.save_model_steps = 25
         self.load_data_steps = 100
-        self.loss_weights = [1.25, 1.0] # [policy, value] prevent value overfit in SL
+        # [policy, value] prevent value overfit in SL
+        self.loss_weights = [1.25, 1.0] 
 
 
 
@@ -60,7 +62,9 @@ class ModelConfig:
     cnn_first_filter_size = 5
     cnn_filter_size = 3
     res_layer_num = 7
-    l2_reg = 1e-4   # GO TO JSON SET THIS!!!! not have much worry for overfitting with only 1-2 epochs/dataset
+    # GO TO JSON SET THIS!!!! not have much worry for overfitting with only 
+    # 1-2 epochs/dataset
+    l2_reg = 1e-4   
     value_fc_size = 256
     distributed = False
     input_depth = 18
