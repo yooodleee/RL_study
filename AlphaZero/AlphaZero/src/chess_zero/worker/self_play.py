@@ -12,8 +12,12 @@ from chess_zero.agent.model_chess import ChessModel
 from chess_zero.agent.player_chess import ChessPlayer
 from config import Config
 from chess_zero.env.chess_env import ChessEnv, Winner
-from chess_zero.lib.data_helper import get_game_data_filenames, write_game_data_to_file, pretty_print
-from chess_zero.lib.model_helper import load_best_model_weight, save_as_best_model, reload_best_model_weight_if_changed
+from chess_zero.lib.data_helper import (get_game_data_filenames, 
+                                        write_game_data_to_file, 
+                                        pretty_print)
+from chess_zero.lib.model_helper import (load_best_model_weight, 
+                                         save_as_best_model, 
+                                         reload_best_model_weight_if_changed)
 
 logger = getLogger(__name__)
 
@@ -28,15 +32,20 @@ class SelfPlayWorker:
         self.current_model = self.load_model()
         self.m = Manager()
         self.cur_pipes = self.m.list(
-            [self.current_model.get_pipes(self.config.play.search_threads) for _ in range(self.config.play.max_processes)])
+                        [self.current_model.get_pipes(self.config.play.\
+                                                      search_threads) 
+                        for _ in range(self.config.play.max_processes)])
 
     def start(self):
         self.buffer = []
 
         futures = deque()
-        with ProcessPoolExecutor(max_workers=self.config.play.max_processes) as executor:
+        with ProcessPoolExecutor(max_workers=self.config.play.max_processes) \
+            as executor:
             for game_idx in range(self.config.play.max_processes):
-                futures.append(executor.submit(self_play_buffer(), self.config, cur=self.cur_pipes))
+                futures.append(executor.submit(self_play_buffer(), 
+                                               self.config, 
+                                               cur=self.cur_pipes))
             game_idx = 0
             while True:
                 game_idx += 1
@@ -51,7 +60,10 @@ class SelfPlayWorker:
                 if (game_idx % self.config.play.data.nb_game_in_file) == 0:
                     self.flush_buffer()
                     reload_best_model_weight_if_changed(self.current_model)
-                futures.append(executor.submit(self_play_buffer(), self.config, cur=self.cur_pipes))  # Keep it going
+                # Keep it going
+                futures.append(executor.submit(self_play_buffer(), 
+                                               self.config, 
+                                               cur=self.cur_pipes))  
         
         if len(data) > 0:
             self.flush_buffer()
@@ -66,9 +78,11 @@ class SelfPlayWorker:
     def flush_buffer(self):
         rc = self.config.resource
         game_id = datetime.now().strftime("%Y%m%d-%H%M%S.%f")
-        path = os.path.join(rc.play_data_dir, rc.play_data_filename_tmpl % game_id)
+        path = os.path.join(rc.play_data_dir, 
+                            rc.play_data_filename_tmpl % game_id)
         logger.info(f"save play data to {path}")
-        thread = Thread(target = write_game_data_to_file(), args = (path, self.buffer))
+        thread = Thread(target = write_game_data_to_file(), 
+                        args = (path, self.buffer))
         thread.start()
         self.buffer = []
     
@@ -81,7 +95,7 @@ class SelfPlayWorker:
             os.remove(files[i])
 
 
-def self_play_buffer(config, cur)-> Union[ChessEnv, list]:
+def self_play_buffer(config, cur) -> Union[ChessEnv, list]:
     pipes = cur.pop()   # borrow
     env = ChessEnv().reset()
 
