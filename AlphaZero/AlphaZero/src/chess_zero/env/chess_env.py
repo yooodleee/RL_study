@@ -221,9 +221,9 @@ def maybe_flip_fen(fen, flip=False):
         return "".join([swapcase(a) for a in aa])
     
     return "".join( [swapall(row) for row in reversed(rows)] ) \
-        + " " + ('w' if foo[1]=='b' else 'b') \
-        + " " + "".join( sorted( swapall(foo[2]) ) ) \
-        + " " + foo[3] + " " + foo[4] + " " + foo[5]
+            + " " + ('w' if foo[1]=='b' else 'b') \
+            + " " + "".join( sorted( swapall(foo[2]) ) ) \
+            + " " + foo[3] + " " + foo[4] + " " + foo[5]
 
 def aux_planes(fen):
     foo = fen.split(' ')
