@@ -35,7 +35,8 @@ def get_game_data_filenames(rc: ResourceConfig):
 
 
 def get_next_generation_model_dirs(rc: ResourceConfig):
-    dir_pattern = os.path.join(rc.next_generation_model_dir, rc.next_generation_model_dirname_tmpl % "*")
+    dir_pattern = os.path.join(rc.next_generation_model_dir, 
+                               rc.next_generation_model_dirname_tmpl % "*")
     dirs = list(sorted(glob(dir_pattern)))
     return dirs
 
