@@ -31,16 +31,22 @@ class ResourceConfig:
         self.project_dir = os.environ.get("PROJECT_DIR", _project_dir())
         self.data_dir = os.environ.get("DATA_DIR", _data_dir())
 
-        self.model_dir = os.environ.get("MODEL_DIR", os.path.join(self.data_dir, "model"))
-        self.model_best_config_path = os.path.join(self.model_dir, "model_best_config.json")
-        self.model_best_weight_path = os.path.join(self.model_dir, "model_best_weight.h5")
+        self.model_dir = os.environ.get("MODEL_DIR", 
+                                        os.path.join(self.data_dir, "model"))
+        self.model_best_config_path = os.path.join(self.model_dir, 
+                                                   "model_best_config.json")
+        self.model_best_weight_path = os.path.join(self.model_dir, 
+                                                   "model_best_weight.h5")
 
-        self.model_best_distributed_ftp_server = "alpha-chess-zero.mygamesonline.org"
+        self.model_best_distributed_ftp_server \
+            = "alpha-chess-zero.mygamesonline.org"
         self.model_best_distributed_ftp_user = "2537576_chess"
         self.model_best_distributed_ftp_password = "alpha-chess-zero-2"
-        self.model_best_distributed_ftp_remote_path = "/alpha-chess-zero.mygamesonline.org/"
+        self.model_best_distributed_ftp_remote_path \
+            = "/alpha-chess-zero.mygamesonline.org/"
 
-        self.next_generation_model_dir = os.path.join(self.model_dir, "next_generation")
+        self.next_generation_model_dir = os.path.join(self.model_dir, 
+                                                      "next_generation")
         self.next_generation_model_dirname_tmpl = "model_%s"
         self.next_generation_model_config_filename = "model_config.json"
         self.next_generation_model_weight_filename = "model_weight.h5"
@@ -52,13 +58,12 @@ class ResourceConfig:
         self.main_log_path = os.path.join(self.log_dir, "main.log")
     
     def create_directories(self):
-        dirs = [
-            self.project_dir,
-            self.data_dir,
-            self.model_dir,
-            self.play_data_dir,
-            self.log_dir,
-            self.next_generation_model_dir]
+        dirs = [self.project_dir,
+                self.data_dir,
+                self.model_dir,
+                self.play_data_dir,
+                self.log_dir,
+                self.next_generation_model_dir]
         
         for d in dirs:
             if not os.path.exists(d):
@@ -85,11 +90,14 @@ def create_uci_labels():
                             [(l1 + t, n1 + t) for t in range(-7, 8)] + \
                             [(l1 + t, n1 - t) for t in range(-7, 8)] + \
                             [(l1 + a, n1 + b) for (a, b) in
-                             [(-2, -1), (-1, -2), (-2, 1), (1, -2), (2, -1), (-1, 2), (2, 1), (1, 2)]]
+                             [(-2, -1), (-1, -2), (-2, 1), (1, -2), 
+                              (2, -1), (-1, 2), (2, 1), (1, 2)]]
             
             for (l2, n2) in destinations:
-                if (l1, n1) != (l2, n2) and l2 in range(8) and n2 in range(8):
-                    move = letters[l1] + numbers[n1] + letters[l2] + numbers[n2]
+                if (l1, n1) != (l2, n2) and l2 in range(8) \
+                                and n2 in range(8):
+                    move = letters[l1] + numbers[n1] \
+                            + letters[l2] + numbers[n2]
                     labels_array.append(move)
     
     for l1 in range(8):
@@ -143,7 +151,8 @@ class Config:
         return np.asarray([pol[ind] for ind in Config.unflipped_index])
 
 
-Config.unflipped_index = [Config.labels.index(x) for x in Config.flipped_labels]
+Config.unflipped_index = [Config.labels.index(x) 
+                          for x in Config.flipped_labels]
 
 
 # print(Config.labels)
