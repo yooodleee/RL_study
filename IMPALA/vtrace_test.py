@@ -4,7 +4,7 @@ For details and theory see:
 
 "IMPALA: Scalable Distributed Deep-RL with
 Importance Weighted Actor-Learner Architectures"
-by Espeholt, Soyer, Munos et al.
+    by Espeholt, Soyer, Munos et al.
 """
 
 from __future__ import absolute_import
@@ -29,14 +29,17 @@ def _softmax(logits):
 
 
 def _ground_truth_calculation(
-    discounts,
-    log_rhos,
-    rewards,
-    values,
-    bootstrap_value,
-    clip_rho_threshold,
-    clip_pg_rho_threshold):
-    """Calculates the ground truth for V-trace in Python/Numpy."""
+        discounts,
+        log_rhos,
+        rewards,
+        values,
+        bootstrap_value,
+        clip_rho_threshold,
+        clip_pg_rho_threshold):
+    
+    """
+    Calculates the ground truth for V-trace in Python/Numpy.
+    """
     vs = []
     seq_len = len(discounts)
     rhos = np.exp(log_rhos)
@@ -49,49 +52,61 @@ def _ground_truth_calculation(
         clipped_pg_rhos = np.minimum(rhos, clip_pg_rho_threshold)
 
     # This is a very inefficient way to calculate the V-trace ground truth.
-    # We calculate it this way because it is close to the mathematical notation of
-    # V-trace.
+    # We calculate it this way because it is close to the mathematical 
+    # notation of V-trace. 
+
     # v_s = V(x_s)
     #       + \sum^{T-1}_{t=s} \gamma^{t-s}
     #           * \prod_{i=s}^{t-1} c_i
     #           * \rho_t (r_t + \gamma V(x_{t+1}) - V(x_t))
-    # Note that when we take the product over c_i, we write 's:t' as the notation
-    # of the paper is inclusive of the 't-1', but Python is exclusive.
+    # Note that when we take the product over c_i, we write 's:t' 
+    # as the notation of the paper is inclusive of the 't-1', 
+    # but Python is exclusive.
     # Also note that np.prod([]) == 1.
-    values_t_plus_1 = np.concatenate([values, bootstrap_value[None, :]], axis=0)
+    values_t_plus_1 = np.concatenate([values, 
+                                      bootstrap_value[None, :]], 
+                                      axis=0)
     for s in range(seq_len):
         v_s = np.copy(values[s])    # Very important copy.
         for t in range(s, seq_len):
-            v_s += (
-                np.prod(discounts[s:t], axis=0)
+            v_s += (np.prod(discounts[s:t], axis=0)
                 * np.prod(cs[s:t], axis=0)
                 * clipped_rhos[t]
-                * (rewards[t] + discounts[t] * values_t_plus_1[t + 1] - values[t]))
+                * (rewards[t] \
+                   + discounts[t] \
+                   * values_t_plus_1[t + 1] \
+                   - values[t]))
             vs.append(v_s)
         vs = np.stack(vs, axis=0)
-        pg_advantages = (
-            clipped_pg_rhos
-            * (rewards + discounts * np.concatenate([vs[1:], bootstrap_value[None, :]], axis=0) - values))
+        pg_advantages = (clipped_pg_rhos \
+                         * (rewards + discounts \
+                            * np.concatenate([vs[1:], 
+                                              bootstrap_value[None, :]], 
+                                              axis=0) - values))
         
         return vtrace.VTraceReturns(vs=vs, pg_advantages=pg_advantages)
 
 
 
 class LogProbsFromLogitsAndActionsTest(
-    tf.test.TestCase, parameterized.TestCase):
+        tf.test.TestCase, parameterized.TestCase):
 
     @parameterized.named_parameters(('Batch1', 1), ('Batch2', 2))
     def tet_log_probs_from_logits_and_actions(self, batch_size):
-        """Test log_probs_from_logits_and_actions."""
+        """
+        Test log_probs_from_logits_and_actions.
+        """
         seq_len = 7
         num_actions = 3
 
         policy_logits = _shaped_arange(seq_len, batch_size, num_actions) + 10
-        actions = np.random.randint(
-            0, num_actions, size=(seq_len, batch_size), dtype=np.int32)
+        actions = np.random.randint(0, 
+                                    num_actions, 
+                                    size=(seq_len, batch_size), 
+                                    dtype=np.int32)
         
         action_log_probs_tensor = vtrace.log_probs_from_logits_and_actions(
-            policy_logits, actions)
+                                    policy_logits, actions)
         
         # Ground Truth
         # Using broadcasting to create a mask that indexes action logis
@@ -101,12 +116,14 @@ class LogProbsFromLogitsAndActionsTest(
             return array[mask].reshape(*array.shape[:-1])
         
         # Note: Normally log(softmax) is not a good idea because it's not
-        # numerically stable. However, in this test we have well-behaved values.
+        # numerically stable. However, in this test  
+        # well-behaved values.
         ground_truth_v = index_with_mask(
             np.log(_softmax(policy_logits)), action_index_mask)
         
         with self.test_session() as session:
-            self.assertAllClose(ground_truth_v, session.run(action_log_probs_tensor))
+            self.assertAllClose(ground_truth_v, 
+                                session.run(action_log_probs_tensor))
 
 
 
@@ -114,32 +131,28 @@ class VtraceTest(tf.test.TestCase, parameterized.TestCase):
 
     @parameterized.named_parameters(('Batch1', 1), ('Batch5', 5))
     def test_vtrace(self, batch_size):
-        """Test V-trace against ground truth data calculated in python."""
+        """
+        Test V-trace against ground truth data calculated in python.
+        """
         seq_len = 5
 
         # Create log_rhos such that rho will span from near-zero to above the
-        # clipping thresholds. In particullar, calculate log_rhos in [-2.5, 2.5),
+        # clipping thresholds. In particullar, calculate log_rhos 
+        # in [-2.5, 2.5),
         # so that rho is in approx [0.08, 12.2).
-        log_rhos = _shaped_arange(seq_len, batch_size) / (batch_size * seq_len)
+        log_rhos = _shaped_arange(seq_len, batch_size) \
+                    / (batch_size * seq_len)
         log_rhos = 5 * (log_rhos - 0.5) # [0.0, 1.0) -> [-2.5, 2.5).
-        values = {
-            'log_rhos': log_rhos,
-            # T, B where B_i: [0.9 / (i+1)] * T
-            'discounts':
-                np.array([[0.9 / (b+1)
-                           for b in range(batch_size)]
-                           for _ in range(seq_len)]),
-            'rewards': 
-                _shaped_arange(seq_len, batch_size),
-            'values':
-                _shaped_arange(seq_len, batch_size) / batch_size,
-            'bootstrap_value':
-                _shaped_arange(batch_size) + 1.0,
-            'clip_rho_threshold':
-                3.7,
-            'clip_pg_rho_threshold':
-                2.2,
-        }
+        values = {'log_rhos': log_rhos, 
+                  # T, B where B_i: [0.9 / (i+1)] * T
+                  'discounts': np.array([[0.9 / (b+1)
+                                for b in range(batch_size)]
+                                for _ in range(seq_len)]), 
+                  'rewards': _shaped_arange(seq_len, batch_size),
+                  'values': _shaped_arange(seq_len, batch_size) / batch_size,
+                  'bootstrap_value': _shaped_arange(batch_size) + 1.0,
+                  'clip_rho_threshold': 3.7,
+                  'clip_pg_rho_threshold': 2.2}
 
         output = vtrace.from_importance_weights(**values)
 
@@ -163,33 +176,43 @@ class VtraceTest(tf.test.TestCase, parameterized.TestCase):
         placeholders = {
             # T, B, NUM_ACTIONS
             'behaviour_policy_logits':
-                tf.compat.v1.placeholder(dtype=tf.float32, shape=[None, None, None]),
+                tf.compat.v1.placeholder(dtype=tf.float32, 
+                                         shape=[None, None, None]),
             # T, B, NUM_ACTIONS
             'target_policy_logits':
-                tf.compat.v1.placeholder(dtype=tf.float32, shape=[None, None, None]),
+                tf.compat.v1.placeholder(dtype=tf.float32, 
+                                         shape=[None, None, None]),
             'actions':
-                tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, None]),
+                tf.compat.v1.placeholder(dtype=tf.int32, 
+                                         shape=[None, None]),
             'discounts':
-                tf.compat.v1.placeholder(dtype=tf.float32, shape=[None, None]),
+                tf.compat.v1.placeholder(dtype=tf.float32, 
+                                         shape=[None, None]),
             'rewards':
-                tf.compat.v1.placeholder(dtype=tf.float32, shape=[None, None]),
+                tf.compat.v1.placeholder(dtype=tf.float32, 
+                                         shape=[None, None]),
             'values':
-                tf.compat.v1.placeholder(dtype=tf.float32, shape=[None, None]),
+                tf.compat.v1.placeholder(dtype=tf.float32, 
+                                         shape=[None, None]),
             'bootstrap_value':
-                tf.compat.v1.placeholder(dtype=tf.float32, shape=[None]),
-        }
+                tf.compat.v1.placeholder(dtype=tf.float32, 
+                                         shape=[None])}
 
         from_logits_output = vtrace.from_logits(
-            clip_rho_threshold=clip_rho_threshold,
-            clip_pg_rho_threshold=clip_pg_rho_threshold,
-            **placeholders)
+                            clip_rho_threshold=clip_rho_threshold,
+                            clip_pg_rho_threshold=clip_pg_rho_threshold,
+                            **placeholders)
         
         target_log_probs = vtrace.log_probs_from_logits_and_actions(
-            placeholders['target_policy_logits'], placeholders['actions'])
+                            placeholders['target_policy_logits'], 
+                            placeholders['actions'])
         behaviour_log_probs = vtrace.log_probs_from_logits_and_actions(
-            placeholders['behaviour_policy_logits'], placeholders['actions'])
+                                placeholders['behaviour_policy_logits'], 
+                                placeholders['actions'])
         log_rhos = target_log_probs - behaviour_log_probs
-        ground_truth = (log_rhos, behaviour_log_probs, target_log_probs)
+        ground_truth = (log_rhos, 
+                        behaviour_log_probs, 
+                        target_log_probs)
 
         values = {
             'behaviour_policy_logits':
@@ -197,7 +220,9 @@ class VtraceTest(tf.test.TestCase, parameterized.TestCase):
             'target_policy_logits':
                 _shaped_arange(seq_len, batch_size, num_actions),
             'actions':
-                np.random.randint(0, num_actions - 1, size=(seq_len, batch_size)),
+                np.random.randint(0, 
+                                  num_actions - 1, 
+                                  size=(seq_len, batch_size)),
             'discounts':
                 np.array(   # T, B where B_i: [0.9 / (i+1)] * T
                     [[0.9 / (b + 1)
@@ -208,26 +233,27 @@ class VtraceTest(tf.test.TestCase, parameterized.TestCase):
             'values':
                 _shaped_arange(seq_len, batch_size) / batch_size,
             'bootstrap_value':
-                _shaped_arange(batch_size) + 1.0,   # B
-        }
+                _shaped_arange(batch_size) + 1.0}   # B
+        
 
         feed_dict = {placeholders[k]: v for k, v in values.items()}
         with self.test_session() as session:
-            from_logits_output_v = session.run(
-                from_logits_output, feed_dict=feed_dict)
-            (ground_truth_log_rhos, ground_truth_behaviour_action_log_probs,
-            ground_truth_target_action_log_probs) = session.run(
-                ground_truth, feed_dict=feed_dict)
+            from_logits_output_v = session.run(from_logits_output, 
+                                               feed_dict=feed_dict)
+            (ground_truth_log_rhos, 
+             ground_truth_behaviour_action_log_probs, 
+             ground_truth_target_action_log_probs) = session.run(
+                                                    ground_truth, feed_dict=feed_dict)
         
         # Calculate V-trace using the ground truth logits.
         from_iw = vtrace.from_importance_weights(
-            log_rhos=ground_truth_log_rhos,
-            discounts=values['discounts'],
-            rewards=values['rewards'],
-            values=values['values'],
-            bootstrap_value=values['bootstrap_value'],
-            clip_rho_threshold=clip_rho_threshold,
-            clip_pg_rho_threshold=clip_pg_rho_threshold)
+                log_rhos=ground_truth_log_rhos,
+                discounts=values['discounts'],
+                rewards=values['rewards'],
+                values=values['values'],
+                bootstrap_value=values['bootstrap_value'],
+                clip_rho_threshold=clip_rho_threshold,
+                clip_pg_rho_threshold=clip_pg_rho_threshold)
         
         with self.test_session() as session:
             from_iw_v = session.run(from_iw)
@@ -242,7 +268,9 @@ class VtraceTest(tf.test.TestCase, parameterized.TestCase):
         self.assertAllClose(ground_truth_log_rhos, from_logits_output_v.log_rhos)
     
     def test_higher_rank_inputs_for_importance_weights(self):
-        """Checks support for additional dimensions in inputs."""
+        """
+        Checks support for additional dimensions in inputs.
+        """
         placeholders = {
             'log_rhos': tf.compat.v1.placeholder(
                 dtype=tf.float32, shape=[None, None, 1]),
@@ -259,7 +287,9 @@ class VtraceTest(tf.test.TestCase, parameterized.TestCase):
         self.assertEqual(output.vs.shape.as_list()[-1], 42)
     
     def test_inconsistent_rank_input_for_importance_weights(self):
-        """Test one of many possible errors in shape of inputs."""
+        """
+        Test one of many possible errors in shape of inputs.
+        """
         placeholders = {
             'log_rhos': tf.compat.v1.placeholder(
                 dtype=tf.float32, shape=[None, None, 1]),
