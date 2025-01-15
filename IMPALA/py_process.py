@@ -1,8 +1,9 @@
 """PyProcess.
 
-This file includes utilities for running code in separate  Python processes as
-part of a TensorFlow graph. It is similar to tf.py_func, but the code is run in
-separate processes to avoid the GIL.
+This file includes utilities for running code in separate  
+    Python processes as part of a TensorFlow graph. 
+It is similar to tf.py_func, but the code is run in
+    separate processes to avoid the GIL.
 
 Example:
 
@@ -56,15 +57,21 @@ class _TFProxy(object):
     def __getattr__(self, name):
         def call(*args):
             kwargs = dict(
-                zip(function_utils.fn_args(getattr(self._type, name))[1:], args))
-            specs = self._type._tensor_specs(name, kwargs, self._constructor_kwargs)
+                zip(function_utils.\
+                    fn_args(getattr(self._type, name))[1:], args))
+            specs = self._type._tensor_specs(name, 
+                                             kwargs, 
+                                             self._constructor_kwargs)
 
             if specs is None:
                 raise ValueError(
-                    'No tensor specifications were provided for: %s' % name)
+                    'No tensor specifications were provided for: %s' \
+                        % name)
             
-            flat_dtypes = nest.flatten(nest.map_structure(lambda s: s.dtype, specs))
-            flat_shapes = nest.flatten(nest.map_structure(lambda s: s.dtype, specs))
+            flat_dtypes = nest.flatten(nest.map_structure(lambda s: s.dtype, 
+                                                          specs))
+            flat_shapes = nest.flatten(nest.map_structure(lambda s: s.dtype, 
+                                                          specs))
 
             def py_call(*args):
                 try:
@@ -80,8 +87,10 @@ class _TFProxy(object):
                     else:
                         raise
             
-            result = tf.py_function(
-                py_call(), (name,) + tuple(args), flat_dtypes, name=name)
+            result = tf.py_function(py_call(), 
+                                    (name,) + tuple(args), 
+                                    flat_dtypes, 
+                                    name=name)
             
             if isinstance(result, tf.Operation):
                 return result
@@ -95,8 +104,10 @@ class _TFProxy(object):
     def _start(self):
         self._out, in_ = multiprocessing.Pipe()
         self._process = multiprocessing.Process(
-            target=self._worler_fn,
-            args = (self._type, self._constructor_kwargs, in_))
+                            target=self._worler_fn,
+                            args = (self._type, 
+                                    self._constructor_kwargs, 
+                                    in_))
         self._process.start()
         result = self._out.recv()
 
@@ -179,7 +190,8 @@ class PyProcessHook(tf.compat.v1.train.SessionRunHook):
     def begin(self):
         tf.compat.v1.logging.info('Starting all processes.')
         tp = multiprocessing.pool.ThreadPool()
-        tp.map(lambda p: p.start(), tf.compat.v1.get_collection(PyProcess.COLLECTION))
+        tp.map(lambda p: p.start(), 
+               tf.compat.v1.get_collection(PyProcess.COLLECTION))
         tp.close()
         tp.join()
         tf.compat.v1.logging.info('All process started.')
@@ -187,7 +199,8 @@ class PyProcessHook(tf.compat.v1.train.SessionRunHook):
     def end(self, session):
         tf.compat.v1.logging.info('Closing all processes.')
         tp = multiprocessing.pool.ThreadPool()
-        tp.map(lambda p: p.close(session), tf.compat.v1.get_collection(PyProcess.COLLECTION))
+        tp.map(lambda p: p.close(session), 
+               tf.compat.v1.get_collection(PyProcess.COLLECTION))
         tp.close()
         tp.join()
         tf.compat.v1.logging.info('All processes closed.')
