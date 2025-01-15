@@ -18,7 +18,7 @@ os.makedirs(config.log_dir, exist_ok=True)
 os.makedirs(config.save_path, exist_ok=True)
 
 # Create the callback that logs mean reward of the last 100 episodes to wandb
-cusom_callback=CustomWandbCallback(config.check_freq, config.save_path)
+cusom_callback = CustomWandbCallback(config.check_freq, config.save_path)
 
 
 '''
@@ -27,24 +27,32 @@ Set up loging to wandb
 
 # Set wandb to log the training process
 if config.log_to_wandb:
-    wandb.init(project=config.project_train, entity=config.entity, name=config.name_train, notes=config.notes, sync_tensorboard=config.sync_tensorboard)
-    # wandb_callback is a callback that logs the training process to wandb, this is done because wandb.watch() does not work with sb3
-    wandb_callback=WandbCallback()
+    wandb.init(project=config.project_train, 
+               entity=config.entity, 
+               name=config.name_train, 
+               notes=config.notes, 
+               sync_tensorboard=config.sync_tensorboard)
+    # wandb_callback is a callback that logs the training process to wandb, 
+    # this is done because wandb.watch() does not work with sb3
+    wandb_callback = WandbCallback()
 
 
 '''
 Set up the environment
 '''
 # Create multiple environments and wrap them correctly
-env=make_atari_env("BreakoutNoFrameskip-v4", n_envs=config.n_envs, seed=config.seed)
-env=VecFrameStack(env, n_stack=config.n_stack)
+env = make_atari_env("BreakoutNoFrameskip-v4", 
+                     n_envs=config.n_envs, 
+                     seed=config.seed)
+env = VecFrameStack(env, n_stack=config.n_stack)
 
 
 '''
 Set up the model
 '''
-# Create the model with the parameters specified in config.py, go to config.py to see the meaning of each parameter in detail
-model=PPO(policy=config.policy,
+# Create the model with the parameters specified in config.py, 
+# go to config.py to see the meaning of each parameter in detail
+model = PPO(policy=config.policy,
           env=env,
           learning_rate=config.learning_rate,
           n_steps=config.n_steps,
@@ -76,30 +84,57 @@ print("model in device: ", model.device)
 
 # Load the model if config.pretrained is set to True in config.py
 if config.pretrained:
-    model=PPO.load(config.saved_model_path, env=env, verbose=config.verbose, tensorboard_log=config.log_dir)
-    # Unzip the file a2c_Breakout_1M.zip and sotre the unzipped files in the folder a2c_Breakout_unzipped
+    model = PPO.load(config.saved_model_path, 
+                     env=env, 
+                     verbose=config.verbose, 
+                     tensorboard_log=config.log_dir)
+    # Unzip the file a2c_Breakout_1M.zip and sotre the unzipped files 
+    # in the folder a2c_Breakout_unzipped
     unzip_file(config.save_path, config.unzip_file_path)
-    model.policy.load_state_dict(torch.load(os.path.join(config.unzip_file_path, "policy.pth")))
-    model.policy.optimizer.load_state_dict(torch.load(os.path.join(config.unzip_file_path, "policy.optimizer.pth")))
+    model.policy.\
+        load_state_dict(torch.\
+                        load(os.path.join(config.unzip_file_path, 
+                                          "policy.pth")))
+    model.policy.optimizer.\
+        load_state_dict(torch.\
+                        load(os.path.join(config.unzip_file_path, 
+                                          "policy.optimizer.pth")))
 
 
 '''
 Train the model and save it
 '''
-# model.learn will train the model for 1e6 timesteps, timestep is the number of actions taken by the agent,
-# in a game like breakout, the agent takes an action every frame, then the number of timesteps is the number of frames,
-# which is the number of frames in 1 game multiplied by the number of games played.
-# The average number frames in 1 game is 1000, so 1e6 timesteps is 1000 games more or less.
-# log_interval is the number of timesteps between each log, in this case, the training process will be logged every 100 timesteps.
-# callback is a callback that logs the training process to wandb, this is done because wandb.watch() does not work with sb3
+# model.learn will train the model for 1e6 timesteps, 
+# timestep is the number of actions taken by the agent,
+# in a game like breakout, the agent takes an action every frame, 
+# then the number of timesteps is the number of frames,
+# which is the number of frames in 1 game multiplied by the number 
+# of games played.
+#
+# The average number frames in 1 game is 1000, 
+# so 1e6 timesteps is 1000 games more or less.
+#
+# log_interval is the number of timesteps between each log, in this case, 
+# the training process will be logged every 100 timesteps.
+#
+# callback is a callback that logs the training process to wandb, 
+# this is done because wandb.watch() does not work with sb3.
 
 if config.log_to_wandb:
-    model.learn(total_timesteps=config.total_timesteps, log_interval=config.log_interval, callback=[wandb_callback, cusom_callback], progress_bar=True)
+    model.learn(total_timesteps=config.total_timesteps, 
+                log_interval=config.log_interval, 
+                callback=[wandb_callback, cusom_callback], 
+                progress_bar=True)
 else:
-    model.learn(total_timesteps=config.total_timesteps, log_interval=config.log_interval, callback=cusom_callback, progress_bar=True)
+    model.learn(total_timesteps=config.total_timesteps, 
+                log_interval=config.log_interval, 
+                callback=cusom_callback, 
+                progress_bar=True)
 
 # Save the model
-model.save(config.saved_model_path[:-4])    # remove the .zip extension from the path
+
+# remove the .zip extension from the path
+model.save(config.saved_model_path[:-4])    
 
 
 '''
