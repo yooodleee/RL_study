@@ -106,7 +106,9 @@ Train the model and save it
 
 # in a game like breakout, the agent takes an action every frame, 
 # then the number of timesteps is the number of frames,
-# which is the number of frames in 1 game multiplied by the number of games played.
+# which is the number of frames in 1 game multiplied by the number 
+# of games played.
+#
 # The average number of frames in 1 game is 1000, so 1e6 timesteps 
 # is 1000 games more or less.
 # log_interval is the number of timesteps between each log, in this case, 
