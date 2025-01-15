@@ -1,4 +1,6 @@
-"""Environments and environment helper classes."""
+"""
+Environments and environment helper classes.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -18,7 +20,9 @@ nest = tf.nest
 
 
 class LocalLevelCache(object):
-    """Local level cache."""
+    """
+    Local level cache.
+    """
 
     def __init__(self, cache_dir='/tmp/level_cache'):
         self._cache_dir = cache_dir
@@ -37,43 +41,41 @@ class LocalLevelCache(object):
             tf.compat.v1.gfile.Copy(pk3_path, path)
 
 
-DEFAULT_ACTION_SET = (
-    (0, 0, 0, 1, 0, 0, 0),      # Forward
-    (0, 0, 0, -1, 0, 0, 0),     # Backward
-    (0, 0, -1, 0, 0, 0, 0),     # Strafe Left
-    (0, 0, 1, 0, 0, 0, 0),      # Strafe Right
-    (-20, 0, 0, 0, 0, 0, 0),    # Look Left
-    (20, 0, 0, 0, 0, 0, 0),     # Look Right
-    (-20, 0, 0, 1, 0, 0, 0),    # Look Left + Forward
-    (20, 0, 0, 1, 0, 0, 0),     # Look Right + Forward
-    (0, 0, 0, 0, 1, 0, 0),      # Fire.
-)
+DEFAULT_ACTION_SET = ((0, 0, 0, 1, 0, 0, 0),      # Forward
+                    (0, 0, 0, -1, 0, 0, 0),     # Backward
+                    (0, 0, -1, 0, 0, 0, 0),     # Strafe Left
+                    (0, 0, 1, 0, 0, 0, 0),      # Strafe Right
+                    (-20, 0, 0, 0, 0, 0, 0),    # Look Left
+                    (20, 0, 0, 0, 0, 0, 0),     # Look Right
+                    (-20, 0, 0, 1, 0, 0, 0),    # Look Left + Forward
+                    (20, 0, 0, 1, 0, 0, 0),     # Look Right + Forward
+                    (0, 0, 0, 0, 1, 0, 0))      # Fire.
+                
 
 
 class PyProcessDmLab(object):
-    """DeepMind Lab wrapper for PyProcess."""
+    """
+    DeepMind Lab wrapper for PyProcess.
+    """
 
-    def __init__(
-        self,
-        level,
-        config,
-        num_action_repeats,
-        seed,
-        runfiles_path=None,
-        level_cache=None
-    ):
+    def __init__(self,
+                level,
+                config,
+                num_action_repeats,
+                seed,
+                runfiles_path=None,
+                level_cache=None):
+        
         self._num_action_repeats = num_action_repeats
         self._random_state = np.random.RandomState(seed=seed)
         if runfiles_path:
             deepmind_lab.set_runfiles_path(runfiles_path)
         config = {k: str(v) for k, v in config.iteritems()}
         self._observation_spec = ['RGB_INTERLEAVED', 'INSTR']
-        self._env = deepmind_lab.Lab(
-            level=level,
-            observations=self._observation_spec,
-            config=config,
-            level_cache=level_cache,
-        )
+        self._env = deepmind_lab.Lab(level=level,
+                                     observations=self._observation_spec,
+                                     config=config,
+                                     level_cache=level_cache)
     
     def _reset(self):
         self._env.reset(seed=self._random_state.randint(0, 2 ** 31 - 1))
@@ -100,39 +102,38 @@ class PyProcessDmLab(object):
     
     @staticmethod
     def _tensor_specs(method_name, unused_kwargs, constructor_kwargs):
-        """Returns a nest of 'TensorSpec' with the method's output specification."""
+        """
+        Returns a nest of 'TensorSpec' with the method's 
+            output specification.
+        """
         width = constructor_kwargs['config'].get('width', 320)
         height = constructor_kwargs['config'].get('height', 240)
 
-        observation_spec = [
-            tf.TensorSpec([height, width, 3], tf.unit8),
-            tf.TensorSpec([], tf.string),
-        ]
+        observation_spec = [tf.TensorSpec([height, width, 3], tf.unit8),
+                            tf.TensorSpec([], tf.string)]
 
         if method_name == 'initial':
             return observation_spec
         elif method_name == 'step':
-            return (
-                tf.TensorSpec([], tf.float32),
-                tf.TensorSpec([], tf.bool),
-                observation_spec,
-            )
+            return (tf.TensorSpec([], tf.float32),
+                    tf.TensorSpec([], tf.bool),
+                    observation_spec)
 
 
-StepOutputInfo = collections.namedtuple(
-    'StepOutputInfo', 'episode_return_episode_step')
+StepOutputInfo = collections.namedtuple('StepOutputInfo', 
+                                        'episode_return_episode_step')
 
-StepOutput = collections.namedtuple(
-    'StepOutput', 'reward info done observation')
+StepOutput = collections.namedtuple('StepOutput', 
+                                    'reward info done observation')
 
 
 class FlowEnvironment(object):
     """
     An environment that returns a new state for every modifying method.
 
-    The environment returns a new environment state for every modifying action and
-    forces previous actions to be completed first. Similar to 'flow' for
-    'TensorArray'.
+    The environment returns a new environment state for every modifying 
+        action and forces previous actions to be completed first. 
+    Similar to 'flow' for 'TensorArray'.
     """
 
     def __init__(self, env):
@@ -140,11 +141,14 @@ class FlowEnvironment(object):
         Initializes the environment.
 
         Args:
-            env: An environment with 'initial()' and 'step(action)' methods where
-                'initial' returns the initial observations and 'step' takes an action
-                and returns a tuple of (reward, done, observation). 'observation'
-                should be the observation after the step is taken. If 'done' is
-                True, the observation should be the first observation in the next episode.
+            env: An environment with 'initial()' and 'step(action)' methods 
+                where 'initial' returns the initial observations and 'step' 
+                takes an action and returns a tuple of 
+                (reward, done, observation). 
+                'observation' should be the observation after the step 
+                    is taken. 
+                If 'done' is True, the observation should be the 
+                    first observation in the next episode.
         """
         self._env = env
     
@@ -153,10 +157,11 @@ class FlowEnvironment(object):
         Returns the initial output and initial state.
 
         Returns:
-            A tuple of ('StepOutput', environment state). The environment state should
-            be passed in to the next invocation of 'step' and should not be used in 
-            any other way. The reward and transition type in the 'StepOutput' is the
-            reward/transition type that lead to the observation in 'StepOutput'.
+            A tuple of ('StepOutput', environment state). The environment 
+                state should be passed in to the next invocation of 'step' 
+                and should not be used in any other way. The reward and 
+                transition type in the 'StepOutput' is the reward/transition 
+                type that lead to the observation in 'StepOutput'.
         """
         with tf.name_scope('flow_environment_initial'):
             initial_reward = tf.constant(0.)
@@ -164,14 +169,14 @@ class FlowEnvironment(object):
             initial_done = tf.constant(True)
             initial_observation = self._env.initial()
 
-            initial_output = StepOutput(
-                initial_reward,
-                initial_info,
-                initial_done,
-                initial_observation)
+            initial_output = StepOutput(initial_reward,
+                                        initial_info,
+                                        initial_done,
+                                        initial_observation)
             
-            # Control dependency to make sure the next step can't be taken before the
-            # initial output has been read from the environment.
+            # Control dependency to make sure the next step can't be 
+            # taken before the # initial output has been read 
+            # from the environment.
             with tf.control_dependencies(nest.flatten(initial_output)):
                 initial_flow = tf.constant(0, dtype=tf.int64)
             initial_state = (initial_flow, initial_info)
@@ -186,17 +191,18 @@ class FlowEnvironment(object):
             state: The environment state from the last step or initial state.
 
         Returns:
-            A tuple of ('StepOutput', environment state). The environment state should
-            be passed in to the enxt invocation of 'ste' and should not be used in
-            any other way. On episode end (i.e. 'done' is True), the returned reward
-            should be included in the sum of rewards for the endinf episode and not
-            part of the next episode.
+            A tuple of ('StepOutput', environment state). The environment state 
+                should be passed in to the enxt invocation of 'ste' and should 
+                not be used in any other way. 
+            On episode end (i.e. 'done' is True), the returned reward should 
+                be included in the sum of rewards for the endinf episode and 
+                not part of the next episode.
         """
         with tf.name_scope('flow_environment_step'):
             flow, info = nest.map_structure(tf.convert_to_tensor(), state)
 
-            # Make sure the previous step has been excuted before running the next
-            # step.
+            # Make sure the previous step has been excuted before 
+            # running the next step.
             with tf.control_dependencies([flow]):
                 reward, done, observation = self._env.step(action)
             
@@ -205,13 +211,13 @@ class FlowEnvironment(object):
             
             # When done, include the reward in the output info but not in the
             # state for the next state.
-            new_info = StepOutputInfo(
-                info.episode_return + reward,
-                info.episode_step + 1)
+            new_info = StepOutputInfo(info.episode_return \
+                                      + reward, 
+                                      info.episode_step + 1)
             new_state = new_flow, nest.map_structure(
-                lambda a, b: tf.where(done, a, b),
-                StepOutputInfo(tf.constant(0.), tf.constant(0)),
-                new_info)
+                            lambda a, b: tf.where(done, a, b),
+                            StepOutputInfo(tf.constant(0.), tf.constant(0)),
+                            new_info)
             
             output = StepOutput(reward, new_info, done, observation)
             return output, new_state
