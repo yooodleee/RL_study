@@ -145,8 +145,8 @@ class DynamicBatchingtest(tf.test.TestCase):
                 f0.get()
                 f1.get()
             
-            with self.assertRaisesRegex(
-                tf.errors.InvalidArgumentError, 'Shapes of inputs much be equal'):
+            with self.assertRaisesRegex(tf.errors.InvalidArgumentError, 
+                                        'Shapes of inputs much be equal'):
                 coord.join()
     
     def test_output_must_have_batch_dimension(self):
@@ -164,7 +164,8 @@ class DynamicBatchingtest(tf.test.TestCase):
                 session.run(output)
             
             with self.assertRaisesRegex(
-                tf.errors.InvalidArgumentError, 'Output shape must have a batch dimensions'):
+                tf.errors.InvalidArgumentError, 
+                'Output shape must have a batch dimensions'):
                 coord.join()
     
     def test_output_must_have_same_batch_dimension_size_as_input(self):
@@ -183,7 +184,8 @@ class DynamicBatchingtest(tf.test.TestCase):
             
             with self.assertRaisesRegex(
                 tf.errors.InvalidArgumentError,
-                'Output shape must have the same batch dimension as the input batch '
+                'Output shape must have the same batch dimension \
+                    as the input batch '
                 'size. Expected: 1 Observed: 4'):
                 coord.join()
     
@@ -196,17 +198,20 @@ class DynamicBatchingtest(tf.test.TestCase):
             
             f(tf.constant([1]))
 
-            # Intentionally using tf.Session() instead of self.test_session() to have
-            # control over clossing the session. test_session() is a cached session.
+            # Intentionally using tf.Session() instead of 
+            # self.test_session() to have
+            # control over clossing the session. test_session() 
+            # is a cached session.
             with tf.compat.v1.Session():
                 coord = tf.train.Coordinator()
                 tf.compat.v1.train.start_queue_runners(coord=coord)
-                # Sleep to make sure the queue runner has started the first run call.
+                # Sleep to make sure the queue runner has started 
+                # the first run call.
                 time.sleep(_SLEEP_TIME)
             
             # Session closed.
-            with self.assertRaisesRegex(
-                tf.errors.CancelledError, 'GetInputs operation was cancelled'):
+            with self.assertRaisesRegex(tf.errors.CancelledError, 
+                                        'GetInputs operation was cancelled'):
                 coord.join()
     
     def test_batcher_closed(self):
@@ -217,8 +222,10 @@ class DynamicBatchingtest(tf.test.TestCase):
             
             f(tf.constant([1]))
 
-            # Intentionally using tf.Session() instead of self.test_session() to have
-            # control over closing the session. test_session() is a cached session.
+            # Intentionally using tf.Session() instead of 
+            # self.test_session() to have
+            # control over closing the session. 
+            # test_session() is a cached session.
             with tf.compat.v1.Session():
                 coord = tf.train.Coordinator()
                 tf.compat.v1.train.start_queue_runners(coord=coord)
@@ -229,8 +236,8 @@ class DynamicBatchingtest(tf.test.TestCase):
     
     def test_minimum_batch_size(self):
         with self.test_session() as session:
-            @dynamic_batching.batch_fn_with_options(
-                maximum_batch_size=2, timeout_ms=1000)
+            @dynamic_batching.batch_fn_with_options(maximum_batch_size=2, 
+                                                    timeout_ms=1000)
             def f(a, b):
                 batch_size = tf.shape(a)[0]
                 return a + b, tf.tile([batch_size], [batch_size])
@@ -243,22 +250,20 @@ class DynamicBatchingtest(tf.test.TestCase):
             session.run(output)
             duration = datetime.datetime.now() - start
 
-            # There should have been a timeout here because only one sample was added
-            # and the minimum batch size is 2.
+            # There should have been a timeout here because only one 
+            # sample was added and the minimum batch size is 2.
             self.assertLessEqual(.9, duration.total_seconds())
             self.assertGreaterEqual(1.5, duration.total_seconds())
 
-            outputs = [
-                f(tf.constant([[1, 3]]), tf.constant([2])),
-                f(tf.constant([[1, 3]]), tf.constant([2]))
-            ]
+            outputs = [f(tf.constant([[1, 3]]), tf.constant([2])),
+                        f(tf.constant([[1, 3]]), tf.constant([2]))]
 
             start = datetime.datetime.now()
             (_, batch_size), _ = session.run(outputs)
             duration = datetime.datetime.now() - start
 
-            # The outputs should be executed immediately because two samples are
-            # added.
+            # The outputs should be executed immediately because 
+            # two samples are added.
             self.assertGreaterEqual(.5, duration.total_seconds())
             self.assertEqual(2, batch_size)
 
@@ -269,13 +274,11 @@ class DynamicBatchingtest(tf.test.TestCase):
                 batch_size = tf.shape(a)[0]
                 return a + b, tf.tile([batch_size], [batch_size])
 
-            outputs = [
-                f(tf.constant([1]), tf.constant([2])),
-                f(tf.constant([1]), tf.constant([2])),
-                f(tf.constant([1]), tf.constant([2])),
-                f(tf.constant([1]), tf.constant([2])),
-                f(tf.constant([1]), tf.constant([2])),
-            ]
+            outputs = [f(tf.constant([1]), tf.constant([2])),
+                        f(tf.constant([1]), tf.constant([2])),
+                        f(tf.constant([1]), tf.constant([2])),
+                        f(tf.constant([1]), tf.constant([2])),
+                        f(tf.constant([1]), tf.constant([2]))]
 
             tf.compat.v1.train.start_queue_runners()
 
@@ -288,8 +291,8 @@ class DynamicBatchingtest(tf.test.TestCase):
     def test_static_shape(self):
         assertions_triggered = [0]
 
-        @dynamic_batching.batch_fn_with_options(
-            minimum_batch_size=1, maximum_batch_size=2)
+        @dynamic_batching.batch_fn_with_options(minimum_batch_size=1, 
+                                                maximum_batch_size=2)
         
         def f0(a):
             self.assertEqual(None, a.shape[0].value)
@@ -300,15 +303,16 @@ class DynamicBatchingtest(tf.test.TestCase):
             minimum_batch_size=2, maximum_batch_size=2)
         
         def f1(a):
-            # Even though minimum_batch_size and maximum_batch_size are equal, the
-            # timeout can cause a batch with less than minimum_batch_size.
+            # Even though minimum_batch_size and maximum_batch_size 
+            # are equal, the timeout can cause a batch with less than 
+            # minimum_batch_size.
             self.assertEqual(None, a.shape[0].value)
             assertions_triggered[0] += 1
             return a
         
         def f2(a):
-            # When timeout is disabled and minimum/maximum batch size are equal, the
-            # shape is statically known.
+            # When timeout is disabled and minimum/maximum 
+            # batch size are equal, the shape is statically known.
             self.assertEqual(2, a.shape[0].value)
             assertions_triggered[0] += 1
             return a
@@ -321,14 +325,19 @@ class DynamicBatchingtest(tf.test.TestCase):
 
     def test_out_of_order_execution1(self):
         with self.test_session() as session:
-            batcher = dynamic_batching._Batcher(
-                minimum_batch_size=1, maximum_batch_size=1, timeout_ms=None)
+            batcher = dynamic_batching._Batcher(minimum_batch_size=1, 
+                                                maximum_batch_size=1, 
+                                                timeout_ms=None)
             
             tp = pool.ThreadPool(10)
-            r0 = tp.apply_async(session.run(), batcher.compute([[1]], [tf.int32]))
-            (input0,), computation_id0 = session.run(batcher.get_inputs([tf.int32]))
-            r1 = tp.apply_async(session.run(), batcher.compute([[2]], [tf.int32]))
-            (input1,), computation_id1 = session.run(batcher.get_inputs([tf.int32]))
+            r0 = tp.apply_async(session.run(), 
+                                batcher.compute([[1]], [tf.int32]))
+            (input0,), computation_id0 = session.run(batcher.\
+                                                     get_inputs([tf.int32]))
+            r1 = tp.apply_async(session.run(), 
+                                batcher.compute([[2]], [tf.int32]))
+            (input1,), computation_id1 = session.run(batcher.\
+                                                     get_inputs([tf.int32]))
 
             self.assertAllEqual([1], input0)
             self.assertAllEqual([2], input1)
@@ -345,10 +354,14 @@ class DynamicBatchingtest(tf.test.TestCase):
                 minimum_batch_size=1, maximum_batch_size=1, timeout_ms=None)
             
             tp = pool.ThreadPool(10)
-            r0 = tp.apply_async(session.run(), batcher.compute([[1]], [tf.int32]))
-            (input0,), computation_id0 = session.run(batcher.get_inputs([tf.int32]))
-            r1 = tp.apply_async(session.run(), batcher.compute([[2]], [tf.int32]))
-            (input1,), computation_id1 = session.run*batcher.get_inputs([tf.int32])
+            r0 = tp.apply_async(session.run(), 
+                                batcher.compute([[1]], [tf.int32]))
+            (input0,), computation_id0 = session.run(batcher.\
+                                                     get_inputs([tf.int32]))
+            r1 = tp.apply_async(session.run(), 
+                                batcher.compute([[2]], [tf.int32]))
+            (input1,), computation_id1 = session.\
+                                            run*batcher.get_inputs([tf.int32])
 
             self.assertAllEqual([1], input0)
             self.assertAllEqual([2], input1)
@@ -377,8 +390,9 @@ class DynamicBatchingtest(tf.test.TestCase):
     
     def test_op_shape(self):
         with self.test_session():
-            batcher = dynamic_batching._Batcher(
-                minimum_batch_size=1, maximum_batch_size=1, timeout_ms=None)
+            batcher = dynamic_batching._Batcher(minimum_batch_size=1, 
+                                                maximum_batch_size=1, 
+                                                timeout_ms=None)
             
             _, computation_id = batcher.get_inputs([tf.int32])
 
@@ -400,12 +414,11 @@ class DynamicBatchingBenchmarks(tf.test.Benchmark):
 
             tf.compat.v1.train.start_queue_runners()
 
-            self.run_op_benchmark(
-                name='batching_many_small',
-                sess=session,
-                op_or_tensor=op_to_benchmark,
-                burn_iters=10,
-                min_iters=50)
+            self.run_op_benchmark(name='batching_many_small',
+                                    sess=session,
+                                    op_or_tensor=op_to_benchmark,
+                                    burn_iters=10,
+                                    min_iters=50)
     
     def benchmark_batching_large(self):
         with tf.compat.v1.Session() as session:
@@ -420,12 +433,11 @@ class DynamicBatchingBenchmarks(tf.test.Benchmark):
 
             tf.compat.v1.train.start_queue_runners()
 
-            self.run_op_benchmark(
-                name='batching_many_large',
-                sess=session,
-                op_or_tensor=op_to_benchmark,
-                burn_iters=10,
-                min_iters=50)
+            self.run_op_benchmark(name='batching_many_large',
+                                    sess=session,
+                                    op_or_tensor=op_to_benchmark,
+                                    burn_iters=10,
+                                    min_iters=50)
 
 
 if __name__ == '__main__':
