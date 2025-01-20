@@ -1,14 +1,14 @@
 import random
 import numpy as np
 import os
-import pickle
+import pickle   # saving object to file and callable
 
 class ReplayMemory:
     def __init__(self, capacity, seed):
         random.seed(seed)
-        self.capacity=capacity
-        self.buffer=[]
-        self.position=0
+        self.capacity = capacity
+        self.buffer = []
+        self.position = 0
     
     def push(self, state, action, reward, next_state, done):
         if len(self.buffer) < self.capacity:
@@ -29,8 +29,7 @@ class ReplayMemory:
             os.makedirs("checkpoints/")
         
         if save_path is None:
-            save_path = "checkpoints/sac_buffer_{}_{}".format(env_name, 
-                                                              suffix)
+            save_path = "checkpoints/sac_buffer_{}_{}".format(env_name, suffix)
         print("Saving buffer to {}".format(save_path))
 
         with open(save_path, "wb") as f:
