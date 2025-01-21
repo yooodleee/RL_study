@@ -30,3 +30,9 @@ def print_board(board):
     print('     ' + '   '.join(COLS[:board.num_cols]))
 
 
+def point_from_coords(coords):
+    col = COLS.index(coords[0]) + 1
+    row = int(coords[1:])
+    return gotypes.Point(row=row, col=col)
+
+
