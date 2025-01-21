@@ -22,3 +22,21 @@ def save_model_to_hdf5_group(model, f):
         os.unlink(tempfname)
 
 
+def load_model_from_hdf5_group(f, custom_objects=None):
+    # extract the model into a temprary file. Then we can use Keras
+    # load_model to read it.
+    tempfd, tempfname = tempfile.mkstemp(prefix='tmp-kerasmodel')
+    try:
+        os.close(tempfd)
+        serialized_model = h5py.File(tempfname, 'w')
+        root_item = f.get('kerasmodel')
+        for attr_name, attr_value in root_item.attrs.items():
+            serialized_model.attrs[attr_name] = attr_value
+        for k in root_item.keys():
+            f.copy(root_item.get(k), serialized_model, k)
+        serialized_model.close()
+        return load_model(tempfname, custom_objects=custom_objects)
+    finally:
+        os.unlink(tempfname)
+
+
