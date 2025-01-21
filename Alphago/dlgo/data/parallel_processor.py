@@ -33,3 +33,53 @@ def worker(jobinfo):
         raise Exception('>>> Exiting child proceess.')
 
 
+class GoDataProcessor:
+    def __init__(
+            self,
+            encoder='simple',
+            data_directory='data'):
+        
+        self.encoder_string = encoder
+        self.encoder = get_encoder_by_name(encoder, 19)
+        self.data_dir = data_directory
+    
+    def load_go_data(
+            self,
+            data_type='train',
+            num_samples=1000,
+            use_generator=False):
+        
+        index = KGSIndex(data_directory=self.data_dir)
+        index.download_files()
+
+        sampler = Sampler(data_dir=self.data_dir)
+        data = sampler.draw_data(data_type, num_samples)
+
+        self.map_to_workers(data_type, data)
+        if use_generator:
+            generator = DataGenerator(self.data_dir, data)
+            return generator
+        else:
+            features_and_labels = self.consolidate_games(data_type, data)
+            return features_and_labels
+    
+    def unzip_data(self, zip_file_name):
+        this_gz = gzip.open(
+            self.data_dir + '/' + zip_file_name
+        )
+        tar_file = zip_file_name[0:-3]
+        this_tar = open(
+            self.data_dir + '/' + tar_file, 'wb'
+        )
+
+        shutil.copyfileobj(this_gz, this_tar)
+        this_tar.close()
+        return tar_file
+    
+    def process_zip(
+            self,
+            zip_file_name,
+            data_file_name,
+            game_list):
+        
+        tar_file = self.unzip_data(zip_file_name)
