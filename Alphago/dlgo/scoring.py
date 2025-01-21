@@ -45,3 +45,34 @@ class GameResult(namedtuple('gameResult', 'b w komi')):
         return 'W+%.1f' % (w - self.b,)
 
 
+def _collect_region(
+        start_pos,
+        board,
+        visited=None):
+    
+    if visited is None:
+        visited = {}
+    if start_pos in visited:
+        return [], set()
+    all_points = [start_pos]
+    all_borders = set()
+    visited[start_pos] = True
+    here = board.get(start_pos)
+    deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    for delta_r, delta_c in deltas:
+        next_p = Point(
+            row=start_pos.row + delta_r,
+            col=start_pos.col + delta_c
+        )
+        if not board.is_on_grid(next_p):
+            continue
+        neighbor = board.get(next_p)
+        if neighbor == here:
+            points, borders = _collect_region(next_p, board, visited)
+            all_points += points
+            all_borders |= borders
+        else:
+            all_borders.add(neighbor)
+    return all_points, all_borders
+
+
