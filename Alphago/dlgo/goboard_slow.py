@@ -213,4 +213,32 @@ class GameState():
         game_result = compute_game_result(self)
         return game_result.winner
     
+    @classmethod
+    def new_game(cls, board_size):
+        if isinstance(board_size, int):
+            board_size = (board_size, board_size)
+        board = Board(*board_size)
+        return GameState(
+            board,
+            Player.black,
+            None,
+            None,
+        )
+    
+    @property
+    def situation(self):
+        return (self.next_player, self.board)
+    
+    def does_move_violate_ko(self, player, move):
+        if not move.is_play:
+            return False
+        next_board = copy.deepcopy(self.board)
+        next_board.place_stone(player, move.point)
+        next_situation = (player.other, next_board)
+        past_state = self.previous_state
+        while past_state is not None:
+            if past_state.situation == next_situation:
+                return True
+            past_state = past_state.previous_state
+        return False
     
