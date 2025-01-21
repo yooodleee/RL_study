@@ -76,3 +76,26 @@ def _collect_region(
     return all_points, all_borders
 
 
+def evaluate_territory(board):
+    status = {}
+    for r in range(1, board.num_rows + 1):
+        for c in range(1, board.num_cols + 1):
+            p = Point(row=r, col=c)
+            if p in status:
+                continue
+            stone = board.get(p)
+            if stone is not None:
+                status[p] = board.get(p)
+            else:
+                group, neighbors = _collect_region(p, board)
+                if len(neighbors) == 1:
+                    neighbors_stone = neighbors.pop()
+                    stone_str = 'b' if neighbors_stone == Player.black else 'w'
+                    fill_with = 'terrtory_' + stone_str
+                else:
+                    fill_with = 'dame'
+                for pos in group:
+                    status[pos] = fill_with
+    return Territory(status)
+
+
