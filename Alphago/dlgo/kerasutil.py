@@ -3,7 +3,8 @@ import os
 
 import h5py
 import keras
-from keras.models import load_model, save_model
+from keras import models    # load_model, save_model
+from keras import backend
 
 
 def save_model_to_hdf5_group(model, f):
@@ -13,7 +14,7 @@ def save_model_to_hdf5_group(model, f):
     tempfd, tempfname = tempfile.mkstemp(prefix='tmp-kerasmodel')
     try:
         os.close(tempfd)
-        save_model(model, tempfname)
+        models.save_model(model, tempfname)
         serialized_model = h5py.File(tempfname, 'r')
         root_item = serialized_model.get('/')
         serialized_model.copy(root_item, f, 'kerasmodel')
@@ -35,7 +36,7 @@ def load_model_from_hdf5_group(f, custom_objects=None):
         for k in root_item.keys():
             f.copy(root_item.get(k), serialized_model, k)
         serialized_model.close()
-        return load_model(tempfname, custom_objects=custom_objects)
+        return models.load_model(tempfname, custom_objects=custom_objects)
     finally:
         os.unlink(tempfname)
 
@@ -61,7 +62,7 @@ def set_gpu_memory_target(frac):
     # do the import here, not at the top, in case TensorFlow is not
     # installed at all.
     import tensorflow as tf
-    from keras.backend.tensorflow_backend import set_session
+    from backend.tensorflow_backend import set_session
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = frac
     set_session(tf.Session(config=config))
