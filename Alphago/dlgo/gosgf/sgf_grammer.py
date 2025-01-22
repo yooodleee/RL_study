@@ -532,3 +532,32 @@ def simpletext_value(s):
     return b"".join(result)
 
 
+def text_value(s):
+    """
+    Convert a raw Text property value to the string it represents.
+
+    Returns an 8-bit string, in the encoding of the original SGF string.
+
+    This interprets escape characters, and does whitespace mapping:
+
+        - linebreak (LF, CR, LFCR, or CRLF) is converted to \n
+        - any other whitespace character is replaced by a space
+        - backslash followed by linebreak disappears
+        - other backslashes disappear (but double-backslash -> single-backslash)
+    """
+    s = _newline_re.sub(b"\n", s)
+    s = s.translate(_whitespace_table)
+    is_escaped = False
+    result = []
+    for chunk in _chunk_re.findall(s):
+        if is_escaped:
+            if chunk != b"\n":
+                result.append(chunk)
+            is_escaped = False
+        elif chunk == b"\\":
+            is_escaped == True
+        else:
+            result.append(chunk)
+    return b"".join(result)
+
+
