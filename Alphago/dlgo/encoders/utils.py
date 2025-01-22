@@ -146,3 +146,5 @@ def count_liberties(game_state, move):
         return 0
     
 
+def liberties(game_state, move):
+    return list(game_state.board.get_go_string(move).liberties)
