@@ -369,3 +369,129 @@ class Node:
         ) + "\n"
 
 
+class Tree_node(Node):
+    """
+    A node embedded in an SGF game.
+
+    A Tree_node is a Node that also knows its position within an Sgf_game.
+
+    Do not instantiate directly; retrieve from an Sgf_game or another Tree_node.
+
+    A Tree_node is a list-like container of its children:
+        it can be indexed, sliced, and iterated over like a list,
+        and supports index().
+
+    A Tree_node with no children is treated as having truth value false.
+
+    Public attributes (treat as read-only):
+        owner --  the node's Sgf_game
+        parent -- the node's parent Tree_node (Noe for the root node)
+    """
+    def __init__(self, parent, properties):
+        self.owner = parent.owner
+        self.parent = parent
+        self._children = []
+        Node.__init__(self, properties, parent._presenter)
+    
+    def __add_child(self, node):
+        self._children.append(node)
+    
+    def __len__(self):
+        return len(self._children)
+    
+    def __getitem__(self, key):
+        return self._children[key]
+    
+    def index(self, child):
+        return self._children.index(child)
+    
+    def new_child(self, index=None):
+        """
+        Create a new Tree_node and add it as this node's last child.
+
+        If 'index' is specified, the new node is inserted in the child list at
+            the specified index instead (behaves like list.insert).
+
+        Returns the new node.
+        """
+        child = Tree_node(self, {})
+        if index is None:
+            self._children.append(child)
+        else:
+            self._children.insert(index, child)
+        return child
+    
+    def delete(self):
+        """
+        Remove this node from its parent.
+        """
+        if self.parent is None:
+            raise ValueError(
+                "can't remove the root node"
+            )
+        self.parent._children.move(self)
+    
+    def reparent(self, new_parent, index=None):
+        """
+        Move this node to a new place in the tree.
+
+        new_parent -- Tree_node from the same game.
+
+        Raises ValueError if the new parent is this node or one of its
+            descendants.
+
+        If 'index' is specified, the node is inserted in the new parent's
+            child list at the specified index (behaves like list.insert);
+            otherwise it's placed at the end.
+        """
+        if new_parent.owner != self.owner:
+            raise ValueError(
+                "new parent doesn't belong to the same game"
+            )
+        n = new_parent
+        while True:
+            if n == self:
+                raise ValueError("would create a loop")
+            n = n.parent
+            if n is None:
+                break
+        # self.parent is not None because moving the root would create a loop.
+        self.parent._children.move(self)
+        self.parent = new_parent
+        if index is None:
+            new_parent._children.append(self)
+        else:
+            new_parent._children.insert(index, self)
+    
+    def find(self, identifier):
+        """
+        Find the nearest ancestor-or-self containing the specified property.
+
+        Returns a Tree_node, or None if there is no such node.
+        """
+        node = self
+        while node is not None:
+            if node.has_property(identifier):
+                return node
+            node = node.parent
+        return None
+    
+    def find_property(self, identifier):
+        """
+        Return the value of a property, defined at this node or an ancestor.
+
+        This is intended for use with properties of type 'game-info', 
+            and with properties with the 'inherit' attribute.
+
+        This returns the interpreted value, in the same way as get().
+
+        It searches up the tree, in the same way as find().
+
+        Raises KeyError if no node defining the property is found.
+        """
+        node = self.find(identifier)
+        if node is None:
+            raise KeyError
+        return node.get(identifier)
+
+
