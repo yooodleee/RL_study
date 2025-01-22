@@ -97,3 +97,28 @@ def is_candidate(game_state, move, player):
         count_liberties(game_state, move) == 2
 
 
+def guess_ladder_stones(
+        game_state,
+        move,
+        escape_player):
+    
+    adjacent_strings = [
+        game_state.board.get_go_string(nb)
+        for nb in move.neighbors()
+        if game_state.board.get_go_string(nb)
+    ]
+    if adjacent_strings:
+        string = adjacent_strings[0]
+        neighbors = []
+        for string in adjacent_strings:
+            stones = string.stones
+            for stone in stones:
+                neighbors.append(stone)
+        return [
+            Move(nb) for nb in neighbors
+            if is_candidate(game_state, Move(nb), escape_player)
+        ]
+    else:
+        return []
+
+
