@@ -450,3 +450,27 @@ def main_sequence_iter(game_tree):
         game_tree = game_tree.children[0]
 
 
+_split_compose_re = re.compile(
+    r"( (?: [^\\:] | \\.)* ) :".encode('ascii'),
+    re.VERBOSE | re.DOTALL,
+)
+
+
+def parse_compose(s):
+    """
+    Split the parts of an SGF Compose value.
+
+    If the value is a well-formed Compose, returns a pair of strings.
+
+    If it isn't (ie, there is no delimiter), returns the complete string and
+        None.
+
+    Interprets backslash escapes in order to find the delimiter, 
+        but leaves bakslash escapes unchanged in the returned strings.
+    """
+    m = _split_compose_re.match(s)
+    if not m:
+        return s, None
+    return m.group(1), s[m.end():]
+
+
