@@ -138,3 +138,11 @@ def determine_escape_candidates(
                 )
     return escape_candidates
 
+
+def count_liberties(game_state, move):
+    if game_state.board.get_go_string(move):
+        return game_state.board.get_go_string(move).num_liberties
+    else:
+        return 0
+    
+
