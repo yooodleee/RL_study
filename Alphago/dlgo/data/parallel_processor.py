@@ -175,3 +175,88 @@ class GoDataProcessor:
 
         return features, labels
     
+    @staticmethod
+    def get_handicap(sgf):  # get handicap stones
+        go_board = Board(19, 19)
+        first_move_done = False
+        move = None
+        game_state = GameState.new_game(19)
+        if sgf.get_handicap() is not None and sgf.get_handicap() != 0:
+            for setup in sgf.get_root().get_setup_stones():
+                for move in setup:
+                    row, col = move
+                    go_board.place_stone(
+                        Player.black,
+                        Point(row + 1, col + 1),
+                    )   # black gets handicap
+            first_move_done = True
+            game_state = GameState(go_board, Player.white, None, move)
+        return game_state, first_move_done
+    
+    def map_to_workers(
+            self,
+            data_type,
+            samples):
+        
+        zip_names = set()
+        indices_by_zip_name = {}
+        for filename, index in samples:
+            zip_names.add(filename)
+            if filename not in indices_by_zip_name:
+                indices_by_zip_name[filename] = []
+            indices_by_zip_name[filename].append(index)
+        
+        zips_to_process = []
+        for zip_name in zip_names:
+            base_name = zip_name.replace('.tar.gz', '')
+            data_file_name = base_name + data_type
+            if not os.path.isfile(
+                self.data_dir + '/' + data_file_name
+            ):
+                zips_to_process.append(
+                    (
+                        self.__class__,
+                        self.encoder_string,
+                        zip_name,
+                        data_file_name,
+                        indices_by_zip_name[zip_name],
+                    )
+                )
+        
+        cores = multiprocessing.cpu_count() # determine number of CPU cores and split work load among them
+        pool = multiprocessing.Pool(processes=cores)
+        p = pool.map_async(worker, zips_to_process)
+        try:
+            _ = p.get()
+        except KeyboardInterrupt:   # caught keyboard interrupt, terminating workers
+            pool.terminate()
+            pool.join()
+            sys.exit()
+    
+    def num_total_examples(
+            self,
+            zip_file,
+            game_list,
+            name_list):
+        
+        total_examples = 0
+        for index in game_list:
+            name = name_list[index + 1]
+            if name.endswith('.sgf'):
+                sgf_content = zip_file.extractfile(name).read()
+                sgf = Sgf_game.from_string(sgf_content)
+                game_state, first_move_done = self.get_handicap(sgf)
+
+                num_moves = 0
+                for item in sgf.main_sequence_iter():
+                    color, move = item.get_move()
+                    if color is not None:
+                        if first_move_done:
+                            num_moves += 1
+                        first_move_done = True
+                total_examples = total_examples + num_moves
+            else:
+                raise ValueError(
+                    name + ' is not a valid sgf'
+                )
+        return total_examples
