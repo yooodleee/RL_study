@@ -273,3 +273,29 @@ def parse_sgf_collection(s):
     return result
 
 
+def block_format(pieces, width=79):
+    """
+    Concatenate bytestrings, adding newlines.
+
+    pieces -- iterable of strings
+    width  -- int (default 79)
+
+    Returns "".join(pieces), with added newlines between pieces as necessary
+        to avoid lines longer than 'width'.
+
+    Leaves newlines inside 'pieces' untouched, and ignores them in its width
+        calculation. If a single piece is longer than 'width', it will become
+        a single long line in the output.
+    """
+    lines = []
+    line = b""
+    for s in pieces:
+        if len(line) + len(s) > width:
+            lines.append(line)
+            line = b""
+        line += s
+    if line:
+        lines.append(line)
+    return b"\n".join(lines)
+
+
