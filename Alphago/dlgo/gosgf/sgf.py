@@ -794,4 +794,131 @@ class Sgf_game:
         return result
     
     def main_sequence_iter(self):
+        """
+        Provide the 'leftmost' variation as an iterator.
+
+        Returns an iterator providing Node instances, from the root to a leaf.
+
+        The Node instances may or may not be Tree_nodes.
+
+        It's OK to use these Node instances to modify properties:
+            even if hey are not the same objects as returned by the main tree
+            nevigation methods, they share the underlying property maps.
+
+        If you know the game has no variations, or you're only interested in
+            the 'leftmost' variation, you can use this function to retrieve the
+            nodes without building the entire game tree.
+        """
+        if isinstance(self.root, _Unexpected_root_tree_node):
+            return self.root_main_sequence_iter()
+        return iter(self.get_main_sequence())
+    
+    def extend_main_sequence(self):
+        """
+        Create a new Tree_node and add to the 'leftmost' variation.
         
+        Returns the new node.
+        """
+        return self.get_last_node().new_child()
+    
+    def get_size(self):
+        """
+        Return the board size as an integer.
+        """
+        return self.size
+    
+    def get_charset(self):
+        """
+        Return the effective value of the CA root property.
+
+        This applies the default, and returns the normalized form.
+
+        Raises ValueError if the CA property doesn't identify a Python code.
+        """
+        try:
+            s = self.root.get(b"CA")
+        except KeyError:
+            return "ISO-8859-1"
+        try:
+            return sgf_grammer.normalize_charset_name(s)
+        except LookupError:
+            raise ValueError(
+                "no codec avialable for CA %s" % s
+            )
+    
+    def get_komi(self):
+        """
+        Return the komi as a float.
+
+        Returns 0.0 if the KM property isn't present in the root node.
+
+        Raises ValueError if the KM property is malformed.
+        """
+        try:
+            return self.root.get(b"KM")
+        except KeyError:
+            return 0.0
+    
+    def get_handicap(self):
+        """
+        Return the number of handicap stones as a small integer.
+
+        Returns Nond if the HA property isn't present, or has (illegal)
+            value zero.
+
+        Raises ValueError if the HA property is otherwise malformed.
+        """
+        try:
+            handicap = self.root.get(b"HA")
+        except KeyError:
+            return None
+        if handicap == 0:
+            handicap = None
+        elif handicap == 1:
+            raise ValueError
+        return handicap
+    
+    def get_player_name(self, color):
+        """
+        Return the name of the specified player.
+
+        Returns None if there is no corresponding 'PB'
+            or 'PW' property.
+        """
+        try:
+            return self.root.get(
+                {'b': b'PB', 'w': b'PW'}[color]
+            ).decode(
+                self.presenter.encoding
+            )
+        except KeyError:
+            return None
+    
+    def get_winner(self):
+        """
+        Return the color of the winning player.
+
+        Returns None if there is no RE property, or if neither player won.
+        """
+        try:
+            color = self.root.get(b"RE").decode(
+                self.presenter.encoding
+            )[0].lower()
+        except LookupError:
+            return None
+        if color not in ("b", "w"):
+            return None
+        return color
+    
+    def set_date(self, date=None):
+        """
+        Set the DT property to a single data.
+
+        data -- datetime.date (defaults to today)
+
+        (SGF allows dates to be rather more complicated than this,
+            so there's no corresponding get_date() method.)
+        """
+        if date is None:
+            date = datetime.date.today()
+        self.root.get('DT', self.strftime('%Y-%m-%d'))
