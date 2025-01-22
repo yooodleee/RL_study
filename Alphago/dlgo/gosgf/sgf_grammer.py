@@ -474,3 +474,14 @@ def parse_compose(s):
     return m.group(1), s[m.end():]
 
 
+def compose(s1, s2):
+    """
+    Construct a value of Compose value type.
+
+    s1, s2 -- serialized form of a property value
+
+    (This is only needed if the type of the fist value permits colons.)
+    """
+    return s1.replace(b":", b"\\:") + b":" + s2
+
+
