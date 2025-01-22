@@ -80,3 +80,50 @@ def is_valid_property_value(s):
     return bool(_propvalue_re.search(s))
 
 
+def tokenize(s, start_position=0):
+    """
+    Tokenize a string containing SGF data.
+
+    s               -- 8-bit string
+    start_position  -- index into 's'
+
+    Skips leading junk.
+
+    Returns a list of pairs of strings (token type, contents), and also the
+        index in 's' of the start of the unprocessed 'tail'.
+
+    token types and contents:
+        I -- PropIdent: upper-case letters
+        V -- PropValue: raw value, without the enclosing brackets
+        D -- delimiter: ';', '(', or ')'
+
+    Stops when it has seen as many closing parens as open ones, at the end of
+        the string, or when it fisrt finds something it can't tokenize.
+
+    The first two tokens are always '(' and ';' (otherwise it won't find the
+        start of the content).
+    """
+    result = []
+    m = _find_start_re.search(s, start_position)
+    if not m:
+        return [], 0
+    i = m.start()
+    depth = 0
+    while True:
+        m = _tokenize_re.match(s, i)
+        if not m:
+            break
+        group = m.lastgroup
+        token = m.group(m.lastindex)
+        result.append((group, token))
+        i = m.end()
+        if group == 'D':
+            if token == b'(':
+                depth += 1
+            elif token == b')':
+                depth -= 1
+                if depth == 0:
+                    break
+    return result, i
+
+
