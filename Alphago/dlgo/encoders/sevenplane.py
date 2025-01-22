@@ -49,3 +49,5 @@ class SevenPlaneEncoder(Encoder):
         return self.num_planes, self.board_height, self.board_width
     
 
+def create(board_size):
+    return SevenPlaneEncoder(board_size)
