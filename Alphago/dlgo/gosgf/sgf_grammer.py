@@ -213,3 +213,29 @@ def _parse_sgf_game(s, start_position):
     return variation, end_position
 
 
+def parse_sgf_game(s):
+    """
+    Read a single SGF game from a string, returning the parse tree.
+
+    s -- 8-bit string
+
+    Returns a Coarse_game_tree.
+
+    Applies the rules for FF[4].
+
+    Raises ValueError if can't parse the string.
+
+    If a property more than once in a node (which is not permitted by
+        the spec), treats it the same as a single property with multiple
+        values.
+
+    Identifiles the start of the SGF content by looking for '(;' (with possible
+        whitespace between); ignores everything preceding that. Ignores everything
+        following the first game.
+    """
+    game_tree, _ = _parse_sgf_game(s, 0)
+    if game_tree is None:
+        raise ValueError("no SGF data found")
+    return game_tree
+
+
