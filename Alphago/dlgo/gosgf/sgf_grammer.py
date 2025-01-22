@@ -485,3 +485,50 @@ def compose(s1, s2):
     return s1.replace(b":", b"\\:") + b":" + s2
 
 
+_newline_re = re.compile(
+    r"\n\r|\r\n|\n|\r".encode('ascii')
+)
+if six.PY2:
+    _binary_maketrans = string.maketrans
+else:
+    _binary_maketrans = bytes.maketrans
+
+_whitespace_table = _binary_maketrans(b"\t\f\v", b"   ")
+
+_chunk_re = re.compile(
+    r" [^\n\\]+ | [\n\\] ".encode('ascii'),
+    re.VERBOSE,
+)
+
+
+def simpletext_value(s):
+    """
+    Convert a raw SimpleText property value to the string it represents.
+
+    Returns an 8-bit string, in the encoding of the original SGF string.
+
+    This interprets escape characters, and does whitespace mapping:
+        
+        - backslash followed by linebreak (LF, CR, LFCR, or CRLF) disappears
+        - any other linebreak is replaced by a space
+        - any other whitespace character is replaced by a space
+        - other backslashes disappear (but double-backslash -> single-backslash)
+    """
+    s = _newline_re.sub(b"\n", s)
+    s = s.translate(_whitespace_table)
+    is_escaped = False
+    result = []
+    for chunk in _chunk_re.findall(s):
+        if is_escaped:
+            if chunk != b"\n":
+                result.append(chunk)
+            is_escaped = False
+        elif chunk == b"\\":
+            is_escaped = True
+        elif chunk == b"\n":
+            result.append(b" ")
+        else:
+            result.append(chunk)
+    return b"".join(result)
+
+
