@@ -299,3 +299,45 @@ def block_format(pieces, width=79):
     return b"\n".join(lines)
 
 
+def serialize_game_tree(game_tree, wrap=79):
+    """
+    Serialize an SGF game as a string.
+
+    game_tree -- Coarse_game_tree
+    wrap      -- int (default 79), or None
+
+    Returns an 8-bit string, ending with a newline.
+
+    If 'wrap' is not None, makes some effort to keep output
+        lines no longer than 'wrap'.
+    """
+    l = []
+    to_serialize = [game_tree]
+    while to_serialize:
+        game_tree = to_serialize.pop()
+        if game_tree is None:
+            l.append(b")")
+            continue
+        l.append(b"(")
+        for properties in game_tree.sequence:
+            l.append(b";")
+            # Force FF to the front, largely to work around a Query bug
+            # which it ignore the first few bytes of the file.
+            for prop_ident, prop_values in sorted(
+                    list(properties.items()),
+                    key=lambda pair: (-(pair[0] == b"FF"), pair[0])):
+                # Make a single string for each property, to get prettier
+                # block_format output.
+                m = [prop_ident]
+                for value in prop_values:
+                    m.append(b"[" + value + b"]")
+                l.append(b"".join(m))
+        to_serialize.append(None)
+        to_serialize.extend(reversed(game_tree.children))
+    l.append(b"\n")
+    if wrap is None:
+        return b"".join(l)
+    else:
+        return block_format(l, wrap)
+
+
