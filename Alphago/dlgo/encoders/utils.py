@@ -122,3 +122,19 @@ def guess_ladder_stones(
         return []
 
 
+def determine_escape_candidates(
+        game_state,
+        move,
+        capture_player):
+    
+    escape_candidates = move.neighbors()
+    for other_ladder_stone in game_state.board.get_go_string(move).stones:
+        for neighbor in other_ladder_stone.neighbors():
+            right_color = game_state.color(neighbor) == capture_player
+            one_liberty = count_liberties(game_state, neighbor) == 1
+            if right_color and one_liberty:
+                escape_candidates.append(
+                    liberties(game_state, neighbor)
+                )
+    return escape_candidates
+
