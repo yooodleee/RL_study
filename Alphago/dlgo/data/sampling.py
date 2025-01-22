@@ -98,3 +98,56 @@ class Sampler:
             if line != "":
                 (filename, index) = eval(line)
                 self.test_games.append((filename, index))
+    
+    def draw_training_samples(
+            self,
+            num_sample_games):
+        
+        # draw training games, not overlapping with any of the test games
+        available_games = []
+        index = KGSIndex(data_directory=self.data_dir)
+        for fileinfo in index.file_info:
+            filename = fileinfo['fileinfo']
+            year = int(filename.split('-')[1].split('_')[0])
+            if year > self.cap_year:
+                continue
+            num_games = fileinfo['num_games']
+            for i in range(num_games):
+                available_games.append((filename, i))
+        print('total num games: ' + str(len(available_games)))
+
+        sample_set = set()
+        while len(sample_set) < num_sample_games:
+            sample = random.choice(available_games)
+            if sample not in self.test_games:
+                sample_set.add(sample)
+        print('Drawn ' + str(num_sample_games) + ' samples:')
+        return list(sample_set)
+    
+    def draw_training(self):
+        # draw all available training games
+        available_games = []
+        index = KGSIndex(data_directory=self.data_dir)
+
+        for fileinfo in index.file_info:
+            filename = fileinfo['filename']
+            year = int(filename.split('-')[1].split('_')[0])
+            if year > self.cap_year:
+                continue
+            if 'num_games' in fileinfo.keys():
+                num_games = fileinfo['num_games']
+            else:
+                continue
+            for i in range(num_games):
+                available_games.append((filename, i))
+        print('total num games: ' + str(len(available_games)))
+
+
+        sample_set = set()
+        for sample in available_games:
+            if sample not in self.test_games:
+                sample_set.add(sample)
+        print(
+            'Drawn all samples, ie ' + str(len(sample_set)) + 'samples:'
+        )
+        return list(sample_set)
