@@ -387,3 +387,47 @@ def make_tree(
                 )
 
 
+def make_coarse_game_tree(
+        root,
+        get_children,
+        get_properties):
+    
+    """
+    Construct a Coarse_game_tree from a node tree.
+
+    root            -- node
+    get_children    -- function taking a node, returning a sequence of nodes
+    get_properties  -- function taking a node, returning a property map
+
+    Returns a Coarse_game_tree.
+
+    Walks the node tree based at 'root' using get_children(), and uses
+        get_properties() to extract the raw properties.
+
+    Makes no further assumptions about the node type.
+
+    Doesn't check that the property maps have well-formed keys and values.
+    """
+    result = Coarse_game_tree()
+    to_serialize = [(result, root)]
+    while to_serialize:
+        game_tree, node = to_serialize.pop()
+        while True:
+            game_tree.sequence.append(
+                get_properties(node)
+            )
+            children = get_children(node)
+            if len(children) != 1:
+                break
+            node = children[0]
+        for child in children:
+            child_tree = Coarse_game_tree()
+            game_tree.children.append(child_tree)
+            to_serialize.append(
+                (
+                    child_tree, child
+                )
+            )
+        return result
+
+
