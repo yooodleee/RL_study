@@ -145,3 +145,71 @@ class Coarse_game_tree:
         self.sequence = []  # must be at least one node
         self.children = []  # may be empty
 
+
+def _parse_sgf_game(s, start_position):
+    """
+    Common implementation for parse_game and parse_sgf_games.
+    """
+    tokens, end_position = tokenize(s, start_position)
+    if not tokens:
+        return None, None
+    stack = []
+    game_tree = None
+    sequence = None
+    properties = None
+    index = 0
+    try:
+        while True:
+            token_type, token = tokens[index]
+            index += 1
+            if token_type == 'V':
+                raise ValueError("undexpected value")
+            if token_type == 'D':
+                if token == 'b':
+                    if sequence is None:
+                        raise ValueError("unexpected node")
+                    properties = {}
+                    sequence.append(properties)
+                else:
+                    if sequence is not None:
+                        if not sequence:
+                            raise ValueError("empty sequence")
+                        game_tree.sequence = sequence
+                        sequence = None
+                    if token == b'(':
+                        stack.append(game_tree)
+                        game_tree = Coarse_game_tree()
+                        sequence = []
+                    else:
+                        # token == b')'
+                        variation = game_tree
+                        game_tree = stack.pop()
+                        if game_tree is None:
+                            break
+                        game_tree.children.append(variation)
+                    properties = None
+            else:
+                # token_type == 'I'
+                prop_ident = token
+                prop_values = []
+                while True:
+                    token_type, token = tokens[index]
+                    if token_type != 'V':
+                        break
+                    index += 1
+                    prop_values.append(token)
+                if not prop_values:
+                    raise ValueError("property with no values")
+                try:
+                    if prop_ident in properties:
+                        properties[prop_ident] += prop_values
+                    else:
+                        properties[prop_ident] = prop_values
+                except TypeError:
+                    raise ValueError("property value outside a node")
+    except IndexError:
+        raise ValueError("unexpected end of SGF data")
+    assert index == len(tokens)
+    return variation, end_position
+
+
