@@ -431,3 +431,22 @@ def make_coarse_game_tree(
         return result
 
 
+def main_sequence_iter(game_tree):
+    """
+    Provide the 'leftmost' complete sequence of a Coarse_game_tree.
+
+    game_tree -- Coarse_game_tree
+
+    Returns an iterable of property maps.
+
+    If the game has no variations, this provides the complete game.
+    Otherwise, it chooses the first variation each time it has a choice.
+    """
+    while True:
+        for properties in game_tree.sequence:
+            yield properties
+        if not game_tree.children:
+            break
+        game_tree = game_tree.children[0]
+
+
