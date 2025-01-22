@@ -507,3 +507,44 @@ class _Root_tree_node(Tree_node):
         Node.__init__(self, property_map, owner.presenter)
 
 
+class _Unexpected_root_tree_node(_Root_tree_node):
+    """
+    Varient of _Root_tree_node used with 'loaded' Sgf_games.
+    """
+
+    def __init__(self, owner, coarse_tree):
+        _Root_tree_node.__init__(self, coarse_tree.sequence[0], owner)
+        self._coarse_tree = coarse_tree
+    
+    def _expand(self):
+        sgf_grammer.make_tree(
+            self._coarse_tree,
+            self,
+            Tree_node,
+            Tree_node.__add_child,
+        )
+        delattr(self, '_coarse_tree')
+        self.__class__ = _Root_tree_node
+    
+    def __len__(self):
+        self._expand()
+        return self.__len__()
+    
+    def __getitem__(self, key):
+        self._expand()
+        return self.__getitem__(key)
+    
+    def index(self, child):
+        self._expand()
+        return self.index(child)
+    
+    def new_child(self, index=None):
+        self._expand()
+        return self.new_child(index)
+    
+    def _main_sequence_iter(self):
+        presenter = self._presenter
+        for properties in sgf_grammer.main_sequence_iter(self._coarse_tree):
+            yield Node(properties, presenter)
+
+
