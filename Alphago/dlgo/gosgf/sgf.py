@@ -170,4 +170,202 @@ class Node:
                 )
         self._set_raw_list(identifier, values)
     
+    def set_raw(self, identifier, value):
+        """
+        Set the specified property to a single raw value.
+
+        identifier -- ascii string passing is_valid_property_identifier()
+        value      -- 8-bit string in the raw property encoding
+
+        The value specifies the exact bytes to appear between the square
+            brackets in the SGF file; you must perform any necessary escaping
+            first.
+        """
+        if not sgf_grammer.is_valid_property_identifier(identifier):
+            raise ValueError(
+                "ill-formed property identifier"
+            )
+        if not sgf_grammer.is_valid_property_value(value):
+            raise ValueError(
+                "ill-formed raw property value"
+            )
+        self._set_raw_list(identifier, [value])
     
+    def get(self, identifier):
+        """
+        Return the interpreted value of the specified property.
+
+        Returns the value as a suitable Python representation.
+
+        Raises KeyError if the node does not have a property with the given
+            identifier.
+
+        Raises ValueError if it cannot interpret the value.
+
+        See sgf_properties.Presenter.interpret() for details.
+        """
+        return self._presenter.interpret(
+            identifier,
+            self._property_map[identifier],
+        )
+    
+    def set(self, identifier, value):
+        """
+        Set the value of the specified property.
+
+        identifier -- ascii string passing is_valid_identifier()
+        value      -- new property value (in its Python representation)
+
+        For properties with value type 'none', use value True.
+
+        Raises ValueError if it cannot represent the value.
+
+        See sgf_properties.Presenter.serialize() for details.
+        """
+        self._set_raw_list(
+            identifier,
+            self._presenter.serialize(identifier, value),
+        )
+    
+    def get_raw_move(self):
+        """
+        Return the raw value of the move from a node.
+
+        Returns a pair (color, raw value)
+
+        color is 'b' or 'w'.
+
+        Returns None, None if the node contains no B or W property.
+        """
+        values = self._property_map.get(b"B")
+        if values is not None:
+            color = "b"
+        else:
+            values = self._property_map.get(b"W")
+            if values is not None:
+                color = "w"
+            else:
+                return None, None
+        return color, values[0]
+    
+    def get_move(self):
+        """
+        Retrieve the move from a node.
+
+        Returns a pair (color, move)
+
+        color is 'b' or 'w'.
+
+        move is (row, col), or None for a pass.
+
+        Returns None, None if the node contains no B or W property.
+        """
+        color, raw = self.get_raw_move()
+        if color is None:
+            return None, None
+        return (
+            color,
+            sgf_properties.interpret_go_point(raw, self._presenter.size),
+        )
+    
+    def get_setup_stones(self):
+        """
+        Retrieve Add Block / Add White / Add Empty properties from a node.
+
+        Returns a tuple (black_points, white_points, empty_points)
+
+        Each value is a set of pairs (row, col).
+        """
+        try:
+            bp = self.get(b"AB")
+        except KeyError:
+            bp = set()
+        try:
+            wp = self.get(b"AW")
+        except KeyError:
+            wp = set()
+        try:
+            ep = self.get(b"AE")
+        except KeyError:
+            ep = set()
+        return bp, wp, ep
+    
+    def has_setup_stones(self):
+        """
+        Check whether the node has any AB/AW/AE properties.
+        """
+        d = self._property_map
+        return (b"AB" in d or b"AW" in d or b"AE" in d)
+    
+    def set_move(self, color, move):
+        """
+        Set the B or W property.
+
+        color -- 'b' or 'w'.
+        move  -- (row, col), or None for a pass.
+
+        Replaces any exisitng B or W property in the node.
+        """
+        if color not in ('b', 'w'):
+            raise ValueError
+        if b'B' in self._property_map:
+            del self._property_map[b'B']
+        if b'W' in self._property_map:
+            del self._property_map[b'W']
+        self.set(color.upper().encode('ascii'), move)
+    
+    def set_setup_stones(
+            self,
+            black,
+            white,
+            empty=None):
+        
+        """
+        Set Add Black / Add White / Add Empty properties.
+
+        black, white, empty -- list or set of pairs (row, col)
+
+        Removes any existing AB/AW/AE properties from the node.
+        """
+        if b'AB' in self._property_map:
+            del self._property_map[b'AB']
+        if b'AW' in self._property_map:
+            del self._property_map[b'AW']
+        if b'AE' in self._property_map:
+            del self._property_map[b'AE']
+        if black:
+            self.set(b'AB', black)
+        if white:
+            self.set(b'AW', white)
+        if empty:
+            self.set(b'AE', empty)
+    
+    def add_comment_text(self, text):
+        """
+        Add or extend the node's comment.
+
+        If the node doesn't have a C property, adds one with the 
+            specified text.
+
+        Otherwise, adds the specified text to the existing C property
+            value (with two newlines in front).
+        """
+        if self.has_property(b'C'):
+            self.set(b'C', self.get(b'C') + b"\n\n" + text)
+        else:
+            self.set(b'C', text)
+    
+    def __str__(self):
+        encoding = self.get_encoding()
+
+        def format_property(ident, values):
+            return ident.decode(encoding) + "".join(
+                "[%s]" %s.decode(encoding) for s in values
+            )
+        
+        return "\n".join(
+            format_property(ident, values)
+            for (ident, values) in sorted(self._property_map.items())
+        ) + "\n"
+
+
