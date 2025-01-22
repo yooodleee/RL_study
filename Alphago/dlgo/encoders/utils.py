@@ -29,3 +29,66 @@ def is_ladder_escape(
     )
 
 
+def is_ladder(
+        try_capture,
+        game_state,
+        candidate,
+        ladder_stones=None,
+        recursion_depth=50):
+    
+    if not game_state.is_valid_move(Move(candidate)) or not recursion_depth:
+        return False
+    
+    next_player = game_state.next_player
+    capture_player = next_player if try_capture else next_player.other
+    escape_player = capture_player.other
+
+    if ladder_stones is None:
+        ladder_stones = guess_ladder_stones(
+            game_state,
+            candidate,
+            escape_player,
+        )
+    
+    for ladder_stone in ladder_stones:
+        current_state = game_state.apply_move(candidate)
+
+        if try_capture:
+            candidates = determine_escape_candidates(
+                game_state, ladder_stone, capture_player
+            )
+            attempted_escapes = [   # now try to escape
+                is_ladder(
+                    False,
+                    current_state,
+                    escape_candidate,
+                    ladder_stone,
+                    recursion_depth - 1,
+                )
+                for escape_candidate in candidates
+            ]
+
+            if not any(attempted_escapes):
+                return True # if at least one escape fails, we capture
+        else:
+            if count_liberties(current_state, ladder_stone) >= 3:
+                return True # successful escape
+            if count_liberties(current_state, ladder_stone) == 1:
+                continue    # failed escape, others might still do
+            candidates = liberties(current_state, ladder_stone)
+            attempted_captures = [  # now try to capture
+                is_ladder(
+                    True,
+                    current_state,
+                    capture_candidate,
+                    ladder_stone,
+                    recursion_depth - 1,
+                )
+                for capture_candidate in candidates
+            ]
+            if any(attempted_captures):
+                continue    # failed escape, try others
+            return True # candidate can't be caught in a ladder, escape.
+    return False    # no captures / no escapes
+
+
