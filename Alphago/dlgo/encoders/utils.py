@@ -92,3 +92,8 @@ def is_ladder(
     return False    # no captures / no escapes
 
 
+def is_candidate(game_state, move, player):
+    return game_state.next_player == player and \
+        count_liberties(game_state, move) == 2
+
+
