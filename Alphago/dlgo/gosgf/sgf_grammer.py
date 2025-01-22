@@ -127,3 +127,21 @@ def tokenize(s, start_position=0):
     return result, i
 
 
+class Coarse_game_tree:
+    """
+    An SGF GameTree.
+
+    This is a direct representation of the SGF parse tree.
+    It's 'coarse' in the sense that the objects in the tree structure represent
+        node sequences, not individual nodes.
+
+    Public attributes
+        sequence -- nonempty list of property maps
+        children -- list of Coarse_game_trees
+
+    The sequence represents the nodes before the variations.
+    """
+    def __init__(self):
+        self.sequence = []  # must be at least one node
+        self.children = []  # may be empty
+
