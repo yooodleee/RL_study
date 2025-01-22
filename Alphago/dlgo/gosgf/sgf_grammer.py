@@ -561,3 +561,19 @@ def text_value(s):
     return b"".join(result)
 
 
+def escape_text(s):
+    """
+    Convert a string to a raw Text property value that represents it.
+
+    s -- 8-bit string, in the desired output encoding.
+
+    Returns an 8-bit string which passes is_valid_property_value().
+
+    Normally text_value(escape_text(s)) == s, but there are the following
+        exceptions:
+            - all linebreaks are normalized to \n
+            - whitespace other than line breaks is converted to a single space
+    """
+    return s.replace(
+        b"\\", b"\\\\"
+    ).replace(b"]", b"\\]")
