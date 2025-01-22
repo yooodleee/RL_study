@@ -239,3 +239,37 @@ def parse_sgf_game(s):
     return game_tree
 
 
+def parse_sgf_collection(s):
+    """
+    Read an SGF game collection, returning the parse trees.
+
+    s -- 8-bit string
+
+    Returns a nonempty list of Coarse_game_trees.
+
+    Raises ValueError if no games were found in the string.
+
+    Raises ValueError if there is an error parsing a game.
+        See parse_sgf_game() for details.
+
+    Ignores non-SGF data before the first game, between games, and after the
+        final game. Identifiles the start of each game in the same way as
+        parse_sgf_game().
+    """
+    position = 0
+    result = []
+    while True:
+        try:
+            game_tree, position = _parse_sgf_game(s, position)
+        except ValueError as e:
+            raise ValueError(
+                "error parsing game %d: %s" % (len(result), e)
+            )
+        if game_tree is None:
+            break
+        result.append(game_tree)
+    if not result:
+        raise ValueError("no SGF data found")
+    return result
+
+
