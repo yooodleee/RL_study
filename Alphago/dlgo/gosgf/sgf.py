@@ -548,3 +548,250 @@ class _Unexpected_root_tree_node(_Root_tree_node):
             yield Node(properties, presenter)
 
 
+class Sgf_game:
+    """
+    An SGF game tree.
+
+    The complete game tree is represented using Tree_nodes.
+    The various methods which return Tree_nodes will always return the same
+        object for the same node.
+
+    Instantiate with
+        size        -- int (board zie), in range 1 to 26
+        encoding    -- the raw property encoding (default "UTF-8")
+    
+    'encoding' must be a valid Python codec name.
+
+    The following root node properties are set for newly-created games:
+        FF[4]
+        GM[1]
+        SZ[size]
+        CA[encoding]
+
+    Chainging FF and GM is permitted (but this library will carry on using the
+        FF[4] and GM[1] rules). Chainging SZ is not permitted (unless the change
+        leaves the effective value unchanged). Chainging CA is permitted; this
+        controls the encoding used by serialize().
+    """
+    def __new__(
+            cls,
+            size,
+            encoding="UTF-8",
+            *args,
+            **kwargs):
+        
+        # To complete initialization after this, you need to set 'root'.
+        if not 1 <= size <= 26:
+            raise ValueError(
+                "size out of range: %s" % size
+            )
+        game = super(Sgf_game, cls).__new__(cls)
+        game.size = size
+        game.presenter = sgf_properties.Presenter(size, encoding)
+        return game
+    
+    def __init__(self, *args, **kwargs):
+        self.root = _Root_tree_node({}, self)
+        self.root.set_raw(b'FF', b"4")
+        self.root.set_raw(b'GM', b"1")
+        self.root.set_raw(b'SZ', str(self.size).encode(self.presenter.encoding))
+        # Read the encoding black so we get the normalized form
+        self.root.set_raw(
+            b'CA', self.presenter.encoding.encode('ascii')
+        )
+    
+    @classmethod
+    def from_coarse_game_tree(
+            cls,
+            coarse_game,
+            override_encoding=None):
+        
+        """
+        Alternative constructor: create an Sgf_game from the parser output.
+
+        coarse_game         -- Coarse_game_tree
+        override_encoding   -- encoding name, eg "UTF-8" (optional)
+
+        The node's property maps (as returned by get_raw_property_map()) will
+            be the same dictionary objects as the ones from the Coarse_game_tree.
+
+        The board size and raw property encoding are taken from the SZ and CA
+            properties in the root node (defaulting to 19 and "ISO-8859-1",
+            respectively).
+
+        If override_encoding is specified, the source data is assumed to be in
+            the specified encoding (no matter what the CA property says), and the
+            CA property is set to match.
+        """
+        try:
+            size_s = coarse_game.sequence[0][b'SZ'][0]
+        except KeyError:
+            size = 19
+        else:
+            try:
+                size = int(size_s)
+            except ValueError:
+                raise ValueError("bad SZ property: %s" % size_s)
+        if override_encoding is None:
+            try:
+                encoding = coarse_game.sequence[0][b'CA'][0]
+            except KeyError:
+                encoding = b"ISO-8859-1"
+        else:
+            encoding = override_encoding
+        game = cls.__new__(cls, size, encoding)
+        game.root = _Unexpected_root_tree_node(game, coarse_game)
+        if override_encoding is not None:
+            game.root.set_raw(
+                b"CA",
+                game.presenter.encoding.encode('ascii'),
+            )
+        return game
+    
+    @classmethod
+    def from_string(
+            cls,
+            s,
+            override_encoding=None):
+        
+        """
+        Alternative constructor: read a single Sgf_game from a string.
+
+        s -- 8-bit string
+
+        Raises ValueError if it can't parse the string. See parse_sgf_game()
+            for details.
+
+        See from_coarse_game_tree for details of size and encoding handling.
+        """
+        if not isinstance(s, six.binary_type):
+            s = s.encode('ascii')
+        coarse_game = sgf_grammer.parse_sgf_game(s)
+        return cls.from_coarse_game_tree(
+            coarse_game, 
+            override_encoding,
+        )
+    
+    def serialize(self, wrap=79):
+        """
+        Serialize the SGF data as a string.
+
+        wrap -- int (default 79), or None
+
+        Returns an 8-bit string, in the encoding specified by the CA property
+            in the root node (defaulting to "ISO-8859-1").
+
+        If the raw property encoding and the target encoding match (which is
+            the usual case), the raw property values are included unchanged 
+            in the output (even if they are improperly encoded.)
+
+        Otherwise, if any raw property value is improperly encoded,
+            UnicodeDecodeError is raised, and if any property value can't be
+            represented in the target encoding, UnidoceEncodeError is raised.
+
+        If the target encoding doesn't identify a Python codec,
+            ValueError is raised. Behaivour is unspecified if the targeet encoding
+            isn't ASCII-compatible (eg, UTF-16).
+
+        If 'wrap' is not None, makes some effort to keep output lines no longer
+            than 'wrap'.
+        """
+        try:
+            encoding = self.get_charset()
+        except ValueError:
+            raise ValueError(
+                "unsupported charset: %r"
+                % self.root.get_raw_list(b"CA")
+            )
+        coarse_tree = sgf_grammer.make_coarse_game_tree(
+            self.root,
+            lambda node: node,
+            Node.get_raw_property_map
+        )
+        serialized = sgf_grammer.serialize_game_tree(coarse_tree, wrap)
+        if encoding == self.root.get_encoding():
+            return serialized
+        else:
+            return serialized.decode(
+                self.root.get_encoding()).encode(encoding)
+    
+    def get_property_presenter(self):
+        """
+        Return the property presenter.
+
+        Returns an sgf_properties.Presenter.
+
+        This can be used to customise how property values are interpreted
+            and serialized.
+        """
+        return self.presenter
+    
+    def get_root(self):
+        """
+        Return the root node (as a Tree_node).
+        """
+        return self.root
+    
+    def get_last_node(self):
+        """
+        Return the last node in the 'leftmost' variation
+            (as a Tree_node).
+        """
+        node = self.root
+        while node:
+            node = node[0]
+        return node
+    
+    def get_main_sequence(self):
+        """
+        Return the 'leftmost' variation.
+
+        Returns a list of Tree_nodes, from the root to a leaf.
+        """
+        node = self.root
+        result = [node]
+        while node:
+            node = node[0]
+            result.append(node)
+        return result
+    
+    def get_main_sequence_below(self, node):
+        """
+        Return the 'leftmost' variation below the specified node.
+
+        node -- Tree node
+
+        Returns a list of Tree_nodes, from the first child of 'node'
+            to a leaf.
+        """
+        if node.owner is not self:
+            raise ValueError(
+                "node doesn't belong to this game"
+            )
+        result = []
+        while node:
+            node = node[0]
+            result.append(node)
+        return result
+    
+    def get_sequence_above(self, node):
+        """
+        Return the partial variation leading to the specified node.
+
+        node -- Tree_node
+
+        Returns a list of Tree_nodes, from the root to the parent of 'node'.
+        """
+        if node.owner is not self:
+            raise ValueError(
+                "node doesn't belong to this game"
+            )
+        result = []
+        while node.parent is not None:
+            node = node.parent
+            result.append(node)
+        result.reverse()
+        return result
+    
+    def main_sequence_iter(self):
+        
