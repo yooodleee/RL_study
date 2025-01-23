@@ -544,3 +544,20 @@ def serialize_LB_list(values, context):
     ]
 
 
+class Property_type:
+    """
+    Description of a property type.
+    """
+    def __init__(
+            self,
+            interpreter,
+            serializer,
+            uses_list,
+            allows_empty_list=False):
+        
+        self.interpreter = interpreter
+        self.serializer = serializer
+        self.uses_list = uses_list
+        self.allows_empty_list = bool(allows_empty_list)
+
+
