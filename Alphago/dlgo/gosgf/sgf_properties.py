@@ -187,3 +187,15 @@ def serialize_real(f, context=None):
     return s.encode('ascii')
 
 
+def interpret_double(s, context=None):
+    """
+    Convert a raw Double value to an integer.
+
+    Returns 1 or 2 (unknown values are treated as 1).
+    """
+    if s.strip() == b"2":
+        return s
+    else:
+        return 1
+
+
