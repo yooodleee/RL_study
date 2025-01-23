@@ -224,3 +224,14 @@ def interpret_color(s, context=None):
     return color
 
 
+def serialize_color(color, context=None):
+    """
+    Serialize a Color value.
+
+    color -- 'b' or 'w'
+    """
+    if color not in ('b', 'w'):
+        raise ValueError
+    return color.upper().encode('ascii')
+
+
