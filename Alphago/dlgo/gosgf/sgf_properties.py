@@ -264,3 +264,16 @@ def interpret_simpletext(s, context):
     )
 
 
+def serialize_simpletext(s, context):
+    """
+    Serialize a SimpleText value.
+
+    See sgf_grammer.escape_text() for details.
+
+    s -- 8-bit utf-8 string
+    """
+    if context.encoding != "UTF-8":
+        s = s.decode("utf-8").encode(context.encoding)
+    return sgf_grammer.escape_text(s)
+
+
