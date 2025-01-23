@@ -447,3 +447,35 @@ def serialize_AP(value, context):
     )
 
 
+def interpret_ARLN_list(values, context):
+    """
+    Interpret an AR (arrow) or LN (line) property value.
+
+    Returns a list or pairs (point, point), where point is a pair
+        (row, col).
+    """
+    result = []
+    for s in values:
+        p1, p2 = sgf_grammer.parse_compose()
+        result.append(
+            (interpret_point(p1, context),
+             interpret_point(p2, context))
+        )
+    return result
+
+
+def serialize_ARLN_list(values, context):
+    """
+    Serialize an AR (arrow) or LN (line) property value.
+
+    values -- list of pairs (point, point), where point is a pair (row, col)
+    """
+    return [
+        b":".join(
+            (serialize_point(p1, context),
+             serialize_point(p2, context))
+        )
+        for p1, p2 in values
+    ]
+
+
