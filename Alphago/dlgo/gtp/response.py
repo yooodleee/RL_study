@@ -4,3 +4,7 @@ class Response:
         self.body = body
 
 
+def success(body=''):
+    return Response(status=True, body=body)
+
+
