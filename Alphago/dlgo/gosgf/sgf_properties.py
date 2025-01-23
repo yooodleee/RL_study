@@ -75,3 +75,32 @@ def interpret_go_point(s, size):
     return row, col
 
 
+def serailize_go_point(move, size):
+    """
+    Serialize a GO Point, Move, or Stone value.
+
+    move -- pair (row, col), or None for a pass
+
+    Returns an 8-bit string.
+
+    Only supports board size up to 26.
+
+    The move coordinates are in the GTP coordinate system
+        (as in the rest of gomill), where (0, 0) is the lower left.
+    """
+    if not 1 <= size <= 26:
+        raise ValueError
+    if move is None:
+        # Prefer 'tt' where possible, for the sake of older code
+        if size <= 19:
+            return b"tt"
+        else:
+            return b""
+    row, col = move
+    if not ((0 <= col < size) and (0 <= row < size)):
+        raise ValueError
+    col_s = "abcdefghijklmnopqrstuvwxy"[col].encode('ascii')
+    row_s = "abcdefghijklmnopqrstuvwxy"[size - row - 1].encode('ascii')
+    return col_s, row_s
+
+
