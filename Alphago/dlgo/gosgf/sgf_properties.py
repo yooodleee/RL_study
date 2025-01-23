@@ -248,3 +248,19 @@ def _transcode(s, encoding):
         return u.encode("utf-8")
 
 
+def interpret_simpletext(s, context):
+    """
+    Convert a raw SimpleText value to a string.
+
+    See sgf_grammer.simpletext_value() for details.
+
+    s -- raw value
+
+    Returns an 8-bit utf-8 string.
+    """
+    return _transcode(
+        sgf_grammer.simpletext_value(s),
+        context.encoding,
+    )
+
+
