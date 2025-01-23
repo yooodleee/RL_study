@@ -509,3 +509,38 @@ def serilaize_FG(value, context):
     return str(flags).encode('ascii') + b":" + serialize_simpletext(name, context)
 
 
+def interpret_LB_list(values, context):
+    """
+    Interpret an LB (label) property value.
+
+    Returns a list of pairs ((row, col), string).
+    """
+    result = []
+    for s in values:
+        point, label = sgf_grammer.parse_compose(s)
+        result.append(
+            (
+                interpret_point(point, context),
+                interpret_simpletext(label, context),
+            )
+        )
+    return result
+
+
+def serialize_LB_list(values, context):
+    """
+    Serialize an LB (label) property value.
+
+    values -- list of pairs ((row, col), string)
+    """
+    return [
+        b":".join(
+            (
+                serialize_point(point, context),
+                serialize_simpletext(text, context),
+            )
+        )
+        for point, text in values
+    ]
+
+
