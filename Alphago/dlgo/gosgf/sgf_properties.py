@@ -199,3 +199,16 @@ def interpret_double(s, context=None):
         return 1
 
 
+def serialize_double(i, context=None):
+    """
+    Serialize a Double value.
+
+    i -- integer (1 or 2)
+
+    (unknown values are treated as 1)
+    """
+    if i == 2:
+        return "2"
+    return "1"
+
+
