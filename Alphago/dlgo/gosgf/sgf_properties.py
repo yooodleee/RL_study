@@ -291,3 +291,18 @@ def interpret_text(s, context):
         sgf_grammer.text_value(s),
         context.encoding,
     )
+
+
+def serialize_text(s, context):
+    """
+    Serialize a Text value.
+
+    See sgf_grammer.escape_text() for details.
+
+    s -- 8-bit utf-8 string
+    """
+    if context.encoding != "UTF-8":
+        s = s.decode("utf-8").encode(context.encoding)
+    return sgf_grammer.escape_text(s)
+
+
