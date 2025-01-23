@@ -147,3 +147,18 @@ def serialize_number(i, context=None):
     return ("%d" % i).encode('ascii')
 
 
+def interpret_real(s, context=None):
+    """
+    Convert a raw Real value to the float it represents.
+
+    This is more lenient than the SGF spec: it accepts strings accepted
+        as a float by the platform libc. It rejects infinities and NaNs.
+    """
+    result = float(s)
+    if isinf(result):
+        raise ValueError("infinite")
+    if isnan(result):
+        raise ValueError("not a number")
+    return result
+
+
