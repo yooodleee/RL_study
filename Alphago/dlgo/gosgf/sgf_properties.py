@@ -411,3 +411,39 @@ def serialize_point_list(points, context):
     return result
 
 
+def interpret_AP(s, context):
+    """
+    Interpret an AP (application) property value.
+
+    Returns a pair of strings (name, version number)
+
+    Permits the version number to be missing (which is forbidden
+        by the SGF spec), in which case the second returned value
+        is an empty string.
+    """
+    application, version = sgf_grammer.parse_compose(s)
+    if version is None:
+        version = b""
+    return (
+        interpret_simpletext(application, context),
+        interpret_simpletext(version, context),
+    )
+
+
+def serialize_AP(value, context):
+    """
+    Serialize an AP (application) property value.
+
+    value -- pair (application, version)
+        application -- string
+        version     -- string
+
+    Note this takes a single parameter (which is a pair).
+    """
+    application, version = value
+    return sgf_grammer.compose(
+        serialize_simpletext(application, context),
+        serialize_simpletext(version, context),
+    )
+
+
