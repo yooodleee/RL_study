@@ -16,3 +16,12 @@ class Command:
         return repr(self)
 
 
+def parse(command_string):
+    pieces = command_string.split()
+    try:
+        sequence = int(pieces[0])
+        pieces = pieces[1:]
+    except ValueError:
+        sequence = None
+    name, args = pieces[0], pieces[1:]
+    return Command(sequence, name, args)
