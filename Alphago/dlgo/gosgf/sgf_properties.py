@@ -277,3 +277,17 @@ def serialize_simpletext(s, context):
     return sgf_grammer.escape_text(s)
 
 
+def interpret_text(s, context):
+    """
+    Convert aa raw Text value to a string.
+
+    See sgf_grammer.text_value() for details.
+
+    s -- row value
+
+    Returns an 8-bit utf-8 string.
+    """
+    return _transcode(
+        sgf_grammer.text_value(s),
+        context.encoding,
+    )
