@@ -668,3 +668,178 @@ _property_types_by_ident = {
 _text_property_type = P['text']
 
 del P
+
+
+class Presenter(_Context):
+    """
+    Convert property values between Python and SGF-string representations.
+
+    Instantiate with:
+        size     -- board size (int)
+        encoding -- encoding for the SGF strings
+
+    Public attributes (treat as read-only):
+        size     -- int
+        encoding -- string (normalized form)
+
+    See the _property_types_by_ident table above for a list of properties
+        initially Known, and their types.
+
+    Initially, treats unknown (private) properties as if they had type Text.
+    """
+
+    def __init__(self, size, encoding):
+        try:
+            encoding = normalize_charset_name(encoding)
+        except LookupError:
+            raise ValueError(
+                "unknown encoding: %s" % encoding
+            )
+        _Context.__init__(self, size, encoding)
+        self.property_types_by_ident = _property_types_by_ident.copy()
+        self.default_property_type = _text_property_type
+    
+    def get_property_type(self, identifier):
+        """
+        Return the Property_type for the specified PropIdent.
+
+        Raises KeyError if the property is unknown.
+        """
+        return self.property_types_by_ident[identifier]
+    
+    def register_property(
+            self,
+            identifier,
+            property_type):
+        
+        """
+        Specify the Property_type for a PropIdent.
+        """
+        self.property_types_by_ident[identifier] = property_type
+    
+    def deregister_property(self, identifier):
+        """
+        Forget the type for the specified PropIdent.
+        """
+        del self.property_types_by_ident[identifier]
+    
+    def set_private_property_type(self, property_type):
+        """
+        Specify the Property_type to use for unknown properties.
+
+        Pass property_type = None to make unknown properties
+            raise an error.
+        """
+        self.default_property_type = property_type
+    
+    def _get_effective_property_type(self, identifier):
+        try:
+            return self.property_types_by_ident[identifier]
+        except KeyError:
+            result = self.default_property_type
+            if result is None:
+                raise ValueError("unknown property")
+            return result
+    
+    def interpret_as_type(
+            self,
+            property_type,
+            raw_values):
+        
+        """
+        variant of interpret() for explicity specified type.
+
+        property_type -- Property_type
+        """
+        if not raw_values:
+            raise ValueError("no raw values")
+        if property_type.uses_list:
+            if raw_values == [b""]:
+                raw = []
+            else:
+                raw = raw_values
+        else:
+            if len(raw_values) > 1:
+                raise ValueError("multiple values")
+            raw = raw_values[0]
+        return property_type.interpreter(raw, self)
+    
+    def interpret(
+            self,
+            identifier,
+            raw_values):
+        
+        """
+        Return a Python representation of a property value.
+
+        identifier -- PropIdent
+        raw_values -- nonempty list of 8-bit strings in the presenter's encoding
+
+        See the interpret_... functions above for details of how values are
+            represented as Python types.
+
+        Raises ValueError if it cannot interpret the value.
+
+        Note that in some cases the interpret_... functions accepts values which
+            are not strictly permitted by the specification.
+
+        elist handling: if the property's value type is a list type and
+            'raw_values' is a list containing a single empty string, passes
+            an empty list to the interpret_... function (that is, this function
+            treats all lists like elists).
+
+        Doesn't enforce range restrictions on values with type Number.
+        """
+        return self.interpret_as_type(
+            self._get_effective_property_type(identifier),
+            raw_values,
+        )
+    
+    def serialize_as_type(
+            self,
+            property_type,
+            value):
+        
+        """
+        Variant of serialize() for explicity specified type.
+
+        property_type -- Property_type
+        """
+        serialized = property_type.serilizer(value, self)
+        if property_type.uses_list:
+            if serialized == []:
+                if property_type.allows_empty_list:
+                    return [b""]
+                else:
+                    raise ValueError("empty list")
+            return serialized
+        else:
+            return [serialized]
+    
+    def serialize(self, identifier, value):
+        """
+        Serialize a Python representation of a property value.
+
+        identifier -- PropIdent
+        value      -- corresponding Python value
+
+        Returns a nonempty list of 8-bit strings in the presenter's encoding,
+            suitable for use as raw PropValues.
+
+        See the serialize_... functions above for details of the acceptable
+            values for each type.
+
+        elist handling: if the property's value type is an elist type and the
+            serailize_... function returns an empty list, this returns a list
+            containing a single empty string.
+
+        Raises ValueError if it cannot serialize the value.
+
+        In general, the serialize_... functions try not to produce an invalid
+            result, but do not try to prevent garbage input happening to produce
+            a valid result.
+        """
+        return self.serialize_as_type(
+            self._get_effective_property_type(identifier),
+            value,
+        )
