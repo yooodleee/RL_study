@@ -162,3 +162,28 @@ def interpret_real(s, context=None):
     return result
 
 
+def serialize_real(f, context=None):
+    """
+    Serialize a Real value.
+
+    f -- real number (int or float)
+
+    If the absolute value is too small to conveniently express as a decimal,
+        returns "0" (this currently happens if abs(f) is less than 0.0001).
+    """
+    f = float(f)
+    try:
+        i = int(f)
+    except OverflowError:
+        # infinity
+        raise ValueError
+    if f == i:
+        # avoid trailing '.0';
+        # also avoid scientific notation for large numbers
+        return str(i).encode('ascii')
+    s = repr(f)
+    if 'e-' in s:
+        return "0".encode('ascii')
+    return s.encode('ascii')
+
+
