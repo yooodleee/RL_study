@@ -333,3 +333,25 @@ def serialize_point(point, context):
     return serailize_go_point(point, context.size)
 
 
+def interpret_move(s, context):
+    """
+    Convert a raw SGF Move value to coordinates.
+
+    See interpret_go_point() above for details.
+
+    Returns a piar (row, col), or None for a pass.
+    """
+    return interpret_go_point(s, context.size)
+
+
+def serailize_move(move, context):
+    """
+    Serialize a Move value.
+
+    move -- pair (row, col), or None for a pass
+
+    See serialize_go_point() above for details.
+    """
+    return serailize_go_point(move, context.size)
+
+
