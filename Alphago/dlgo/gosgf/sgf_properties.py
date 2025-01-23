@@ -119,3 +119,12 @@ def interpret_none(s, context=None):
     return True
 
 
+def serialize_none(b, context=None):
+    """
+    Serialize a None value.
+
+    Ignores its parameter.
+    """
+    return b""
+
+
