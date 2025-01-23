@@ -128,3 +128,13 @@ def serialize_none(b, context=None):
     return b""
 
 
+def interpret_number(s, context=None):
+    """
+    Convert a raw Number value to the integer it represents.
+
+    This is a little more lenient than the SGF spec: it permits leading
+        and training spaces, and spaces between the sign and the numerals.
+    """
+    return int(s, 10)
+
+
