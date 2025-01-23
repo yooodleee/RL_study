@@ -47,3 +47,31 @@ def normalize_charset_name(s):
     )
 
 
+def interpret_go_point(s, size):
+    """
+    Convert a raw SGF Go Point, Move, or Stone value to coordinates.
+
+    s    -- 8-bit string
+    size -- board size (int)
+
+    Returns a pair (row, col), or None for a pass.
+
+    Raises ValueError if the string is malformed or the coordinates
+        are out of range.
+
+    Only supports board sizes up to 26.
+
+    The returned coordinates are in the GTP coordinate system
+        (as in the rest of gomill), where (0, 0) is the lower left.
+    """
+    if s == b"" or (s == b"tt" and size <= 19):
+        return None
+    # May propagate ValueError
+    col_s, row_s = s
+    col = _bytestring_ord(col_s) - 97   # 97 == ord("a")
+    row = size - _bytestring_ord(row_s) + 96
+    if not ((0 <= col < size) and (0 <= row < size)):
+        raise ValueError
+    return row, col
+
+
