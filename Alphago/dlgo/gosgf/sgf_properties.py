@@ -561,3 +561,15 @@ class Property_type:
         self.allows_empty_list = bool(allows_empty_list)
 
 
+def _make_property_type(
+        type_name,
+        allows_empty_list=False):
+    
+    return Property_type(
+        globals()["interpret_" + type_name],
+        globals()["serailize_" + type_name],
+        uses_list=(type_name.endswith("_list")),
+        allows_empty_list=allows_empty_list,
+    )
+
+
