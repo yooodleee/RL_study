@@ -50,3 +50,27 @@ def best_result(
     return best_so_far
 
 
+class DepthPrunedAgent(Agent):
+    def __init__(self, max_depth, eval_fn):
+        Agent.__init__(self)
+        self.max_depth = max_depth
+        self.eval_fn = eval_fn
+    
+    def select_move(self, game_state):
+        best_moves = []
+        best_score = None
+        for possible_move in game_state.legal_moves():
+            next_state = game_state.apply_move(possible_move)
+            opponent_best_outcome = best_result(
+                next_state,
+                self.max_depth,
+                self.eval_fn,
+            )
+            our_best_outcome = -1 * opponent_best_outcome
+            if (not best_moves) or our_best_outcome > best_score:
+                best_moves = [possible_move]
+                best_score = our_best_outcome
+            elif our_best_outcome == best_score:
+                best_moves.append(possible_move)
+        
+        return random.choice(best_moves)
