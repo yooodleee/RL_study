@@ -104,3 +104,9 @@ def serailize_go_point(move, size):
     return col_s, row_s
 
 
+class _Context:
+    def __init__(self, size, encoding):
+        self.size = size
+        self.encoding = encoding
+
+
