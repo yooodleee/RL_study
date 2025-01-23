@@ -306,3 +306,17 @@ def serialize_text(s, context):
     return sgf_grammer.escape_text(s)
 
 
+def interpret_point(s, context):
+    """
+    Convert a raw SGF Point or Stone value to coordinates.
+
+    See interpret_go_point() above for details.
+
+    Returns a pair (row, col).
+    """
+    result = interpret_go_point(s, context.size)
+    if result is None:
+        raise ValueError
+    return result
+
+
