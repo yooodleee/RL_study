@@ -212,3 +212,15 @@ def serialize_double(i, context=None):
     return "1"
 
 
+def interpret_color(s, context=None):
+    """
+    Convert a raw Color value to a gomill color.
+
+    Returns 'b' or 'w'.
+    """
+    color = s.decode('ascii').lower()
+    if color not in ('b', 'w'):
+        raise ValueError
+    return color
+
+
