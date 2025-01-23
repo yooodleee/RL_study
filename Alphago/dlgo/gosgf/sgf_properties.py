@@ -573,3 +573,24 @@ def _make_property_type(
     )
 
 
+_property_types_by_name = {
+    'none': _make_property_type('none'),
+    'number': _make_property_type('number'),
+    'real': _make_property_type('real'),
+    'double': _make_property_type('double'),
+    'color': _make_property_type('color'),
+    'simpletext': _make_property_type('simpletext'),
+    'text': _make_property_type('text'),
+    'point': _make_property_type('point'),
+    'move': _make_property_type('move'),
+    'point_list': _make_property_type('point_list'),
+    'point_elist': _make_property_type('point_list', allows_empty_list=True),
+    'stone_list': _make_property_type('point_list'),
+    'AP': _make_property_type('AP'),
+    'ARLN_list': _make_property_type('ARLN_list'),
+    'FG': _make_property_type('FG'),
+    'LB_list': _make_property_type('LB_list'),
+}
+
+
+P = _property_types_by_name
