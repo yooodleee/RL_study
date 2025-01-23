@@ -138,3 +138,12 @@ def interpret_number(s, context=None):
     return int(s, 10)
 
 
+def serialize_number(i, context=None):
+    """
+    Serialize a Number value.
+
+    i -- integer
+    """
+    return ("%d" % i).encode('ascii')
+
+
