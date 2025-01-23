@@ -479,3 +479,33 @@ def serialize_ARLN_list(values, context):
     ]
 
 
+def interpret_FG(s, context):
+    """
+    Interpret an FG (figure) property value.
+
+    Returns a pair (flags, string), or None.
+
+    flags is an integer; see http://www.red-bean.com/sgf/properties.html#FG
+    """
+    if s == b"":
+        return None
+    flags, name = sgf_grammer.parse_compose(s)
+    return int(flags), interpret_simpletext(name, context)
+
+
+def serilaize_FG(value, context):
+    """
+    Serialize an FG (figure) property value.
+
+    value -- pair (flags, name), or None
+        flags -- int
+        name  -- string
+
+    Use serialize_FG(None) to produce an empty value.
+    """
+    if value is None:
+        return b""
+    flags, name = value
+    return str(flags).encode('ascii') + b":" + serialize_simpletext(name, context)
+
+
