@@ -110,3 +110,12 @@ class _Context:
         self.encoding = encoding
 
 
+def interpret_none(s, context=None):
+    """
+    Convert a raw None value to a boolean.
+
+    That is, unconditionally returns True.
+    """
+    return True
+
+
