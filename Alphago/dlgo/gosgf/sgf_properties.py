@@ -355,3 +355,59 @@ def serailize_move(move, context):
     return serailize_go_point(move, context.size)
 
 
+def interpret_point_list(values, context):
+    """
+    Convert a raw SGF list of Points to a set of coordinates.
+
+    values -- list of strings
+
+    Returns a set of pairs (row, col).
+
+    If 'values' is empty, returns an empty set.
+
+    This interprets compressed point lists.
+
+    Doesn't complain if there is overlap, or if a single point is
+        specified as a 1x1 retangle.
+
+    Raises ValueError if the data is otherwise malformed.
+    """
+    result = set()
+    for s in values:
+        # No need to use parse_compose(),
+        # as \: would always be an error.
+        p1, is_retangle, p2 = s.partition(b":")
+        if is_retangle:
+            top, left = interpret_point(p1, context)
+            bottom, right = interpret_point(p2, context)
+            if not (bottom <= top and left <= right):
+                raise ValueError
+            for row in range(bottom, top + 1):
+                for col in range(left, right + 1):
+                    result.add((row, col))
+        else:
+            pt = interpret_point(p1, context)
+            result.add(pt)
+    return result
+
+
+def serialize_point_list(points, context):
+    """
+    Serialize a list of Points, Moves, or Stones.
+
+    points -- iterable of pairs (row, col)
+
+    Returns a list of strings.
+
+    If 'points' is empty, returns an empty list.
+
+    Doesn't produce a compressed point list.
+    """
+    result = [
+        serialize_point(point, context) 
+        for point in points
+    ]
+    result.sort()
+    return result
+
+
