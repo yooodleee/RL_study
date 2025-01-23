@@ -113,3 +113,17 @@ class DenseLayer(Layer):
         print(" |-- dimensions: ({}, {})".format(self.input_dim, self.output_dim))
     
 
+# computes sigmoid on doubles
+def sigmoid_double(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+# computes sigmoid on vectors
+def sigmoid(z):
+    return np.vectorize(sigmoid_double)(z)
+
+# derivative of sigmoid function
+def sigmoid_prime_double(x):
+    return sigmoid_double(x) * (1 - sigmoid_double(x))
+
+def sigmoid_prime(z):
+    return np.vectorize(sigmoid_prime_double)(z)
