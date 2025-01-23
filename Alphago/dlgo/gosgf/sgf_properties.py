@@ -320,3 +320,16 @@ def interpret_point(s, context):
     return result
 
 
+def serialize_point(point, context):
+    """
+    Serialize a Point or Stone value.
+
+    point -- pair (row, col)
+
+    See serialize_go_point() above for details.
+    """
+    if point is None:
+        raise ValueError
+    return serailize_go_point(point, context.size)
+
+
