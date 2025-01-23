@@ -235,3 +235,16 @@ def serialize_color(color, context=None):
     return color.upper().encode('ascii')
 
 
+def _transcode(s, encoding):
+    """
+    Common implementation for interpret_text and interpret_simpletext.
+    """
+    # If encoding is UTF-8, we don't need to transcode, but we 
+    # still want to report an error if it's not properly encoded.
+    u = s.decode(encoding)
+    if encoding == "UTF-8":
+        return s
+    else:
+        return u.encode("utf-8")
+
+
