@@ -39,3 +39,8 @@ class Board:
         return self._grid.get(point)
 
 
+class Move:
+    def __init__(self, point):
+        self.point = point
+    
+
