@@ -63,7 +63,7 @@ class ACAgent(Agent):
             lr=0.1,
             batch_size=128):
         
-        opt = SGD(lr=lr)
+        opt = optimizers.SGD(lr=lr)
         self._model.compile(
             optimizer=opt,
             loss=['categorical_crossentropy', 'mse'],
