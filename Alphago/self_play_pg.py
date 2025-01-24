@@ -26,7 +26,55 @@ def simulate_game(black_player, white_player):
     print(game_result)
     
     return GameRecord(
-        Winner=game_result.winner
+        winner=game_result.winner
     )
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--board-size', type=int, required=True
+    )
+    parser.add_argument(
+        '--learning-agent', required=True
+    )
+    parser.add_argument(
+        '--num-games', '-n', type=int, default=10
+    )
+    parser.add_argument(
+        '--experience-out', required=True
+    )
+
+    args = parser.add_argument()
+    agent_filename = args.learning_agent
+    experience_filename = args.experience_out
+    num_games = args.num_games
+    global BOARD_SIZE
+    BOARD_SIZE = args.board_size
+
+    agent1 = agent.load_policy_agent(h5py.File(agent_filename))
+    agent2 = agent.load_policy_agent(h5py.File(agent_filename))
+    collector1 = rl.ExperienceCollector()
+    collector2 = rl.ExperienceCollector()
+    agent1.set_collector(collector1)
+    agent2.set_collector(collector2)
+
+    for i in range(num_games):
+        collector1.begin_episode()
+        collector2.begin_episode()
+
+        game_record = simulate_game(agent1, agent2)
+        if game_record.winner == Player.black:
+            collector1.complete_episode(reward=1)
+            collector2.complete_episode(reward=-1)
+        else:
+            collector2.complete_episode(reward=1)
+            collector1.complete_episode(reward=-1)
+    
+    experience = rl.combine_experience([collector1, collector2])
+    with h5py.File(experience_filename, 'w') as experience_outf:
+        experience.serialize(experience_outf)
+
+
+if __name__ == '__main__':
+    main()
