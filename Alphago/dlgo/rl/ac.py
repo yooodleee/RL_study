@@ -96,3 +96,16 @@ class ACAgent(Agent):
         )
     
 
+def load_ac_agent(h5file):
+    model = kerasutil.load_model_from_hdf5_group(h5file['model'])
+    encoder_name = h5file['encoder'].attrs['name']
+    if not isinstance(encoder_name, str):
+        encoder_name = encoder_name.decode('ascii')
+    board_width = h5file['encoder'].attrs['board_width']
+    board_height = h5file['encoder'].attrs['board_height']
+    encoder = encoders.get_encoder_by_name(
+        encoder_name,
+        (board_width, board_height),
+    )
+
+    return ACAgent(model, encoder)
