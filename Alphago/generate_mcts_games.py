@@ -38,3 +38,49 @@ def generate_game(
     return np.array(boards), np.array(moves)
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--board-size', '-b', type=int, default=9
+    )
+    parser.add_argument(
+        '--rounds', '-r', type=int, default=1000
+    )
+    parser.add_argument(
+        '--temperature', '-t', type=float, default=0.8
+    )
+    parser.add_argument(
+        '--max-moves', '-m', type=int, default=60, help='max moves per game.'
+    )
+    parser.add_argument(
+        '--num-games', '-n', type=int, default=10
+    )
+    parser.add_argument('--board-out')
+    parser.add_argument('--move-out')
+
+    args = parser.parse_args()
+    xs = []
+    ys = []
+
+    for i in range(args.num_games):
+        print(
+            'Generating game %d%d...' % (i + 1, args.num_game)
+        )
+        x, y = generate_game(
+            args.board_size,
+            args.rounds,
+            args.max_moves, 
+            args.temperature,
+        )
+        xs.append(x)
+        ys.append(y)
+    
+    x = np.concatenate(xs)
+    y = np.concatenate(ys)
+
+    np.save(args.board_out, x)
+    np.save(args.move_out, y)
+
+
+if __name__ == '__main__':
+    main()
