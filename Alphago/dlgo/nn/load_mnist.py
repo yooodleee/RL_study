@@ -9,3 +9,9 @@ def encode_label(j):
     return e
 
 
+def shape_data(data):
+    features = [np.reshape(x, (784, 1)) for x in data[0]]
+    labels = [encode_label(y) for y in data[1]]
+    return list(zip(features, labels))
+
+
