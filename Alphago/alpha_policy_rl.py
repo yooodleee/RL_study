@@ -2,7 +2,7 @@ import h5py
 
 from dlgo.agent.pg import PolicyAgent
 from dlgo.agent.predict import load_prediction_agent
-from dlgo.agent.alphago import AlphaGoEncoder
+from dlgo.encoders.alphago import AlphaGoEncoder
 from dlgo.rl.simulate import experience_simulation
 
 
