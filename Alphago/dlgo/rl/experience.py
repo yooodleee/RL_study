@@ -50,3 +50,24 @@ class ExperienceCollector:
         )
 
 
+class ExperienceBuffer:
+    def __init__(
+            self,
+            states,
+            actions,
+            rewards,
+            advantages):
+        
+        self.states = states
+        self.actions = actions
+        self.rewards = rewards
+        self.advantages = advantages
+    
+    def serialize(self, h5file):
+        h5file.create_group('experience')
+        h5file['experience'].create_dataset('states', data=self.states)
+        h5file['experience'].create_dataset('actions', data=self.actions)
+        h5file['experience'].create_dataset('rewards', data=self.rewards)
+        h5file['experience'].create_dataset('advantages', data=self.advantages)
+    
+
