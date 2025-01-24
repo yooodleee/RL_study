@@ -22,3 +22,11 @@ def print_board(board):
         print('%d   %s' % (row, ' | '.join(pieces)))
 
 
+def point_from_coords(text):
+    col_name = text[0]
+    row = int(text[1])
+    return ttt.Point(
+        row, COL_NAMES.index(col_name) + 1
+    )
+
+
