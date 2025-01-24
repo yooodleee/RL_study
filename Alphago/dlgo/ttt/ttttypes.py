@@ -17,3 +17,6 @@ class Player(enum.Enum):
         return Player.x if self == Player.o else Player.o
 
 
+class Point(namedtuple('Point', 'row col')):
+    def __deepcopy__(self, memodict={}):
+        return self
