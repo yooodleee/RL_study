@@ -30,3 +30,30 @@ def point_from_coords(text):
     )
 
 
+def main():
+    game = ttt.GameState.new_game()
+
+    human_player = ttt.Player.x
+
+    bot = minmax.MinmaxAgent()
+
+    while not game.is_over():
+        print_board(game.board)
+        if game.next_player == human_player:
+            human_move = input('-- ')
+            point = point_from_coords(human_move.strip())
+            move = ttt.Move(point)
+        else:
+            move = bot.select_move(game)
+        game = game.apply_move(move)
+    
+    print_board(game.board)
+    winner = game.winner()
+    if winner is None:
+        print("It's a draw.")
+    else:
+        print('Winner: ', str(winner))
+
+
+if __name__ == '__main__':
+    main()
