@@ -127,4 +127,11 @@ class VPG(BatchPolopt, Serializable):
         # logger.record_tabular('MeanKL', mean_kl)
         # logger.record_tabular('MaxKL', max_kl)
 
-    
+    @overrides
+    def get_itr_snapshot(self, itr, samples_data):
+        return dict(
+            itr=itr,
+            policy=self.policy,
+            baseline=self.baseline,
+            env=self.env,
+        )
