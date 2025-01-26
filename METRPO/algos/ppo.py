@@ -59,4 +59,94 @@ class PPO(BatchPolopt):
         self.optimizer = optimizeer
         super().__init__(**kwargs)
 
+    @overrides
+    def init_opt(self):
+        is_recurrent = int(self.policy.recurrent)
+        obs_var = self.env.observation_space.new_tensor_variable(
+            'obs', extra_dims=1 + is_recurrent
+        )
+        action_var = self.env.action_space.new_tensor_variable(
+            'action', extra_dims=1 + is_recurrent
+        )
+        advantage_var = tensor_utils.new_tensor(
+            'advantage', ndim=1 + is_recurrent, dtype=tf.float32
+        )
+        dist = self.policy.distribution
+
+        old_dist_info_vars = {
+            k: tf.compat.v1.placeholder(
+                tf.float32, shape=(None,) * (1 + is_recurrent) + shape, name='old_%s' % k
+            )
+            for k, shape in dist.dist_info_specs
+        }
+        old_dist_info_vars_list = [old_dist_info_vars[k] for k in dist.dist_info_keys]
+
+        state_info_vars = {
+            k: tf.compat.v1.placeholder(
+                tf.float32, shape=(None,) * (1 + is_recurrent) + shape, name=k
+            )
+            for k, shape in self.policy.state_info_specs
+        }
+        state_info_vars_list = [state_info_vars[k] for k in self.policy.state_info_keys]
+
+        kl_penalty_var = tf.Variable(
+            initial_value=self.initial_kl_penalty,
+            dtype=tf.float32,
+            name="kl_penalty",
+        )
+
+        # TODO: The code below only works for FF policy.
+        assert is_recurrent == 0
+
+        dist_info_vars = self.policy.dist_info_sym(obs_var, state_info_vars)
+
+        lr = dist.likelihood_ratio_sym(action_var, old_dist_info_vars, dist_info_vars)
+        kl = dist.kl_sym(old_dist_info_vars, dist_info_vars)
+        ent = tf.reduce_mean(dist.entropy_sym(dist_info_vars))
+        mean_kl = tf.reduce_mean(kl)
+
+        clipped_lr = tf.clip_by_value(lr, 1. - self.clip_lr, 1. + self.clip_lr)
+
+        surr_loss = -tf.reduce_mean(lr * advantage_var)
+        clipped_surr_loss = -tf.reduce_mean(
+            tf.minimum(lr * advantage_var, clipped_lr * advantage_var)
+        )
+
+        clipped_surr_pen_loss = clipped_surr_loss - self.entropy_bonus_coeff * ent
+        if self.use_kl_penalty:
+            clipped_surr_pen_loss += kl_penalty_var * tf.maximum(0., mean_kl - self.step_size)
+        
+        self.optimizer.update_opt(
+            loss=clipped_surr_pen_loss,
+            target=self.policy,
+            inputs=[obs_var, action_var, advantage_var] + state_info_vars_list + old_dist_info_vars_list,
+            diagnostic_vars=OrderDict([
+                ("UnclippedSurrLoss", surr_loss),
+                ("MeanKL", mean_kl),
+            ])
+        )
+        self.kl_penalty_var = kl_penalty_var
+        self.f_increase_penalty = tensor_utils.compile_function(
+            inputs=[],
+            outputs=tf.compat.v1.assign(
+                kl_penalty_var,
+                tf.minimum(kl_penalty_var * self.increase_penalty_factor, self.max_penalty),
+            )
+        )
+        self.f_decrease_penalty = tensor_utils.compile_function(
+            inputs=[],
+            outputs=tf.compat.v1.assign(
+                kl_penalty_var,
+                tf.maximum(kl_penalty_var * self.decrease_penalty_factor, self.min_penalty),
+            )
+        )
+        self.f_reset_penalty = tensor_utils.compile_function(
+            inputs=[],
+            outputs=tf.compat.v1.assign(
+                kl_penalty_var,
+                self.initial_kl_penalty,
+            )
+        )
+        return dict()
+    
     
