@@ -54,7 +54,7 @@ class PPO(BatchPolopt):
         self.adaptive_learning_rate = adaptive_learning_rate
         self.max_learning_rate = max_learning_rate
         self.min_learning_rate = min_learning_rate
-        if optimizeer is NOne:
+        if optimizeer is None:
             optimizeer = AdamOptimizer()
         self.optimizer = optimizeer
         super().__init__(**kwargs)
