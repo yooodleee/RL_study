@@ -180,4 +180,11 @@ class PPO(BatchPolopt):
         # logger.record_tabular('dLoss', loss_before - loss_after)
         return dict()
     
-    
+    @overrides
+    def get_itr_snapshot(self, itr, samples_data):
+        return dict(
+            itr=itr,
+            policy=self.policy,
+            baseline=self.baseline,
+            env=self.env,
+        )
