@@ -187,3 +187,88 @@ class BatchPolopt(RLAlgoritm):
                     self.optmize_policy(itr, samples_data)
                     logger.log("Saving snapshot...")
                     params = self.get_itr_snapshot(itr, samples_data)   # , **kwargs
+                    if self.store_paths:
+                        params["paths"] = samples_data["paths"]
+                    logger.save_itr_params(itr, params)
+                    logger.log("Saved")
+                    logger.record_tabular('Time', time.time() - start_time)
+                    logger.record_tabular('ItrTime', time.time() - itr_start_time)
+                    if 'horizon' in self.kwargs:
+                        # paths = self.obtain_samples(itr, True)
+                        avg_cost = self.evaluate_fixed_init_trajectories(
+                            self.reset_initial_states,
+                            self.kwargs['horizon'],
+                        )
+                        logger.record_tabular('validation_cost', avg_cost)
+                    logger.dump_tabular(with_prefix=False)
+                    if self.plot:
+                        self.update_plot()
+                        if self.pause_for_plot:
+                            input(
+                                "Plotting evaluation run: Pree Enter to continue..."
+                            )
+        else:
+            with tf.compat.v1.Session() as sess:
+                sess.run(tf.compat.v1.global_variables_initializer())
+                self.start_worker()
+                start_time = time.time()
+                for itr in range(self.start_itr, self.n_itr):
+                    itr_start_time = time.time()
+                    with logger.prefix('itr #%d | ' % itr):
+                        logger.log("Obtaining samples...")
+                        paths = self.obtain_samples(itr)
+                        logger.log("Processing samples...")
+                        samples_data = self.process_samples(itr, paths)
+                        logger.log("Logging diagnotics...")
+                        self.log_diagnotics(paths)
+                        logger.log("Optimizing policy...")
+                        self.optimize_policy(itr, samples_data)
+                        logger.log("Saving sanpshot...")
+                        params = self.get_itr_snapshot(itr, samples_data)   # , **kwargs)
+                        if self.store_paths:
+                            params["paths"] = samples_data["paths"]
+                        logger.save_itr_params(itr, params)
+                        logger.log("Saved")
+                        logger.record_tabular('Time', time.time() - start_time)
+                        logger.record_tabular('ItrTime', time.time() - itr_start_time)
+                        if 'horizon' in self.kwargs:
+                            avg_cost = self.evaluate_fixed_init_trajectories(
+                                self.reset_initial_states,
+                                self.kwargs['horizon'],
+                            )
+                            logger.record_tabular('validation_cost', avg_cost)
+                        logger.dump_tabular(with_prefix=False)
+                        if self.plot:
+                            self.update_pklot()
+                            if self.pause_for_plot:
+                                input(
+                                    "Plotting evaluation run: Press Enter to continue..."
+                                )
+            
+        self.shutdown_worker()
+    
+    def log_diagnostics(self, paths):
+        self.env.log_diagnostics(paths)
+        self.policy.log_diagnostics(paths)
+        self.baseline.log_diagnostics(paths)
+
+    def init_opt(self):
+        """
+        Initialize the optimization procedure. If using tensorflow, this may
+            include declaring all the variables and compiling functions.
+        """
+        raise NotImplementedError
+    
+    def get_itr_snapshot(self, itr, samples_data):
+        """
+        Returns all the data that should be saved in the snapshot
+            for this iteration.
+        """
+        raise NotImplementedError
+    
+    def optimize_policy(self, itr, samples_data):
+        raise NotImplementedError
+    
+    def update_plot(self):
+        if self.plot:
+            plotter.update_plot(self.policy, self.max_path_length)
