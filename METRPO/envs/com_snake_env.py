@@ -79,4 +79,16 @@ class SnakeEnv(MujocoEnv, Serializable):
             logger.record_tabular('MinForwardProgress', np.nan)
             logger.record_tabular('StdForwardProgress', np.nan)
     
+    def cost_np(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert int(x.shape[1] / 2) == idx
+        assert np.amax(np.abs(u)) <= 1.0
+        return -np.mean(
+            x_next[:, idx] - self.ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1)
+        )
+    
     
