@@ -103,4 +103,16 @@ class gameEnv():
 
         return penalize
     
+    def newPosition(self, sparcity):
+        iterables = [range(self.sizeX), range(self.sizeY)]
+        points = []
+        for t in itertools.product(*iterables):
+            points.append(t)
+        for objectA in self.objects:
+            if (objectA.x, objectA.y) in points:
+                points.remove((objectA.x, objectA.y))
+        location = np.random.choice(range(len(points)), replace=False)
+        
+        return points[location]
+    
     
