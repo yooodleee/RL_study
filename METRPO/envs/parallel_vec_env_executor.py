@@ -174,4 +174,8 @@ class ParallelVecEnvExecutor(object):
         dones = np.asarray([True] * self._num_envs)
         return self._run_reset(dones)
     
+    @property
+    def num_envs(self):
+        return self._num_envs
+    
     
