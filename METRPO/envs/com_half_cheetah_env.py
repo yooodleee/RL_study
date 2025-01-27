@@ -28,4 +28,8 @@ class HalfCheetahEnv(MujocoEnv, Serializable):
             self.model.data.qvel.flatten()[2:],
         ])
     
+    def get_body_xmat(self, body_name):
+        idx = self.model.body_names.index(body_name)
+        return self.model.data.xmat[idx].reshape((3, 3))
+    
     
