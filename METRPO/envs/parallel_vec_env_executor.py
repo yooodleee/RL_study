@@ -178,4 +178,8 @@ class ParallelVecEnvExecutor(object):
     def num_envs(self):
         return self._num_envs
     
+    @property
+    def action_space(self):
+        return self._action_space
+    
     
