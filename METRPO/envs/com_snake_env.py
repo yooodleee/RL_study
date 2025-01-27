@@ -37,4 +37,14 @@ class SnakeEnv(MujocoEnv, Serializable):
         super(SnakeEnv, self).__init__(*args, **kwargs)
         Serializable.quick_init(self, locals())
     
+    def get_current_obs(self):
+        qpos = np.squeeze(self.model.data.qpos)
+        qvel = np.squeeze(self.model.data.qvel)
+        return np.concatenate([
+            self.get_body_com("torso")[:2],
+            qpos[2:],
+            self.get_body_comvel("torso")[:2],
+            qvel[2:],
+        ]).reshape(-1)
+    
     
