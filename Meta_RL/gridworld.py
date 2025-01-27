@@ -157,4 +157,16 @@ class gameEnv():
         a_big = scipy.misc.imresize(a, [32, 32, 3], interp='nearest')
         return a, a_big
     
-    
+    def step(self, action):
+        penalty = self.moveChar(action)
+        reward, done = self.checkGoal()
+        state, s_big = self.renderEnv()
+        if reward == None:
+            print (done, reward, penalty)
+            return state, (reward + penalty), done
+        else:
+            goal = None
+            for ob in self.objects:
+                if ob.name == 'goal':
+                    goal = ob
+            return state, s_big, (reward + penalty), done, [self.objects[0].y, self.objects[0].x], [goal.y, goal.x]
