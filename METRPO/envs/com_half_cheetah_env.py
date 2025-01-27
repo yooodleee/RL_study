@@ -32,4 +32,8 @@ class HalfCheetahEnv(MujocoEnv, Serializable):
         idx = self.model.body_names.index(body_name)
         return self.model.data.xmat[idx].reshape((3, 3))
     
+    def get_body_com(self, body_name):
+        idx = self.model.body_names.index(body_name)
+        return self.model.data.com_subtree[idx]
+    
     
