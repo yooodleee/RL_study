@@ -37,3 +37,37 @@ class WrappedCls(object):
         )
 
 
+class TfEnv(ProxyEnv):
+    
+    @cached_property
+    def observation_space(self):
+        return to_tf_space(self.wrapped_env.observation_space)
+    
+    @cached_property
+    def action_space(self):
+        return to_tf_space(self.wrapped_env.action_space)
+    
+    @cached_property
+    def spec(self):
+        return EnvSpec(
+            observation_space=self.observation_space,
+            action_space=self.action_space,
+        )
+    
+    @property
+    def vectorized(self):
+        return getattr(self.wrapped_env, "vectorized", False)
+    
+    def vec_env_executor(self, n_envs, max_path_length):
+        return VecTfEnv(
+            self.wrapped_env.vec_env_executor(
+                n_envs=n_envs, max_path_length=max_path_length
+            )
+        )
+    
+    @classmethod
+    def wrap(cls, env_cls, **extra_kwargs):
+        # Use a class wrapper rather than a lambda method for smoother serailization
+        return WrappedCls(cls, env_cls, extra_kwargs)
+
+
