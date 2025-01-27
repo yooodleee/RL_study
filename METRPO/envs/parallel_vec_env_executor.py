@@ -149,4 +149,25 @@ class ParallelVecEnvExecutor(object):
                 self.ts[i] = 0
         return obs, rewards, dones, tensor_utils.stack_tensor_dict_list(list(env_infos))
     
+    def _run_reset(self, dones):
+        dones = np.asarray(dones)
+        results = singleton_pool.run_each(
+            worker_run_reset,
+            [(dones, self.scope) for _ in self._alloc_env_ids],
+        )
+        ids, flat_obs = list(map(np.concatenate, list(zip(*results))))
+        zipped = list(zip(ids, flat_obs))
+        sorted_obs = np.asarray([x[1] for x in sorted(zipped, key=lambda x: x[0])])
+
+        done_ids = np.where(dones)
+        done_flat_obs = sorted_obs[done_ids]
+        done_unflat_obs = self._observation_space.unflatten_n(done_flat_obs)
+        all_obs = [None] * self._num_envs
+        done_cursor = 0
+        for idx, done in enumerate(dones):
+            if done:
+                all_obs[idx] = done_unflat_obs[done_cursor]
+                done_cursor += 1
+        return all_obs
+    
     
