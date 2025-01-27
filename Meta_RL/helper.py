@@ -83,3 +83,31 @@ def set_image_bandit(values, probs, selection, trail):
     return bandit_image
 
 
+def set_image_context(
+        correct,
+        observation,
+        values,
+        selection, 
+        trial):
+    
+    obs = observation * 255.0
+    obs_a = obs[:, 0: 1, :]
+    obs_b = obs[:, 1: 2, :]
+    cor = correct * 255.0
+    obs_a = scipy.misc.imresize(obs_a, [100, 100], interp='nearest')
+    obs_b = scipy.misc.imresize(obs_b, [100, 100], interp='nearest')
+    cor = scipy.misc.imresize(cor, [100, 100], interp='nearest')
+    bandit_image = Image.open('./resources/c_bandit.png')
+    draw = ImageDraw.Draw(bandit_image)
+    font = ImageFont.truetype("./resources.FreeSans.ttf", 24)
+    draw.text((50, 360), 'Trail: ' + str(trial), (0, 0, 0), font=font)
+    draw.text((50, 330), 'Reward: ' + str(values), (0, 0, 0), font=font)
+    bandit_image = np.array(bandit_image)
+    bandit_image[120: 220, 0: 100, :] = obs_a
+    bandit_image[120: 220, 100: 200, :] = obs_b
+    bandit_image[0: 100, 50: 150, :] = cor
+    bandit_image[291: 297, 10 + (selection * 95): 10 + (selection * 95) + 80, :] = [80.0, 80.0, 225.0]
+
+    return bandit_image
+
+
