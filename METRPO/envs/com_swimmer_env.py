@@ -38,3 +38,25 @@ def get_original_representation(states):
     return out
 
 
+class SwimmerEnv(MujocoEnv, Serializable):
+
+    FILE = 'swimmer.xml'
+    ORI_IND = 2
+
+    @autoargs.arg(
+        'ctrl_cost_coeff',
+        type=float,
+        help='cost coefficient for controls',
+    )
+
+    def __init__(
+            self,
+            ctrl_cost_coeff=1e-2,
+            *args,
+            **kwargs):
+        
+        self.ctrl_cost_coeff = ctrl_cost_coeff
+        super(SwimmerEnv, self).__init__(*args, **kwargs)
+        Serializable.quick_init(self, locals())
+    
+    
