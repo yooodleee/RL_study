@@ -135,4 +135,26 @@ class gameEnv():
         if ended == False:
             return 0.0, False
     
+    def renderEnv(self):
+        if self.partial == True:
+            padding = 2
+            a = np.ones(
+                [self.sizeY + (padding * 2), self.sizeX + (padding * 2), 3]
+            )
+            a[padding: -padding, padding: -padding, :] = 0
+            a[padding: -padding, padding: -padding, :] += np.dstack([self.bg, self.bg, self.bg])
+        else:
+            a = np.zeros([self.sizeY, self.sizeX, 3])
+            padding = 0
+            a += np.dstack([self.bg, self.bg, self.bg])
+        hero = self.objects[0]
+        for item in self.objects:
+            a[item.y + padding: item.y + item.size + padding, item.x + padding: item.x + item.size + padding, :] = item.color
+            # if item.name == 'hero':
+            #     hero = item
+        if self.partial == True:
+            a = a[(hero.y): (hero.y + (padding * 2) + hero.size), (hero.x): (hero.x + (padding * 2) + hero.size), :]
+        a_big = scipy.misc.imresize(a, [32, 32, 3], interp='nearest')
+        return a, a_big
+    
     
