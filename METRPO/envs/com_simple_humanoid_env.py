@@ -103,4 +103,13 @@ class SimpleHumanoidEnv(MujocoEnv, Serializable):
         logger.record_tabular('MinForwardProgress', np.min(progs))
         logger.record_tabular('StdForwardProgress', np.std(progs))
     
+    def cost_np(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        return np.mean(self.cost_np_vec(x, u, x_next))
+    
     
