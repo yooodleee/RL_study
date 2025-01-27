@@ -113,4 +113,40 @@ class ParallelVecEnvExecutor(object):
         self.ts = np.zeros(n, dtype='int')
         self.max_path_length = max_path_length
     
+    def step(self, action_n):
+        results = singleton_pool.run_each(
+            worker_run_step,
+            [(action_n, self.scope) for _ in self._alloc_env_ids],
+        )
+        results = [x for x in results if x is not None]
+        ids, obs, rewards, dones, env_infos = list(zip(*results))
+        ids = np.concatenate(ids)
+        obs = self._observation_space.unflatten_n(np.concatenate(obs))
+        rewards = np.concatenate(rewards)
+        dones = np.concatenate(dones)
+        env_infos = tensor_utils.split_tensor_dict_list(
+            tensor_utils.concat_tensor_dict_list(env_infos)
+        )
+        if env_infos is None:
+            env_infos = [dict() for _ in range(self._num_envs)]
+        
+        items = list(zip(ids, obs, rewards, dones, env_infos))
+        items = sorted(items, key=lambda x: x[0])
+
+        ids, obs, rewards, dones, env_infos = list(zip(*items))
+
+        obs = list(obs)
+        rewards = np.asarray(rewards)
+        dones = np.asarray(dones)
+
+        self.ts += 1
+        dones[self.ts >= self.max_path_length] = True
+
+        reset_obs = self._run_reset(dones)
+        for (i, done) in enumerate(dones):
+            if done:
+                obs[i] = reset_obs[i]
+                self.ts[i] = 0
+        return obs, rewards, dones, tensor_utils.stack_tensor_dict_list(list(env_infos))
+    
     
