@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import scipy.misc
 import os
 import csv
+import math
 import itertools
 import tensorflow
 import keras    # tesorflow.contrib.slim
@@ -59,5 +60,26 @@ def make_gif(images, fname, duration=2, true_image=False):
     
     clip = mpy.VideoClip(make_frame, duration=duration)
     clip.write_gif(fname, fps=len(images) / duration, verbose=False)
+
+
+def set_image_bandit(values, probs, selection, trail):
+    bandit_image = Image.open('./resources/bandit/png')
+    draw = ImageDraw.Draw(bandit_image)
+    font = ImageFont.truetype("./resources/FreeSans/ttf", 24)
+    draw.text(
+        (40, 10), str(float("{0:.2f}".format(probs[0]))), (0, 0, 0), font=font
+    )
+    draw.text(
+        (130, 30), str(float("{0:.2f}".format(probs[1]))), (0, 0, 0), font=font
+    )
+    draw.text(
+        (60, 370), 'Trial: ' + str(trail), (0, 0, 0), font=font
+    )
+    bandit_image = np.array(bandit_image)
+    bandit_image[115: 115 + math.floor(values[0] * 2.5), 20: 75, :] = [0, 255.0, 0]
+    bandit_image[115: 115 + math.floor(values[1] * 2.5), 120: 175, :] = [0, 255.0, 0]
+    bandit_image[101: 107, 10 + (selection * 95): 10 + (selection * 95) + 80, :] = [80.0, 80.0, 255.0]
+
+    return bandit_image
 
 
