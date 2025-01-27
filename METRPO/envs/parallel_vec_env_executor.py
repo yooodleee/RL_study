@@ -170,4 +170,8 @@ class ParallelVecEnvExecutor(object):
                 done_cursor += 1
         return all_obs
     
+    def reset(self):
+        dones = np.asarray([True] * self._num_envs)
+        return self._run_reset(dones)
+    
     
