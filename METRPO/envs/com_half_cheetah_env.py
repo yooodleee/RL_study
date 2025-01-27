@@ -74,4 +74,17 @@ class HalfCheetahEnv(MujocoEnv, Serializable):
             )
         )
     
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next):
+        
+        # return -tf.reduce_mean(x_next[:, 9] - self.ctrl_cost * 0.5 * tf.reduce_sum(tf.square(u), axis=1))
+        return -tf.reduce_mean(
+            tf.clip_by_value(
+                x_next[:, 9] - self.ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1), -10, 10
+            )
+        )
+    
     
