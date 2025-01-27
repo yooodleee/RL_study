@@ -12,3 +12,7 @@ def get_xy_coordinate(theta):
     return np.array([np.cos(theta), np.sin(theta)])
 
 
+def get_dxy_by_dt(theta, theta_dot):
+    return np.array([-np.sin(theta) * theta_dot, np.cos(theta) ( theta_dot)])
+
+
