@@ -23,3 +23,20 @@ class gameOb():
         self.name = name
 
 
+class gameEnv():
+    def __init__(
+            self,
+            partial,
+            size,
+            goal_color):
+        
+        self.sizeX = size
+        self.sizeY = size
+        self.actions = 4
+        self.objects = []
+        self.partial = partial
+        self.bg = np.zeros([size, size])
+        a, a_big = self.reset(goal_color)
+        plt.imshow(a_big, interpolation="nearest")
+    
+    
