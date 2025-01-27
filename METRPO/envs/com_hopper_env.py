@@ -44,4 +44,18 @@ class HooperEnv(MujocoEnv, Serializable):
         super(HooperEnv, self).__init__(*args, **kwargs)
         Serializable.quick_init(self, locals())
     
+    # Consist of 11 dimensions
+    # 0: z - com
+    # 1: forward pitch along y-axis
+    # 5: x-comvel
+    # 6: z-comvel
+    @overrides
+    def get_current_obs(self):
+        return np.concatenate([
+            self.get_body_com("torst")[2].flat,
+            self.model.data.qpos[2:].flat,
+            self.get_body_comvel("torso")[[0, 2]].flat,
+            self.model.data.qvel[2:].flat,
+        ])
+    
     
