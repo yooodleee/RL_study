@@ -61,4 +61,10 @@ class SimpleHumanoidEnv(MujocoEnv, Serializable):
             head_ops,
         ])
     
+    def _get_com(self):
+        data = self.model.data
+        mass = self.model.body_mass
+        xpos = data.xipos
+        return (np.sum(mass * xpos, 0) / np.sum(mass))[0]
+    
     
