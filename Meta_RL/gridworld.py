@@ -60,4 +60,47 @@ class gameEnv():
 
         return state, s_big
     
+    def moveChar(self, action):
+        # 0 - up, 1 - down, 2 - left, 3 - right, 4 - 90 counter-clockwise, 5 - 90 clockwise
+        hero = self.objects[0]
+        blockPositions = [[-1, -1]]
+        for ob in self.objects:
+            if ob.name == 'block': blockPositions.append([ob.x, ob.y])
+        blockPositions = np.array(blockPositions)
+        heroX = hero.x
+        heroY = hero.y
+        penalize = 0
+        if action < 4:
+            if self.orientation == 0:
+                direction = action
+            if self.orientation == 1:
+                if action == 0: direction = 1
+                elif action == 1: direction = 0
+                elif action == 2: direction = 3
+                elif action == 3: direction = 2
+            if self.orientation == 2:
+                if action == 0: direction = 3
+                elif action == 1: direction = 2
+                elif action == 2: direction = 0
+                elif action == 3: direction = 1
+            if self.orientation == 3:
+                if action == 0: direction = 2
+                elif action == 1: direction = 3
+                elif action == 2: direction = 1
+                elif action == 3: direction = 0
+            
+            if direction == 0 and hero.y >= 1 and [hero.x, hero.y - 1] not in blockPositions.tolist():
+                hero.y -= 1
+            if direction == 1 and hero.y <= self.sizeY-2 and [hero.x, hero.y + 1] not in blockPositions.tolist():
+                hero.y += 1
+            if direction == 2 and hero.x >= 1 and [hero.x - 1, hero.y] not in blockPositions.tolist():
+                hero.x -= 1
+            if direction == 3 and hero.x <= self.sizeX-2 and [hero.x + 1, hero.y] not in blockPositions.tolist():
+                hero.x += 1
+        if hero.x == heroX and hero.y == heroY:
+            penalize = 0.0
+        self.objects[0] = hero
+
+        return penalize
+    
     
