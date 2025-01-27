@@ -67,4 +67,29 @@ class SimpleHumanoidEnv(MujocoEnv, Serializable):
         xpos = data.xipos
         return (np.sum(mass * xpos, 0) / np.sum(mass))[0]
     
+    def step(self, action):
+        self.forward_dynamics(action)
+
+        next_obs = self.get_current_obs()
+
+        alive_bonus = self.alive_bonus
+        data = self.model.data
+
+        # comvel = self.get_body_comvel("torso")
+        idx = self.model.geom_names.index("head")
+        head_h = self.model.data.geom_xpos[idx][-1]
+
+        # lin_vel_reward = comvel[0]
+        lb, ub = self.action_bounds
+        scaling = (ub - lb) * 0.5
+        ctrl_cost = 1e-2 * self.ctrl_cost_coeff * np.sum(np.square(action / scaling))
+        # impact_cst = .5 * self.impact_cost_coeff * np.sum(np.square(np.clip(data.cfrc_ext, -1, 1)))
+        # vel_deviation_cost = 0.5 * self.vel_deviation_cost_coeff * np.sum(np.square(comvel[1:]))
+        # reward = lin_vel_reward + alive_bonus - ctrl_cost - impact_cost - vel_deviation_cost
+        # done = data.qpos[2] < 0.8 or data.qpos[2] > 2.0
+        reward = -(head_h - 1.5) ** 2 - ctrl_cost
+        done = False
+
+        return Step(next_obs, reward, done)
+    
     
