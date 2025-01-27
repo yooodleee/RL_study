@@ -50,4 +50,16 @@ class SnakeEnv(MujocoEnv, Serializable):
     def get_ori(self):
         return self.model.data.qpos[self.__class__.ORI_IND]
     
+    def step(self, action):
+        self.forward_dynamics(action)
+        next_obs = self.get_current_obs()
+        lb, ub = self.action_bounds
+        scaling = (ub - lb) * 0.5
+        ctrl_cost = 0.5 * self.ctrl_cost_coeff * np.sum(np.square(action / scaling))
+        forward_reward = self.get_body_comvel("torso")[0]
+        reward = forward_reward - ctrl_cost
+        done = False
+
+        return Step(next_obs, reward, done)
+    
     
