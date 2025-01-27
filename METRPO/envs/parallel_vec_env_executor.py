@@ -186,4 +186,5 @@ class ParallelVecEnvExecutor(object):
     def observation_space(self):
         return self._observation_space
     
-    
+    def terminate(self):
+        pass
