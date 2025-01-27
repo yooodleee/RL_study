@@ -39,4 +39,7 @@ class gameEnv():
         a, a_big = self.reset(goal_color)
         plt.imshow(a_big, interpolation="nearest")
     
+    def getFeatures(self):
+        return np.array([self.objects[0].x, self.objects[0].y]) / float(self.sizeX)
+    
     
