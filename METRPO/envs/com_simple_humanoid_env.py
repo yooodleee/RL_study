@@ -121,4 +121,13 @@ class SimpleHumanoidEnv(MujocoEnv, Serializable):
         ctrl_cost = 1e-2 * self.ctrl_cost_coeff * tf.reduce_sum(np.square(u), axis=1)
         return tf.reduce_mean((x_next[:, -1] - 1.5) ** 2 + ctrl_cost)
     
-    
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        head_h = x_next[:, -1]
+        ctrl_cost = 1e-2 * self.ctrl_cost_coeff * np.sum(np.square(u), axis=1)
+        return (head_h - 1.5) ** 2 + ctrl_cost
