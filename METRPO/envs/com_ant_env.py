@@ -50,4 +50,86 @@ class AntEnv(MujocoEnv, Serializable):
 
         return Step(ob, float(reward), done)
     
+    @overrides
+    def get_ori(self):
+        ori = [0, 1, 0, 0]
+        rot = self.model.data.qpos[self.__class__.ORI_IND: self.__class__.ORI_IND + 4]  # take the quaternion
+        ori = q_mult(q_mult(rot, ori), q_inv(rot))[1: 3]    # project onto x-y plane
+        ori = math.atan2(ori[1], ori[0])
+
+        return ori
     
+    @overrides
+    def log_diagnostics(self, paths):
+        progs = [
+            path["observation"][-1][-3] - path["observation"][0][-3]
+            for path in paths
+        ]
+        logger.record_tabular('AverageForwardProgress', np.mean(progs))
+        logger.record_tabular('MaxForwardProgress', np.max(progs))
+        logger.record_tabular('MinForwardProgress', np.min(progs))
+        logger.record_tabular('StdForwardProgress', np.std(progs))
+    
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next,
+            dones):
+        
+        vel = x_next[:, 15]
+        return -tf.reduce_mean(
+            (
+                vel 
+                - 1e-2 
+                * 0.5 
+                * tf.reduce_mean(tf.square(u), axis=1)
+                + 0.05  
+            ) * (1 - dones)
+        )
+    
+    def cost_np_vec(self, x, u, x_next):
+        vel = x_next[:, 15]
+        assert np.amax(np.abs(u)) <= 1.0
+        return -(
+            vel
+            - 1e-2
+            * 0.5
+            * np.sum(np.square(u), axis=1)
+            + 0.05
+        )
+    
+    def cost_np(self, x, u, x_next):
+        return np.mean(self.cost_np_vec(x, u, x_next))
+    
+    def is_done(self, x, x_next):
+        """
+        params
+            x: vector of obs
+            x_next: vector of next obs
+
+        returns
+            boolean array
+        """
+        notdone = np.logical_and(
+            np.logical_and(
+                x_next[:, 2] >= 0.2,
+                x_next[:, 2] <= 1.0,
+            ),
+            np.amin(np.isfinite(x_next), axis=1)
+        )
+        return np.invert(notdone)
+    
+    def is_done_tf(self, x, x_next):
+        """
+        return
+            float array 1.0 = True, 0.0 = False
+        """
+        notdone = tf.logical_and(
+            tf.logical_and(
+                x_next[:, 2] >= 0.2,
+                x_next[:, 2] <= 1.0,
+            ),
+            tf.reduce_all(np.isfinite(x_next), axis=1)
+        )
+        return tf.cast(tf.logical_not(notdone), tf.float32)
