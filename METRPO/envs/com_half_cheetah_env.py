@@ -20,4 +20,12 @@ class HalfCheetahEnv(MujocoEnv, Serializable):
         Serializable.__init__(self, *args, **kwargs)
         self.ctrl_cost_coeff = 1e-1
     
+    def get_current_obs(self):
+        return np.concatenate([
+            self.get_body_com("torso")[[0, 2]],
+            self.model.data.qpos.flatten()[2:],
+            self.get_body_comvel("torso")[[0, 2]],
+            self.model.data.qvel.flatten()[2:],
+        ])
+    
     
