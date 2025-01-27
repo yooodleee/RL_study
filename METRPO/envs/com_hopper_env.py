@@ -58,4 +58,28 @@ class HooperEnv(MujocoEnv, Serializable):
             self.model.data.qvel[2:].flat,
         ])
     
+    @overrides
+    def step(self, action):
+        self.forward_dynamics(action)
+        next_obs = self.get_current_obs()
+        lb, ub = self.action_bounds
+        scaling = (ub - lb) * 0.5
+        vel = next_obs[5]
+        height = next_obs[0]
+        ang = next_obs[1]
+        reward = vel \
+                - 0.5 \
+                * self.ctrl_cost_coeff \
+                * np.sum(np.square(action / scaling)) \
+                - np.sum(np.maximum(np.abs(next_obs[2:]) - 100, 0)) \
+                - 10 * np.maximum(0.45 - height, 0) \
+                - 10 * np.maximum(abs(ang) - .2, 0)
+        
+        # notdone = np.isfinite(state).all() and \
+        #           (np.abs(state[3:]) < 100).all() and (state[0] > .7) and \
+        #           (abs(state[2]) < .2)
+        # done = not notdone
+        done = False
+        return Step(next_obs, reward, done)
+    
     
