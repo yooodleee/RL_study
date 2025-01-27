@@ -126,4 +126,14 @@ class SwimmerEnv(MujocoEnv, Serializable):
             x_next[:, 5] - self.ctrl_cost_coeff * np.mean(np.square(u), axis=1)
         )
     
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next):
+        
+        return -tf.reduce_mean(
+            x_next[:, 5] - self.ctrl_cost_coeff * tf.reduce_mean(tf.square(u), axis=1)
+        )
+    
     
