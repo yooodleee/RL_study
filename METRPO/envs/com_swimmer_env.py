@@ -74,4 +74,7 @@ class SwimmerEnv(MujocoEnv, Serializable):
             qvel[2:5],
         ]).reshape(-1)
     
+    def get_ori(self):
+        return self.model.data.qpos[self.__class__.ORI_IND]
+    
     
