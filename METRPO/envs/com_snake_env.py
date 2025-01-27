@@ -101,4 +101,12 @@ class SnakeEnv(MujocoEnv, Serializable):
             x_next[:, idx] - self.ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1)
         )
     
-    
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert int(x.shape[1] / 2) == idx
+        assert np.amax(np.abs(u)) <= 1.0
+        return -(x_next[:, idx] - self.ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1))
