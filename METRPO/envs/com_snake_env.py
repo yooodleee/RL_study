@@ -91,4 +91,14 @@ class SnakeEnv(MujocoEnv, Serializable):
             x_next[:, idx] - self.ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1)
         )
     
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next):
+        
+        return -tf.reduce_mean(
+            x_next[:, idx] - self.ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1)
+        )
+    
     
