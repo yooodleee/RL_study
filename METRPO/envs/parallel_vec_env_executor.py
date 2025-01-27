@@ -78,3 +78,39 @@ def worker_collect_env_time(G):
     return G.env_time
 
 
+class ParallelVecEnvExecutor(object):
+
+    def __init__(
+            self,
+            env,
+            n,
+            max_path_length,
+            scope=None):
+        
+        if scope is None:
+            # initialize random scope
+            scope = str(uuid.uuid4())
+        
+        envs_per_worker = int(np.ceil(n * 1.0 / singleton_pool.n_parallel))
+        alloc_env_ids = []
+        rest_alloc = n
+        start_id = 0
+        for _ in range(singleton_pool.n_parallel):
+            n_allocs = min(envs_per_worker, rest_alloc)
+            alloc_env_ids.append(list(range(start_id, start_id + n_allocs)))
+            start_id += n_allocs
+            rest_alloc = max(0, rest_alloc - envs_per_worker)
+        
+        singleton_pool.run_each(
+            worker_init_envs, [(alloc, scope, env) for alloc in alloc_env_ids]
+        )
+
+        self._alloc_env_ids = alloc_env_ids
+        self._action_space = env.action_space
+        self._observation_space = env.observation_space
+        self._num_envs = n
+        self.scope = scope
+        self.ts = np.zeros(n, dtype='int')
+        self.max_path_length = max_path_length
+    
+    
