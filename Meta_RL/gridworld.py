@@ -42,4 +42,22 @@ class gameEnv():
     def getFeatures(self):
         return np.array([self.objects[0].x, self.objects[0].y]) / float(self.sizeX)
     
+    def reset(self, goal_color):
+        self.objects = []
+        self.goal_color = goal_color
+        self.other_color = [1 - a for a in self.goal_color]
+        self.orientation = 0
+        self.hero = gameOb(self.newPosition(0), 1, [0, 0, 1], None, 'hero')
+        self.objects.append(self.hero)
+        for i in range(self.sizeX - 1):
+            bug = gameOb(self.newPosition(0), 1, self.goal_color, 1, 'goal')
+            self.objects.append(bug)
+        for i in range(self.sizeX - 1):
+            hole = gameOb(self.newPosition(0), 1, self.other_color, 0, 'fire')
+            self.objects.append(hole)
+        state, s_big = self.renderEnv()
+        self.state = state
+
+        return state, s_big
+    
     
