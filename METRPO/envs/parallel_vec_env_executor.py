@@ -74,3 +74,7 @@ def worker_run_step(G, action_n, scope):
     return ids, obs, rewards, dones, env_infos
 
 
+def worker_collect_env_time(G):
+    return G.env_time
+
+
