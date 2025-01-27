@@ -36,4 +36,17 @@ class HalfCheetahEnv(MujocoEnv, Serializable):
         idx = self.model.body_names.index(body_name)
         return self.model.data.com_subtree[idx]
     
+    def step(self, action):
+        self.forward_dynamics(action)
+        next_obs = self.get_current_obs()
+        action = np.clip(action, *self.action_bounds)
+        ctrl_cost = self.ctrl_cost_coeff * 0.5 * np.sum(np.square(action))
+        run_cost = -1 * self.get_body_comvel("torso")[0]
+        cost = ctrl_cost + run_cost
+        reward = -cost
+        reward = np.clip(reward, -10, 10)
+        done = False
+        
+        return Step(next_obs, reward, done)
+    
     
