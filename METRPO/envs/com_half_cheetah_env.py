@@ -87,4 +87,14 @@ class HalfCheetahEnv(MujocoEnv, Serializable):
             )
         )
     
-    
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        # return -(x_next[:, 9] - self.ctrl_cost_coeff * 0.5 * np.sum(np.squre(u), axis=1))
+        return -np.clip(
+            x_next[:, 9] - self.ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1), -10, 10
+        )
