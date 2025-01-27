@@ -40,3 +40,24 @@ def normalized_columns_initializer(std=1.0):
         out *= std / np.sqrt(np.square(out).sum(axis=0, keepdims=True))
         return tf.constant(out)
     return _initializer
+
+
+# This code allows gifs to be saved of the training episode for use in the Control Center.
+def make_gif(images, fname, duration=2, true_image=False):
+    import moviepy as mpy   # moviepy.editor
+
+    def make_frame(t):
+        try:
+            x = images[int(len(images) / duration * t)]
+        except:
+            x = images[-1]
+        
+        if true_image:
+            return x.astype(np.uint8)
+        else:
+            return ((x + 1) / 2 * 255).astype(np.uint8)
+    
+    clip = mpy.VideoClip(make_frame, duration=duration)
+    clip.write_gif(fname, fps=len(images) / duration, verbose=False)
+
+
