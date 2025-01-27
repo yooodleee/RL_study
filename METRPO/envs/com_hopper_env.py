@@ -128,4 +128,10 @@ class HooperEnv(MujocoEnv, Serializable):
             - np.sum(np.maximum(np.abs(x_next[:, 2:]) - 100, 0), axis=1)
         )
     
-    
+    def cost_np(
+            self,
+            x,
+            u,
+            x_next):
+        
+        return np.mean(self.cost_np_vec(x, u, x_next))
