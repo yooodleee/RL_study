@@ -136,4 +136,11 @@ class SwimmerEnv(MujocoEnv, Serializable):
             x_next[:, 5] - self.ctrl_cost_coeff * tf.reduce_mean(tf.square(u), axis=1)
         )
     
-    
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        return -(x_next[:, 5] - self.ctrl_cost_coeff * np.mean(np.square(u), axis=1))
