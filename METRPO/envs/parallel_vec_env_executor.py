@@ -182,4 +182,8 @@ class ParallelVecEnvExecutor(object):
     def action_space(self):
         return self._action_space
     
+    @property
+    def observation_space(self):
+        return self._observation_space
+    
     
