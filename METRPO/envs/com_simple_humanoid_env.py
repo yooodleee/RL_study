@@ -49,4 +49,16 @@ class SimpleHumanoidEnv(MujocoEnv, Serializable):
         super(SimpleHumanoidEnv, self).__init__(*args, **kwargs)
         Serializable.quick_init(self, locals())
     
+    def get_current_obs(self):
+        data = self.model.data
+        idx = self.model.geom_names.index("head")
+        head_ops = self.data.geom_xpos[idx]
+        return np.concatenate([
+            data.qpos.flat[3:],
+            data.qvel.flat,
+            # np.clip(data.cfrc_ext, -1, 1).flat,
+            # self.get_body_com("torso").flat,
+            head_ops,
+        ])
+    
     
