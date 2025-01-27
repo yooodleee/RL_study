@@ -115,4 +115,15 @@ class SwimmerEnv(MujocoEnv, Serializable):
             logger.record_tabular('MinForwardProgress', np.nan)
             logger.record_tabular('StdForwardProgress', np.nan)
     
+    def cost_np(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        return -np.mean(
+            x_next[:, 5] - self.ctrl_cost_coeff * np.mean(np.square(u), axis=1)
+        )
+    
     
