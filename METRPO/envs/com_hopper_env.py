@@ -93,4 +93,21 @@ class HooperEnv(MujocoEnv, Serializable):
         logger.record_tabular('MinForwardprogress', np.min(progs))
         logger.record_tabular('StdForwardProgress', np.std(progs))
     
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next):
+        
+        vel = x_next[:, 5]
+        height = x_next[:, 0]
+        ang = x_next[:, 1]
+        return -tf.reduce_mean(
+            vel
+            - self.ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1)
+            - 10 * tf.maximum(0.45 - height, 0)
+            - 10 * tf.maximum(tf.abs(ang) - .2, 0)
+            - tf.reduce_sum(tf.maximum(tf.abs(x_next[:, 2:]) - 100, 0), axis=1)
+        )
+    
     
