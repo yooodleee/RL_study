@@ -110,4 +110,22 @@ class HooperEnv(MujocoEnv, Serializable):
             - tf.reduce_sum(tf.maximum(tf.abs(x_next[:, 2:]) - 100, 0), axis=1)
         )
     
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next):
+        
+        vel = x_next[:, 5]
+        height = x_next[:, 0]
+        ang = x_next[:, 1]
+        assert np.amax(np.abs(u)) <= 1.0
+        return -(
+            vel
+            - self.ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1)
+            - 10 * np.maximum(0.45 - height, 0)
+            - 10 * np.maximum(np.abs(ang) - .2, 0)
+            - np.sum(np.maximum(np.abs(x_next[:, 2:]) - 100, 0), axis=1)
+        )
+    
     
