@@ -59,4 +59,9 @@ class SwimmerEnv(MujocoEnv, Serializable):
         super(SwimmerEnv, self).__init__(*args, **kwargs)
         Serializable.quick_init(self, locals())
     
+    def get_original_states(self):
+        qpos = np.squeeze(self.model.data.qpos)
+        qvel = np.squeeze(self.model.data.qvel)
+        return np.concatenate([qpos, qvel])
+    
     
