@@ -20,3 +20,20 @@ def to_tf_space(space):
         raise NotImplementedError
 
 
+class WrappedCls(object):
+    def __init__(
+            self,
+            cls,
+            env_cls,
+            extra_kwargs):
+        
+        self.cls = cls
+        self.env_cls = env_cls
+        self.extra_kwargs = extra_kwargs
+    
+    def __call__(self, *args, **kwargs):
+        return self.cls(
+            self.env_cls(*args, **dict(self.extra_kwargs, **kwargs))
+        )
+
+
