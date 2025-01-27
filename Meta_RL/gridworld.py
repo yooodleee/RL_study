@@ -115,4 +115,24 @@ class gameEnv():
         
         return points[location]
     
+    def checkGoal(self):
+        hero = self.objects[0]
+        others = self.objects[1:]
+        ended = False
+        for other in others:
+            if hero.x == other.x and hero.y == other.y and hero != other:
+                self.objects.remove(other)
+                if other.reward == 1:
+                    self.objects.append(
+                        gameOb(self.newPosition(0), 1, self.goal_color, 1, 'goal')
+                    )
+                    return other.reward, False
+                else:
+                    self.objects.append(
+                        gameOb(self.newPosition(0), 1, self.other_color, 0, 'fire')
+                    )
+                    return other.reward, False
+        if ended == False:
+            return 0.0, False
+    
     
