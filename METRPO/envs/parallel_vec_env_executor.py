@@ -53,3 +53,24 @@ def worker_run_reset(G, flags, scope):
     return ids, ret_arr
 
 
+def worker_run_step(G, action_n, scope):
+    assert hasattr(G, 'parallel_vec_envs')
+    assert scope in G.parallel_vec_envs
+    env_template = G.parallel_vec_env_template[scope]
+    ids = []
+    step_results = []
+    for (idx, env) in G.parallel_vec_envs[scope]:
+        action = action_n[idx]
+        ids.append(idx)
+        step_results.append(tuple(env.step(action)))
+    if len(step_results) == 0:
+        return None
+    obs, rewards, dones, env_infos = list(map(list, list(zip(*step_results))))
+    obs = env_template.observation_space.flatten_n(obs)
+    rewards = np.array(rewards)
+    dones = np.array(dones)
+    env_infos = tensor_utils.stack_tensor_dict_list(env_infos)
+
+    return ids, obs, rewards, dones, env_infos
+
+
