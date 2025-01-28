@@ -90,4 +90,22 @@ class OfficeWorld:
                         print(" ", end="")
                 print()
     
+    def get_model(self):
+        """
+        returns a model of the environment.
+        Compute optimal policies using value iteration.
+        The optimal policies are used to set the average reward per step
+            of each task to 1.
+        """
+        S = [(x, y) for x in range(12) for y in range(9)]   # States
+        A = self.actions.copy() # Actions
+        L = self.objects.copy() # Labeling function
+        T = {}  # Transitions (s, a) -> s' (they are deterministic)
+        for s in S:
+            x, y = S
+            for a in A:
+                T[(s, a)] = self._get_new_position(x, y, a)
+        
+        return S, A, L, T   # SALT xD
+    
     
