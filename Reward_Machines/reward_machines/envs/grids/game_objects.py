@@ -8,4 +8,8 @@ class Entity:
         self.i = i
         self.j = j
     
+    def change_position(self, i, j):
+        self.i = i
+        self.j = j
+    
     
