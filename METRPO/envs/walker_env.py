@@ -42,4 +42,18 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.viewer.cam.lookat[2] += .8
         self.viewer.cam.elevation = -20
     
+    @property
+    def n_goals(self):
+        """
+        return: goal dimensions
+        """
+        return 2
+    
+    @property
+    def n_states(self):
+        """
+        return: state dimensions
+        """
+        return 4
+    
     
