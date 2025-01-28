@@ -41,4 +41,11 @@ class OfficeWorld:
             ret += self.objects[self.agent]
         return ret
     
+    def get_features(self):
+        """
+        returns the features of the current stat (i.e., the location of the agent)
+        """
+        x, y = self.agent
+        return np.array([x, y])
+    
     
