@@ -153,3 +153,32 @@ def get_fingertips_tf(x):
     return tf.concat([x_cord, y_cord], axis=1)
 
 
+"""
+Call this after loading reacher gym version.
+"""
+def gym_to_local():
+    import gym
+    from sandbox.rocky.tf.spaces.box import Box
+    import envs.base as base
+
+    gym.envs.mujoco.reacher.ReacherEnv._get_obs = ReacherEnv._get_obs
+    gym.envs.mujoco.reacher.ReacherEnv._step = ReacherEnv._step
+    gym.envs.mujoco.reacher.ReacherEnv.observation_space = property(
+        lambda self: Box(
+            low=ReacherEnv().observation_space.low,
+            high=ReacherEnv().observation_space.high,
+        )
+    )
+    gym.envs.mujoco.reacher.ReacherEnv.reset = ReacherEnv.reset
+    gym.envs.mujoco.reacher.ReacherEnv.reset_model = ReacherEnv.reset_model
+    gym.envs.mujoco.reacher.ReacherEnv.n_goals = ReacherEnv.n_golas
+    gym.envs.mujoco.reacher.ReacherEnv.n_states = ReacherEnv.n_states
+    gym.envs.mujoco.reacher.ReacherEnv.cost_np = ReacherEnv.cost_np
+    gym.envs.mujoco.reacher.ReacherEnv.cost_tf = ReacherEnv.cost_tf
+    gym.envs.mujoco.reacher.ReacherEnv.cost_np_vec = ReacherEnv.cost_np_vec
+    base.TfEnv.observation_space = property(
+        lambda self: Box(
+            low=ReacherEnv().observation_space.low,
+            high=ReacherEnv().observation_space.high,
+        )
+    )
