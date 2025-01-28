@@ -62,3 +62,9 @@ class Point2DEnv(Env, Serializable):
                 + self.ctrl_cost_coeff \
                 * np.mean(np.square(action), axis=0)
         return -cost
+    
+    @property
+    def action_space(self):
+        return Box(low=-np.ones(2), high=np.ones(2))
+    
+    
