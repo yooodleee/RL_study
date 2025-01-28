@@ -80,4 +80,14 @@ class Point2DEnv(Env, Serializable):
         assert np.amax(np.abs(u)) <= 1.0
         return np.mean(self.cost_np_vec(x, u, x_next))
     
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next):
+        
+        return tf.reduce_mean(
+            tf.norm(goal - x_next, axis=1) + self.ctrl_cost_coeff * tf.reduce_mean(tf.square(u), axis=1)
+        )
+    
     
