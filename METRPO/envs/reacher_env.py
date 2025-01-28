@@ -49,4 +49,14 @@ class ReacherEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         return self._get_obs()
     
+    def reset(self, obs=None):
+        if obs is not None:
+            self.set_state(
+                np.concatenate([obs[:2], obs[4:6]]),
+                np.concatenate([obs[2:4], np.zeros(2)]),
+            )
+            return self._get_obs()
+        else:
+            return self._reset()
+    
     
