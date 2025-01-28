@@ -67,4 +67,8 @@ class Point2DEnv(Env, Serializable):
     def action_space(self):
         return Box(low=-np.ones(2), high=np.ones(2))
     
+    @property
+    def observation_space(self):
+        return Box(low=-10 * np.ones(2), high=10 * np.ones(2))
+    
     
