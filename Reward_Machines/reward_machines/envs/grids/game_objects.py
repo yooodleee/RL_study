@@ -19,3 +19,11 @@ class Entity:
         return True
     
 
+class Agent(Entity):
+
+    def __init__(self, i, j, actions):
+        super().__init__(i, j)
+        self.actions = actions
+        self.initial_position = (i, j)
+    
+    
