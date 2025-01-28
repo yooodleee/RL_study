@@ -46,4 +46,43 @@ class GridRMEnv(RewardMachineEnv):
     def __init__(self, env, rm_files):
         super().__init__(env, rm_files)
     
+    def render(self, mode='human'):
+        if mode == 'human':
+            # commands
+            str_to_action = {"w": 0, "d": 1, "s": 2, "a": 3}
+
+            # play the game
+            done = True
+            while True:
+                if done:
+                    print(
+                        "New episode -----------------------------"
+                    )
+                    obs = self.reset()
+                    print(
+                        "Current task: ", self.rm_files[self.current_rm_id] 
+                    )
+                    self.env.show()
+                    print("Features: ", obs)
+                    print("RM state: ", self.current_u_id)
+                    print("Events: ", self.env.get_events())
+                
+                print("\nAction? (WASD keys or q to quite) ", end="")
+                a = input()
+                print()
+                if a == 'q':
+                    break
+                # Executing action
+                if a in str_to_action:
+                    obs, rew, done, _ = self.step(str_to_action[a])
+                    self.env.show()
+                    print("Features: ", obs)
+                    print("Reward: ", rew)
+                    print("RM state: ", self.current_u_id)
+                    print("Events: ", self.env.get_events())
+                else:
+                    print("Forbidden action")
+        else:
+            raise NotImplementedError
+    
     
