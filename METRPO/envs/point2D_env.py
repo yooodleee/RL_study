@@ -51,4 +51,14 @@ class Point2DEnv(Env, Serializable):
             done=False,
         )
     
+    def get_obs(self):
+        return self.state
     
+    def get_reward(self, action):
+        """
+        Distance from goal and acion cost.
+        """
+        cost = np.linalg.norm(self.goal - self.state) \
+                + self.ctrl_cost_coeff \
+                * np.mean(np.square(action), axis=0)
+        return -cost
