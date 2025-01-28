@@ -146,3 +146,10 @@ def get_fingertips(x):
     y_cord = np.reshape(0.1 * np.sin(x[:, 0]) + 0.11 * np.sin(x[:, 0] + x[:, 1]), (-1, 1))
     return np.concatenate([x_cord, y_cord], axis=1)
 
+
+def get_fingertips_tf(x):
+    x_cord = tf.reshape(0.1 * tf.cos(x[:, 0]) + 0.11 * tf.cos(x[:, 0] + x[:, 1]), (-1, 1))
+    y_cord = tf.reshape(0.1 * tf.sin(x[:, 0]) + 0.11 * tf.sin(x[:, 0] + x[:, 1]), (-1, 1))
+    return tf.concat([x_cord, y_cord], axis=1)
+
+
