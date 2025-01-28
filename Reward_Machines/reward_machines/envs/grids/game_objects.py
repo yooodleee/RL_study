@@ -26,4 +26,7 @@ class Agent(Entity):
         self.actions = actions
         self.initial_position = (i, j)
     
+    def reset(self):
+        self.change_position(*self.initial_position)
+    
     
