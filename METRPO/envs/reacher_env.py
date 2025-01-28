@@ -94,3 +94,18 @@ class ReacherEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             self.get_body_com("target")[:2],
         ])
     
+    @property
+    def n_golas(self):
+        """
+        return: goal dimensions
+        """
+        return 2
+    
+    @property
+    def n_states(self):
+        """
+        return: state dimensions
+        """
+        return 4
+    
+    
