@@ -35,4 +35,20 @@ class Point2DEnv(Env, Serializable):
             self.state = init_state
         return self.state
     
+    def step(self, action):
+        assert self.state is not None, "call env.reset before step."
+        # Clipping action
+        action = np.clip(action, *self.action_space.bounds)
+        action = np.reshape(action, -1)
+        next_state = self.transition['A']@self.state + \
+                     self.transition['B']@action + \
+                     self.transition['c']
+        next_state = np.clip(next_state, *self.observation_space.bounds)
+        self.state = next_state
+        return Step(
+            observation=self.get_obs(),
+            reward=self.get_reward(action),
+            done=False,
+        )
+    
     
