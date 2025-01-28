@@ -28,4 +28,11 @@ class Point2DEnv(Env, Serializable):
         self.init_std = 0.1
         self.ctrl_cost_coeff = ctrl_cost_coeff
     
+    def reset(self, init_state=None):
+        if init_state is None:
+            self.state = self.init_mean + np.random.randn(2) * self.init_std
+        else:
+            self.state = init_state
+        return self.state
+    
     
