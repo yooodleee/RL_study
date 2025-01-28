@@ -32,4 +32,13 @@ class OfficeWorld:
     
         return x, y
     
+    def get_true_propositions(self):
+        """
+        returns the string with the propositions that are True in this state
+        """
+        ret = ""
+        if self.agent in self.objects:
+            ret += self.objects[self.agent]
+        return ret
+    
     
