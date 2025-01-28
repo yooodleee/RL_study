@@ -48,4 +48,46 @@ class OfficeWorld:
         x, y = self.agent
         return np.array([x, y])
     
+    def show(self):
+        for y in range(8, -1, -1):
+            if y % 3 == 2:
+                for x in range(12):
+                    if x % 3 == 0:
+                        print("_", end="")
+                        if 0 < x < 11:
+                            print("_", end="")
+                    if (x, y, Actions.up) in self.forbidden_transitions:
+                        print("_", end="")
+                    else:
+                        print(" ", end="")
+                
+                print()
+            for x in range(12):
+                if (x, y, Actions.left) in self.forbidden_transitions:
+                    print("|", end="")
+                elif x % 3 == 0:
+                    print(" ", end="")
+                if (x, y) == self.agent:
+                    print("A", end="")
+                elif (x, y) in self.objects:
+                    print(self.objects[(x, y)], end="")
+                else:
+                    print(" ", end="")
+                if (x, y, Actions.right) in self.forbidden_transitions:
+                    print("|", end="")
+                elif x % 3 == 2:
+                    print(" ", end="")
+            print()
+            if y % 3 == 0:
+                for x in range(12):
+                    if x % 3 == 0:
+                        print("_", end="")
+                        if 0 < x < 11:
+                            print("_", end="")
+                    if (x, y, Actions.down) in self.forbidden_transitions:
+                        print("_", end="")
+                    else:
+                        print(" ", end="")
+                print()
+    
     
