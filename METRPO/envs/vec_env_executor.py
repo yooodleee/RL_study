@@ -38,4 +38,17 @@ class VecEnvExecutor(object):
     def set_init_sampler(self, init_sampler):
         self.init_sampler = init_sampler
     
+    @property
+    def num_envs(self):
+        return len(self.envs)
     
+    @property
+    def action_space(self):
+        return self._action_space
+    
+    @property
+    def observation_space(self):
+        return self._observation_space
+    
+    def terminate(self):
+        pass
