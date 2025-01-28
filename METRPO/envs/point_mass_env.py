@@ -126,4 +126,13 @@ class PointMassEnv(Env, Serializable):
             tf.norm(goal - x_next[:, :2], axis=1) + self.ctrl_cost_coeff ( tf.reduce_mean(tf.square(u), axis=1))
         )
     
-    
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        assert np.allclose(x[:, 4:], x_next[:, 4:])
+        goal = x_next[:, 4:]
+        return np.linalg.norm(goal - x_next[:, :2], axis=1) + self.ctrl_cost_coeff * np.mean(np.square(u), axis=1)
