@@ -15,4 +15,7 @@ class Entity:
     def idem_position(self, i, j):
         return self.i == i and self.j == j
     
+    def interact(self, agent):
+        return True
     
+
