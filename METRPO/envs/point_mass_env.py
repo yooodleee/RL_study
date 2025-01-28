@@ -45,4 +45,23 @@ class PointMassEnv(Env, Serializable):
             self.goal = init_state[4:]
         return self.get_obs()
     
+    def step(self, action):
+        assert np.all(self.qpos) and np.all(self.qvel) and np.all(self.goal), \
+            "call env.reset before step"
+        # Clipping action
+        action = np.clip(action, *self.action_space.bounds)
+        action = np.reshape(action, -1)
+        qpos = self.qpos
+        qvel = self.qvel
+        for i in range(self.frame_skip):
+            qpos = np.clip(qpos + qvel * self.dt, *self.boundary)
+            # qvel = np.clip(qvel + (action / self.mass) * self.dt, *self.vel_bounds)
+            qvel = np.clip(self.A@qvel + self.B@action + self.c, *self.vel_bounds)
+        self.qpos = qpos
+        self.qvel = qvel
+        return Step(
+            observation=self.get_obs(),
+            reward=self.get_reward(action),
+            done=False,
+        )
     
