@@ -91,4 +91,19 @@ class PointMassEnv(Env, Serializable):
     def action_space(self):
         return Box(low=-np.ones(2), high=np.ones(2))
     
+    @property
+    def observation_space(self):
+        return Box(
+            low=np.concatenate([
+                self.boundary[0] * np.ones(2),
+                self.vel_bounds[0] * np.ones(2),
+                self.boundary[0] * np.ones(2),
+            ]),
+            high=np.concatenate([
+                self.boundary[1] * np.ones(2),
+                self.vel_bounds[1] * np.ones(2),
+                self.boundary[1] * np.ones(2),
+            ])
+        )
+    
     
