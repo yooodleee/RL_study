@@ -16,7 +16,7 @@ from rllab.misc.overrides import overrides
 # 7: xvel (forward = +)
 
 
-class HooperEnv(MujocoEnv, Serializable):
+class HopperEnv(MujocoEnv, Serializable):
 
     FILE = 'hopper.xml'
 
@@ -41,7 +41,7 @@ class HooperEnv(MujocoEnv, Serializable):
         
         self.alive_coeff = alive_coeff
         self.ctrl_cost_coeff = ctrl_cost_coeff
-        super(HooperEnv, self).__init__(*args, **kwargs)
+        super(HopperEnv, self).__init__(*args, **kwargs)
         Serializable.quick_init(self, locals())
     
     # Consist of 11 dimensions
