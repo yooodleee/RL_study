@@ -41,4 +41,10 @@ class Obstacle(Entity):
     def __init__(self, i, j):
         super().__init__(i, j)
     
+    def interact(self, agent):
+        return False
     
+    def __str__(self):
+        return "X"
+
+
