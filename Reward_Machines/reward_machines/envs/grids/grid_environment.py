@@ -41,3 +41,9 @@ class GridEnv(gym.Env):
         return self.env.get_model()
 
 
+class GridRMEnv(RewardMachineEnv):
+
+    def __init__(self, env, rm_files):
+        super().__init__(env, rm_files)
+    
+    
