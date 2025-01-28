@@ -63,3 +63,13 @@ class Empty(Entity):
         return self.label
 
 
+"""
+Enum with the actions that the agent can execute.
+"""
+class Actions(Enum):
+    up      = 0 # move up
+    right   = 1 # move right
+    down    = 2 # move down
+    left    = 3 # move left
+    none    = 4 # none or pick
+    drop    = 5
