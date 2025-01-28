@@ -60,4 +60,19 @@ class CraftWorld:
         """
         return np.array([self.agent.i, self.agent.j])
     
-    
+    def show(self):
+        """
+        Prints the current map.
+        """
+        r = ""
+        for i in range(self.map_height):
+            s = ""
+            for j in range(self.map_width):
+                if self.agent.idem_position(i, j):
+                    s += str(self.agent)
+                else:
+                    s += str(self.map_array[i][j])
+            if (i > 0):
+                r += "\n"
+            r += s
+        print(r)
