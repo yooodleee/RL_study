@@ -46,3 +46,11 @@ class CraftWorld:
 
         return ni, nj
     
+    def get_true_propositions(self):
+        """
+        Returns the string with the propositions that are True in this state.
+        """
+        ret = str(self.map_array[self.agent.i][self.agent.j]).strip()
+        return ret
+    
+    
