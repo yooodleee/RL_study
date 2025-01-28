@@ -115,4 +115,15 @@ class PointMassEnv(Env, Serializable):
         assert np.amax(np.abs(u)) <= 1.0
         return np.mean(self.cost_np_vec(x, u, x_next))
     
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next):
+        
+        goal = tf.stop_gradient(x_next[:, 4:])
+        return tf.reduce_mean(
+            tf.norm(goal - x_next[:, :2], axis=1) + self.ctrl_cost_coeff ( tf.reduce_mean(tf.square(u), axis=1))
+        )
+    
     
