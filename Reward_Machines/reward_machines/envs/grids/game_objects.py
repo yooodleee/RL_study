@@ -12,4 +12,7 @@ class Entity:
         self.i = i
         self.j = j
     
+    def idem_position(self, i, j):
+        return self.i == i and self.j == j
+    
     
