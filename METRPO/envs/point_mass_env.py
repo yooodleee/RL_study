@@ -79,4 +79,12 @@ class PointMassEnv(Env, Serializable):
                 * np.mean(np.square(action), axis=0)
         return -cost
     
+    @property
+    def n_goals(self):
+        return 2
+    
+    @property
+    def n_states(self):
+        return 4
+    
     
