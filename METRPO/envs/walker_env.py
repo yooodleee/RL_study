@@ -78,4 +78,14 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return tf.reduce_mean(tf.norm(x[:, -2:] - get_fingertips_tf(x), axis=1) \
                               + ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1))
     
-    
+    def cost_np_vec(
+            self,
+            x,
+            u,
+            x_next,
+            ctrl_cost_coeff=2):
+        
+        return tf.reduce_mean(tf.norm(x[:, -2:] - get_fingertips_tf(x), axis=1) \
+                              + ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1))
+
+
