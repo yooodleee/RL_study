@@ -36,3 +36,9 @@ class Agent(Entity):
         return "A"
     
 
+class Obstacle(Entity):
+
+    def __init__(self, i, j):
+        super().__init__(i, j)
+    
+    
