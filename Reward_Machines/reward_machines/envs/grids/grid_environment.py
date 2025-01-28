@@ -152,3 +152,13 @@ class OfficeRM3Env(GridRMEnv):
         super().__init__(GridEnv(env), rm_files)
     
 
+class CraftRMEnv(GridRMEnv):
+
+    def __init__(self, file_map):
+        rm_files = [
+            "./envs/grids/reward_machines/craft/t%d" % i for i in range(1, 11)
+        ]
+        env = CraftWorld(file_map)
+        super().__init__(GridEnv(env), rm_files)
+
+
