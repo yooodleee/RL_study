@@ -48,3 +48,18 @@ class Obstacle(Entity):
         return "X"
 
 
+class Empty(Entity):
+    
+    def __init__(
+            self,
+            i,
+            j,
+            label=" "):
+        
+        super().__init__(i, j)
+        self.label = label
+    
+    def __str__(self):
+        return self.label
+
+
