@@ -87,4 +87,8 @@ class PointMassEnv(Env, Serializable):
     def n_states(self):
         return 4
     
+    @property
+    def action_space(self):
+        return Box(low=-np.ones(2), high=np.ones(2))
+    
     
