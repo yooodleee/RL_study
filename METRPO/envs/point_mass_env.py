@@ -31,4 +31,18 @@ class PointMassEnv(Env, Serializable):
         self.init_std = 0.1
         self.ctrl_cost_coeff = 0.01
     
+    def reset(self, init_state=None):
+        if init_state is None:
+            self.qpos = self.init_mean + np.random.randn(2) * self.init_std
+            self.qvel = self.init_mean + np.random.randn(2) * self.init_std
+            # random goal in [5, 10] and [-5, -10]
+            self.goal = np.random.uniform(-self.boundary, self.boundary) \
+                        * ((np.random.uniform(size=2) > 0.5).astype(np.float32) * 2 - 1.)
+        else:
+            assert len(init_state) == 6
+            self.qpos = init_state[:2]
+            self.qvel = init_state[2:4]
+            self.goal = init_state[4:]
+        return self.get_obs()
+    
     
