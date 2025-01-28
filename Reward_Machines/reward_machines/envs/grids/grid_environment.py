@@ -18,4 +18,26 @@ class GridEnv(gym.Env):
             low=0, high=max([N, M]), shape=(2,), dtype=np.uint8
         )
     
+    def get_events(self):
+        return self.env.get_true_propositions()
     
+    def step(self, action):
+        self.env.execute_action(action)
+        obs = self.env.get_features()
+        reward = 0  # all the reward comes from the RM
+        done = False
+        info = {}
+        
+        return obs, reward, done, info
+    
+    def reset(self):
+        self.env.reset()
+        return self.env.get_features()
+    
+    def show(self):
+        self.env.show()
+    
+    def get_model(self):
+        return self.env.get_model()
+
+
