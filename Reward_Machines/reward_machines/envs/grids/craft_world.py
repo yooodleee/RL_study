@@ -11,4 +11,7 @@ class CraftWorld:
         self._load_mal(file_map)
         self.env_game_over = False
     
+    def reset(self):
+        self.agent.reset()
+    
     
