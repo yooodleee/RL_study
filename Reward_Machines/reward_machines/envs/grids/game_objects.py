@@ -29,4 +29,10 @@ class Agent(Entity):
     def reset(self):
         self.change_position(*self.initial_position)
     
+    def get_actions(self):
+        return self.actions
     
+    def __str__(self):
+        return "A"
+    
+
