@@ -96,4 +96,52 @@ class CraftWorld:
         
         return S, A, L, T   # SALT xD
     
-    
+    def _load_map(self, file_map):
+        """
+        Adds the following attributes to the game:
+            - self.map_array: array containing all the static objects in the map
+                (no monsters and no agent)
+                -e.g., self.map_array[i][j]: contains the object located on row 'i'
+                    and column 'j'.
+            - self.agent: is the agent
+            - self.map_height = number of rows in every room
+            - self.map_width = number of columns in every room
+
+        Inputs:
+            - file_map: path to the map file
+        """
+        # contains all the actions that the agent can perform
+        self.actions = [
+            Actions.up.value,
+            Actions.right.value,
+            Actions.down.value,
+            Actions.left.value,
+        ]
+        # loading the map
+        self.map_array = []
+        self.class_ids = {} # use the lower case letters to define the features
+        f = open(file_map)
+        i, j = 0, 0
+        for l in f:
+            # don't consider empty lines
+            if (len(l.rstrip()) == 0):
+                continue
+
+            # this is not an empty line
+            row = []
+            j = 0
+            for e in l.rstrip():
+                if e in "abcdefghijklmnopqrstuvwxyzH":
+                    entity = Empty(i, j, label=e)
+                    if e not in self.class_ids:
+                        self.class_ids[e] = len(self.class_ids)
+                if e in " A":   entity = Empty(i, j)
+                if e == "X":    entity = Obstacle(i, j)
+                if e == "A":    self.agent = Agent(i, j, self.actions)
+                row.append(entity)
+                j += 1
+            self.map_array.append(row)
+            i += 1
+        f.close()
+        # height width
+        self.map_height, self.map_width = len(self.map_array), len(self.map_array[0])
