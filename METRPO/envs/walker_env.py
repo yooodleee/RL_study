@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 from gym import utils
 from gym.envs.mujoco import mujoco_env
 
@@ -66,4 +67,15 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         assert np.amax(np.abs(u)) <= 1.0
         return np.mean(np.linalg.norm(x[:, -2:] - get_fingertips(x), axis=1) \
                        + ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1))
+    
+    def cost_tf(
+            self,
+            x,
+            u,
+            x_next,
+            ctrl_cost_coeff=2):
+        
+        return tf.reduce_mean(tf.norm(x[:, -2:] - get_fingertips_tf(x), axis=1) \
+                              + ctrl_cost_coeff * 0.5 * tf.reduce_sum(tf.square(u), axis=1))
+    
     
