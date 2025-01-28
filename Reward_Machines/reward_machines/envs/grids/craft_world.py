@@ -1,4 +1,5 @@
 from envs.grids.game_objects import *
+import numpy as np
 import random
 import math
 import os
@@ -52,5 +53,11 @@ class CraftWorld:
         """
         ret = str(self.map_array[self.agent.i][self.agent.j]).strip()
         return ret
+    
+    def get_features(self):
+        """
+        Returns the features of the current state (i.e., the location of the agent).
+        """
+        return np.array([self.agent.i, self.agent.j])
     
     
