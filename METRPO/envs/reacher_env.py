@@ -141,3 +141,8 @@ class ReacherEnv(mujoco_env.MujocoEnv, utils.EzPickle):
                 + ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1))
     
 
+def get_fingertips(x):
+    x_cord = np.reshape(0.1 * np.cos(x[:, 0]) + 0.11 * np.cos(x[:, 0] + x[:, 1]), (-1, 1))
+    y_cord = np.reshape(0.1 * np.sin(x[:, 0]) + 0.11 * np.sin(x[:, 0] + x[:, 1]), (-1, 1))
+    return np.concatenate([x_cord, y_cord], axis=1)
+
