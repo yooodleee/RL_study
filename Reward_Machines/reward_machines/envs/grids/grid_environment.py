@@ -242,3 +242,13 @@ class CraftRMEnvM10(CraftRMEnv):
 # ------------------------------------------------------ SINGLE TASK
 
 
+class CraftRM10Env(GridRMEnv):
+
+    def __init__(self, file_map):
+        rm_files = [
+            "./envs/grids/reward_machines/craft/t10.txt"
+        ]
+        env = CraftWorld(file_map)
+        super().__init__(GridEnv(env), rm_files)
+
+
