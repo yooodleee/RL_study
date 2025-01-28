@@ -108,4 +108,14 @@ class ReacherEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         """
         return 4
     
+    def cost_np(
+            self,
+            x,
+            u,
+            x_next,
+            ctrl_cost_coeff=2):
+        
+        assert np.amax(np.abs(u)) <= 1.0
+        return np.mean(np.linalg.norm(x[:, -2:] - get_fingertips(x), axis=1) \
+                       + ctrl_cost_coeff * 0.5 * np.sum(np.square(u), axis=1))
     
