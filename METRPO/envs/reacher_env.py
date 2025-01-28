@@ -33,4 +33,7 @@ class ReacherEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         return obs_next, reward, done, dict(ctrl_cost=np.sum(np.square(a)), comment='this_is_local_step')
     
+    def viewer_setup(self):
+        self.viewer.cam.trackbodyid = 0
+    
     
