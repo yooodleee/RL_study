@@ -29,4 +29,11 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         qvel = self.model.data.qvel
         return np.concatenate([qpos[1:], np.clip(qvel, -10, 10)]).ravel()
     
+    def reset_model(self):
+        self.set_state(
+            self.init_qpos + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq),
+            self.init_qvel + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv),
+        )
+        return self._get_obs()
+    
     
