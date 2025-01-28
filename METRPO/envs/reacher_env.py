@@ -59,4 +59,38 @@ class ReacherEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         else:
             return self._reset()
     
+    # def _get_obs(self):
+    #     theta = self.model.data.qpos.flat[:2]
+    #     return np.concatenate([
+    #         np.cos(theta),
+    #         np.sin(theta),
+    #         self.model.data.qpos.flat[2:],
+    #         self.model.data.qvel.flat[:2],
+    #         self.get_body_com("fingertip") - self.get_body_com("target"),
+    #     ])
+    
+    # def _get_obs(self):
+    #     vec = self.get_body_com("fingertip") - self.get_body_com("target")
+    #     return np.concatenate([
+    #         self.model.data.qpos.flat[:2],
+    #         self.model.data.qvel.flat[:2],
+    #         vec[:2],
+    #     ])
+
+    def _get_obs(self):
+        """
+        state representation: 
+            theta1, 
+            theta2, 
+            theta1_dot, 
+            theta2_dot, 
+            x_goal, 
+            y_goal
+        """
+        assert np.allclose(self.model.data.qpos.flat[2:], self.get_body_com("target")[:2])
+        return np.concatenate([
+            self.model.data.qpos.flat[:2],
+            self.model.data.qvel.flat[:2],
+            self.get_body_com("target")[:2],
+        ])
     
