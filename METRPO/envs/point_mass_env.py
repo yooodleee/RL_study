@@ -65,3 +65,18 @@ class PointMassEnv(Env, Serializable):
             done=False,
         )
     
+    def get_obs(self):
+        return np.concatenate(
+            [self.qpos, self.qvel, self.goal], axis=0
+        )
+    
+    def get_reward(self, action):
+        """
+        Distance from goal and action cost.
+        """
+        cost = np.linalg.norm(self.goal - self.qpos) \
+                + self.ctrl_cost_coeff \
+                * np.mean(np.square(action), axis=0)
+        return -cost
+    
+    
