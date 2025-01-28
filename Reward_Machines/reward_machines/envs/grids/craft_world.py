@@ -76,3 +76,24 @@ class CraftWorld:
                 r += "\n"
             r += s
         print(r)
+
+    def get_model(self):
+        """
+        Returns a model of the environment.
+        Use the model to compute optimal policies using value iteration.
+        The optimal policies are used to set the average reward per step
+            of each task to 1.
+        """
+        S = [(x, y) for x in range(1, 40) for y in range(1, 40)]    # States
+        A = self.actions.copy()     # Actions
+        L = dict([((x, y), str(self.map_array[x][y]).strip()) for x, y in S])   # Labeling function
+        T = {}    # Transition (s, a) -> s' (they are deterministic)
+        for s in S:
+            x, y = S
+            for a in A:
+                x2, y2 = self._get_next_position(x, y, a)
+                T[(s, a)] = s if str(self.map_array[x2][y2]) == "X" else (x2, y2)
+        
+        return S, A, L, T   # SALT xD
+    
+    
