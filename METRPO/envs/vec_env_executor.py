@@ -35,4 +35,7 @@ class VecEnvExecutor(object):
         self.ts[:] = 0
         return results
     
+    def set_init_sampler(self, init_sampler):
+        self.init_sampler = init_sampler
+    
     
