@@ -220,3 +220,10 @@ def logkv(key, val):
     Logger.CURRENT.logkv(key, val)
 
 
+def logkv_mean(key, val):
+    """
+    The same as logkv(), but if called many times, values averaged.
+    """
+    Logger.CURRENT.logkv_mean(key, val)
+
+
