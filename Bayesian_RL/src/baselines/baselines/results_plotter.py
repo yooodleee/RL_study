@@ -30,3 +30,23 @@ def rolling_window(a, window):
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
 
+def ts2xy(ts, xaxis, yaxis):
+    if xaxis == X_TIMESTEPS:
+        x = np.cumsum(ts.l.values)
+    elif xaxis == X_EPISODES:
+        x = np.arange(len(ts))
+    elif xaxis == X_WALLTIME:
+        x = ts.t.values / 3600.
+    else:
+        raise NotImplementedError
+    
+    if yaxis == Y_REWARD:
+        y = ts.r.values
+    elif yaxis == Y_TIMESTEPS:
+        y = ts.l.values
+    else:
+        raise NotImplementedError
+    
+    return x, y
+
+
