@@ -57,3 +57,45 @@ _game_envs['retro'] = {
 }
 
 
+def train(args, extra_args):
+    env_type, env_id = get_env_type(args.env)
+    print('env_type: {}'.format(env_type))
+
+    total_timesteps = int(args.num_timesteps)
+    seed = args.seed
+
+    learn = get_learn_function(args.alg)
+    alg_kwargs = get_learn_function_defaults(args.alg, env_type)
+    alg_kwargs.update(extra_args)
+
+    env = build_env(args)
+    if args.save_video_interval != 0:
+        env = VecVideoRecorder(
+            env,
+            osp.join(logger.Logger.CURRENT.dir, "videos"),
+            record_video_trigger=lambda x: x % args.save_video_interval == 0,
+            video_length=args.save_video_length,
+        )
+    
+    if args.network:
+        alg_kwargs['network'] = args.network
+    else:
+        if alg_kwargs.get('network') is None:
+            alg_kwargs['network'] = get_default_network(env_type)
+    
+    print(
+        'Training {} on {}:{} with arguments \n{}'.format(
+            args.alg, env_type, env_id, alg_kwargs
+        )
+    )
+
+    model = learn(
+        env=env,
+        seed=seed,
+        total_timesteps=total_timesteps,
+        **alg_kwargs,
+    )
+
+    return model, env
+
+
