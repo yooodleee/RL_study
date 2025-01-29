@@ -90,3 +90,44 @@ def plot_results(
     plot_curves(xy_list, xaxis, yaxis, task_name)
 
 
+# Example usage in jupyter-notebook
+# from baselines import log_viewer
+# %matplotlib inline
+# log_viewer.plot_results(["./log"], 10e6, log_viewer.X_TIMESTEPS, "Breakout")
+# Here ./log is a directory containing the monitor.csv files
+
+
+def main():
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        '--dirs', help='List of log directories', nargs='*', default=['./log']
+    )
+    parser.add_argument(
+        '--num_timesteps', type=int, default=int(10e6)
+    )
+    parser.add_argument(
+        '--xaxis', help='Variable on X-axis', default=X_TIMESTEPS
+    )
+    parser.add_argument(
+        '--yaxis', help='Variable on Y-axis', default=Y_REWARD
+    )
+    parser.add_argument(
+        '--task_name', help='Title of plot', default='Breakout'
+    )
+    args = parser.parse_args()
+    args.dirs = [os.path.abspath(dir) for dir in args.dirs]
+    plot_results(
+        args.dirs,
+        args.num_timesteps,
+        args.xaxis,
+        args.yaxis,
+        args.task_name,
+    )
+    plt.show()
+
+
+if __name__ == '__main__':
+    main()
