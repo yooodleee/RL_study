@@ -22,3 +22,9 @@ class KVWriter(object):
         raise NotImplementedError
     
 
+class SeqWriter(object):
+
+    def writeseq(self, seq):
+        raise NotImplementedError
+
+
