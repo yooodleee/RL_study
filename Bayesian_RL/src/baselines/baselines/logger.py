@@ -320,3 +320,21 @@ def profile(n):
         return decorator_with_name
 
 
+# ==========================================================
+# Backend
+# ==========================================================
+
+class Logger(object):
+    
+    DEFAULT = None  # A logger with no output files. (See right below class definition)
+                    # So that you can still log to the terminal without setting up any output files.
+    CURRENT = None  # Current logger being used by the free functions above.
+
+    def __init__(self, dir, output_formats):
+        self.name2val = defaultdict(float)  # values this iteration
+        self.name2cnt = defaultdict(int)
+        self.level = INFO
+        self.dir = dir
+        self.output_formats = output_formats
+    
+    
