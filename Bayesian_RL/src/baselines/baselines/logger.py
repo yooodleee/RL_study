@@ -103,4 +103,7 @@ class JSONOutputFormat(KVWriter):
         self.file.write(json.dumps(kvs) + '\n')
         self.file.flush()
 
-    
+    def close(self):
+        self.file.close()
+
+
