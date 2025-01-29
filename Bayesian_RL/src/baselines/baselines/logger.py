@@ -141,4 +141,7 @@ class CVSOutputFormat(KVWriter):
         self.file.write('\n')
         self.file.flush()
     
-    
+    def close(self):
+        self.file.close()
+
+
