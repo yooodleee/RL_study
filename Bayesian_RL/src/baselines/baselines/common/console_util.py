@@ -95,3 +95,17 @@ def ccap(cmd, dry=False, env=None, **kwargs):
 MESSAGE_DEPTH = 0
 
 
+@contextmanager
+def timed(msg):
+    global MESSAGE_DEPTH
+    print(colorsize('\t' * MESSAGE_DEPTH + '=: ' + msg, color='magenta'))
+    tstart = time.time()
+    MESSAGE_DEPTH += 1
+    yield
+    MESSAGE_DEPTH -= 1
+    print(
+        colorsize(
+            '\t' * MESSAGE_DEPTH + "done in %.3f seconds" % (time.time() - tstart),
+            color='magenta',
+        )
+    )
