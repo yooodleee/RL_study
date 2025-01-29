@@ -39,4 +39,38 @@ class HumanOutputFormat(KVWriter, SeqWriter):
             self.file = filename_or_file
             self.own_file = False
     
+    def writekvs(self, kvs):
+        # Create strings for printing
+        key2str = {}
+        for (key, val) in sorted(kvs.items()):
+            if isinstance(val, float):
+                valstr = '%-8.3g' % (val,)
+            else:
+                valstr = str(val)
+            key2str[self._truncate(key)] = self._truncate(valstr)
+        
+        # Find max widths
+        if len(key2str) == 0:
+            print("WARNING: tried to write empty key-value dict")
+            return 
+        else:
+            keywidth = max(map(len, key2str.keys()))
+            valwidth = max(map(len, key2str.values()))
+        
+        # Write out the data
+        dashes = '-' * (keywidth + valwidth + 7)
+        lines = [dashes]
+        for (key, val) in sorted(key2str.items(), key=lambda kv: kv[0].lower()):
+            lines.append('| %s%s | %s%s |' % (
+                key,
+                ' ' * (keywidth - len(key)),
+                val,
+                ' ' * (valwidth - len(val)),
+            ))
+        lines.append(dashes)
+        self.file.write('\n'.join(lines) + '\n')
+
+        # Flushes the output to the file
+        self.file.flush()
+    
     
