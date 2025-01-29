@@ -41,4 +41,12 @@ class Dataset(object):
         
         return data_map
     
+    def iterate_once(self, batch_size):
+        if self.enable_shuffle:
+            self.shuffle()
+
+        while self._next_id <= self.n - batch_size:
+            yield self.next_batch(batch_size)
+        self._next_id = 0
+
     
