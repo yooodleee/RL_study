@@ -43,3 +43,20 @@ color2num = dict(
     crimson=38,
 )
 
+def colorsize(
+        string,
+        color='green',
+        bold=False,
+        highlight=False):
+    
+    attr = []
+    num = color2num[color]
+    if highlight:
+        num += 10
+    attr.append(str(num))
+    if bold:
+        attr.append('1')
+    
+    return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
+
+
