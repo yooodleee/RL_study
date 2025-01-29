@@ -227,3 +227,17 @@ def get_alg_module(alg, submodule=None):
     return alg_module
 
 
+def get_learn_function(alg):
+    return get_alg_module(alg).learn
+
+
+def get_learn_function_defaults(alg, env_type):
+    try:
+        alg_defaults = get_alg_module(alg, 'defaults')
+        kwargs = getattr(alg_defaults, env_type)()
+    except (ImportError, AttributeError):
+        kwargs = {}
+    
+    return kwargs
+
+
