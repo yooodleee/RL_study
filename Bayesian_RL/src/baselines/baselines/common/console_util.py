@@ -86,3 +86,12 @@ def get_git_commit_message(cwd=None):
     ).decode('utf-8')
 
 
+def ccap(cmd, dry=False, env=None, **kwargs):
+    print_cmd(cmd, dry)
+    if not dry:
+        subprocess.check_call(cmd, env=env, **kwargs)
+
+
+MESSAGE_DEPTH = 0
+
+
