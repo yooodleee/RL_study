@@ -502,3 +502,42 @@ def read_csv(fname):
     return pandas.read_csv(fname, index_col=None, comment='#')
 
 
+def read_tb(path):
+    """
+    path: a tensorboard file OR a directory, where find all TB files 
+        of the form events.
+    """
+    import pandas
+    import numpy as np
+    from glob import glob
+    from collections import defaultdict
+    import tensorflow as tf
+
+    if osp.isdir(path):
+        fnames = glob(osp.join(path, "events."))
+    elif osp.basename(path).startwith("events."):
+        fnames = [path]
+    else:
+        raise NotImplementedError(
+            "Expected tensorboard file or directory containing them. Got %s" % path
+        )
+    
+    tag2paris = defaultdict(list)
+    maxstep = 0
+    for fname in fnames:
+        for summary in tf.compat.v1.train.summary_iterator(fname):
+            if summary.step > 0:
+                for v in summary.summary.value:
+                    pair = (summary.step, v.simple_value)
+                    tag2paris[v.tag].append(pair)
+                maxstep = max(summary.step, maxstep)
+    data = np.empty((maxstep, len(tag2paris)))
+    data[:] = np.nan
+    tags = sorted(tag2paris.keys())
+    for (colidx, tag) in enumerate(tags):
+        pairs = tag2paris[tag]
+        for (step, value) in pairs:
+            data[step - 1, colidx] = value
+    return pandas.DataFrame(data, columns=tags)
+
+
