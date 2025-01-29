@@ -39,3 +39,12 @@ def explained_variance(ypred, y):
     return np.nan if vary == 0 else 1 - np.var(y - ypred) / vary
 
 
+def explained_variance_2d(ypred, y):
+    assert y.ndim == 2 and ypred.ndim == 2
+    vary = np.var(y, axis=0)
+    out = 1 - np.var(y - ypred) / vary
+    out[vary < 1e-10] = 0
+
+    return out
+
+
