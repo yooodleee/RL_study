@@ -257,3 +257,16 @@ def log(*args, level=INFO):
     Logger.CURRENT.log(*args, level=level)
 
 
+def debug(*args):
+    log(*args, level=DEBUG)
+
+def info(*args):
+    log(*args, level=INFO)
+
+def warn(*args):
+    log(*args, level=WARN)
+
+def error(*args):
+    log(*args, level=ERROR)
+
+
