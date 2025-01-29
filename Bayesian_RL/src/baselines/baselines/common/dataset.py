@@ -49,4 +49,15 @@ class Dataset(object):
             yield self.next_batch(batch_size)
         self._next_id = 0
 
+    def subset(
+            self,
+            num_elements,
+            deterministic=True):
+        
+        data_map = dict()
+        for key in self.data_map:
+            data_map[key] = self.data_map[key][:num_elements]
+        
+        return Dataset(data_map, deterministic)
     
+
