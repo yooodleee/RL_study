@@ -193,3 +193,18 @@ def build_env(args):
     return env
 
 
+def get_env_type(env_id):
+    if env_id in _game_envs.keys():
+        env_type = env_id
+        env_id = [g for g in _game_envs[env_type]][0]
+    else:
+        env_type = None
+        for g, e in _game_envs.items():
+            if env_id in e:
+                env_type = g
+                break
+        assert env_type is not None, 'env_id {} is not recognized in env types'.format(env_id, _game_envs.keys())
+    
+    return env_type, env_id
+
+
