@@ -277,3 +277,15 @@ def set_level(level):
     Logger.CURRENT.set_level(level)
 
 
+def get_dir():
+    """
+    Get directory that log files are being written to.
+    will be None if there is no output directory (i.e., if you didn't call start)
+    """
+    return Logger.CURRENT.get_dir()
+
+
+record_tabular = logkv()
+dump_tabular = dumpkvs()
+
+
