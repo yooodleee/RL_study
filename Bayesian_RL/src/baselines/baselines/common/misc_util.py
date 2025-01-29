@@ -69,3 +69,21 @@ class EzPickle(object):
         self.__dict__.update(out.__dict__)
 
 
+def set_global_seeds(i):
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        rank = 0
+    
+    myseed = i + 1000 * rank if i is not None else None
+    try:
+        import tensorflow as tf
+        
+        tf.compat.v1.set_random_seed(myseed)
+    except ImportError:
+        pass
+
+    np.random.seed(myseed)
+    random.seed(myseed)
+
+
