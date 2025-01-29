@@ -305,3 +305,18 @@ class ProfileKV:
         Logger.CURRENT.name2val[self.n] += time.time() - self.t1
 
 
+def profile(n):
+    """
+    Usage:
+    @profile("my_func")
+    def my_func():
+        code
+    """
+    def decorator_with_name(func):
+        def func_wrapper(*args, **kwargs):
+            with ProfileKV(n):
+                return func(*args, **kwargs)
+            return func_wrapper
+        return decorator_with_name
+
+
