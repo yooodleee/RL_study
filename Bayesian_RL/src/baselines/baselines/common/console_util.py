@@ -68,3 +68,21 @@ def print_cmd(cmd, dry=False):
     print(colorsize(('CMD: ' if not dry else 'DRY: ') + cmd))
 
 
+def get_git_commit(cwd=None):
+    return subprocess.check_output(
+        [
+            'git', 'rev-parse', '--short', 'HEAD'
+        ],
+        cwd=cwd,
+    ).decode('utf-8')
+
+
+def get_git_commit_message(cwd=None):
+    return subprocess.check_output(
+        [
+            'git', 'show', '-s', '--format=%B', 'HEAD'
+        ],
+        cwd=cwd,
+    ).decode('utf-8')
+
+
