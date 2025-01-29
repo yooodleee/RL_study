@@ -74,3 +74,19 @@ def plot_curves(xy_list, xaxis, yaxis, title):
     plt.grid(True)
 
 
+def plot_results(
+        dirs,
+        num_timesteps,
+        xaxis,
+        yaxis,
+        task_name):
+    
+    tslist = []
+    for dir in dirs:
+        ts = load_results(dir)
+        ts = ts[ts.l.comsum() <= num_timesteps]
+        tslist.append(ts)
+    xy_list = [ts2xy(ts, xaxis, yaxis) for ts in tslist]
+    plot_curves(xy_list, xaxis, yaxis, task_name)
+
+
