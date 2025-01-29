@@ -28,3 +28,15 @@ class SeqWriter(object):
         raise NotImplementedError
 
 
+class HumanOutputFormat(KVWriter, SeqWriter):
+
+    def __init__(self, filename_or_file):
+        if isinstance(filename_or_file, str):
+            self.file = open(filename_or_file, 'wt')
+            self.own_file = True
+        else:
+            assert hasattr(filename_or_file, 'read'), 'expected file or str, got %s' % filename_or_file
+            self.file = filename_or_file
+            self.own_file = False
+    
+    
