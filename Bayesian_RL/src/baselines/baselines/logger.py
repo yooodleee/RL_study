@@ -90,3 +90,9 @@ class HumanOutputFormat(KVWriter, SeqWriter):
             self.file.close()
 
 
+class JSONOutputFormat(KVWriter):
+
+    def __init__(self, filename):
+        self.file = open(filename, 'wt')
+
+    
