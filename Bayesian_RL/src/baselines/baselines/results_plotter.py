@@ -30,6 +30,12 @@ def rolling_window(a, window):
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
 
+def window_func(x, y, window, func):
+    yw = rolling_window(y, window)
+    yw_func = func(yw, axix=-1)
+    return x[window - 1:], yw_func
+
+
 def ts2xy(ts, xaxis, yaxis):
     if xaxis == X_TIMESTEPS:
         x = np.cumsum(ts.l.values)
