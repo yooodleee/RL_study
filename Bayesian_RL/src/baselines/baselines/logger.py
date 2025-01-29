@@ -95,4 +95,12 @@ class JSONOutputFormat(KVWriter):
     def __init__(self, filename):
         self.file = open(filename, 'wt')
 
+    def writekvs(self, kvs):
+        for k, v in sorted(kvs.items()):
+            if hasattr(v, 'dtype'):
+                v = v.tolist()
+                kvs[k] = float(v)
+        self.file.write(json.dumps(kvs) + '\n')
+        self.file.flush()
+
     
