@@ -428,3 +428,10 @@ def _configure_default_logger():
     Logger.DEFAULT = Logger.CURRENT
 
 
+def reset():
+    if Logger.CURRENT is not Logger.DEFAULT:
+        Logger.CURRENT.close()
+        Logger.CURRENT = Logger.DEFAULT
+        log('Reset logger')
+
+
