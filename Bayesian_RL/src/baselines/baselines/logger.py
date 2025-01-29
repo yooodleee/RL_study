@@ -181,4 +181,9 @@ class TensorBoardOutputFormat(KVWriter):
         self.writer.Flush()
         self.step += 1
     
-    
+    def close(self):
+        if self.writer:
+            self.writer.close()
+            self.writer = None
+
+
