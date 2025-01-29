@@ -482,3 +482,17 @@ def _demo():
     dumpkvs()
 
 
+# ================================================================
+# Readers
+# ================================================================
+
+def read_json(fname):
+    import pandas
+    
+    ds = []
+    with open(fname, 'rt') as fh:
+        for line in fh:
+            ds.append(json.loads(line))
+    return pandas.DataFrame(ds)
+
+
