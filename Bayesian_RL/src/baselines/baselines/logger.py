@@ -249,3 +249,11 @@ def getkvs():
     return Logger.CURRENT.name2val
 
 
+def log(*args, level=INFO):
+    """
+    Write the sequence of args, with no separators, to the console and output files
+        (if you've configured an output file).
+    """
+    Logger.CURRENT.log(*args, level=level)
+
+
