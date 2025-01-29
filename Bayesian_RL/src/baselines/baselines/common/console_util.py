@@ -60,3 +60,11 @@ def colorsize(
     return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
 
 
+def print_cmd(cmd, dry=False):
+    if isinstance(cmd, str):    # for shell=True
+        pass
+    else:
+        cmd = ' '.join(shlex.quote(arg) for arg in cmd)
+    print(colorsize(('CMD: ' if not dry else 'DRY: ') + cmd))
+
+
