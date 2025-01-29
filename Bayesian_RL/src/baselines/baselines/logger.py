@@ -377,4 +377,11 @@ class Logger(object):
             fmt.close()
     
 
-    
+    # Misc
+    # -------------------------------------
+    def _do_log(self, args):
+        for fmt in self.output_formats:
+            if isinstance(fmt, SeqWriter):
+                fmt.writeseq(map(str, args))
+
+
