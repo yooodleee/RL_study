@@ -245,3 +245,7 @@ def dumpkvs():
     Logger.CURRENT.dumpkvs()
 
 
+def getkvs():
+    return Logger.CURRENT.name2val
+
+
