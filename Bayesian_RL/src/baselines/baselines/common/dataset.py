@@ -16,4 +16,15 @@ class Dataset(object):
         self._next_id = 0
         self.shuffle()
 
+    def shuffle(self):
+        if self.deterministic:
+            return
+        perm = np.arange(self.n)
+        np.random.shuffle(perm)
+
+        for key in self.data_map:
+            self.data_map[key] = self.data_map[key][perm]
+        
+        self._next_id = 0
+
     
