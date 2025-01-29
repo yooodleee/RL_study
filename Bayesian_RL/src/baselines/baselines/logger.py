@@ -337,6 +337,7 @@ class Logger(object):
         self.dir = dir
         self.output_formats = output_formats
     
+
     # Logging API, forwarded
     # ---------------------------------------
     def logkv(self, key, val):
@@ -362,4 +363,18 @@ class Logger(object):
         if self.level <= level:
             self._do_log(args)
     
+    
+    # Configuration
+    # ----------------------------------------
+    def set_level(self, level):
+        self.level = level
+    
+    def get_dir(self):
+        return self.dir
+    
+    def close(self):
+        for fmt in self.output_formats:
+            fmt.close()
+    
+
     
