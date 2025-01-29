@@ -227,3 +227,11 @@ def logkv_mean(key, val):
     Logger.CURRENT.logkv_mean(key, val)
 
 
+def logkvs(d):
+    """
+    Log a dictionary of key-value pairs
+    """
+    for (k, v) in d.items():
+        logkv(k, v)
+
+    
