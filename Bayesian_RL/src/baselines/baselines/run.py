@@ -208,3 +208,10 @@ def get_env_type(env_id):
     return env_type, env_id
 
 
+def get_default_network(env_type):
+    if env_type in {'atari', 'retro'}:
+        return 'cnn'
+    else:
+        return 'mlp'
+
+
