@@ -496,3 +496,9 @@ def read_json(fname):
     return pandas.DataFrame(ds)
 
 
+def read_csv(fname):
+    import pandas
+
+    return pandas.read_csv(fname, index_col=None, comment='#')
+
+
