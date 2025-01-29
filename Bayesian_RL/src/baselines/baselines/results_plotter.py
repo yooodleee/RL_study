@@ -50,3 +50,21 @@ def ts2xy(ts, xaxis, yaxis):
     return x, y
 
 
+def plot_curves(xy_list, xaxis, yaxis, title):
+    fig = plt.figure(figsize=(8, 2))
+    maxx = max(xy[0][-1] for xy in xy_list)
+    minx = 0
+    for (i, (x, y)) in enumerate(xy_list):
+        color = COLORS[i]
+        plt.scatter(x, y, s=2)
+        x, y_mean = window_func(x, y, EPISODES_WINDOW, np.mean) # So returns average of last EPISODE_WINDOW episodes
+        plt.plot(x, y_mean, color=color)
+    plt.xlim(minx, maxx)
+    plt.title(title)
+    plt.xlabel(xaxis)
+    plt.ylabel(yaxis)
+    plt.tight_layout()
+    fig.canvas.mpl_connect('resize_event', lambda event: plt.tight_layout())
+    plt.grid(True)
+
+
