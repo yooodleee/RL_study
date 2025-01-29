@@ -48,3 +48,23 @@ def explained_variance_2d(ypred, y):
     return out
 
 
+def ncc(ypred, y):
+    return np.corrcoef(ypred, y)[1, 0]
+
+
+def flatten_arrays(arrs):
+    return np.concatenate([arr.flat for arr in arrs])
+
+
+def unflatten_vector(vec, shapes):
+    i = 0
+    arrs = []
+    for shape in shapes:
+        size = np.prod(shape)
+        arr = vec[i: i + size].reshape(shape)
+        arrs.append(arr)
+        i += size
+    
+    return arrs
+
+
