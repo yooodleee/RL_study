@@ -145,3 +145,25 @@ class CVSOutputFormat(KVWriter):
         self.file.close()
 
 
+class TensorBoardOutputFormat(KVWriter):
+    """
+    Dumps key/value pairs into TensorBoard's numeric format.
+    """
+    def __init__(self, dir):
+        os.makedirs(dir, exist_ok=True)
+        self.dir = dir
+        self.step = 1
+        prefix = 'events'
+        path = osp.join(osp.abspath(dir), prefix)
+
+        import tensorflow as tf
+        from tensorflow.python import pywrap_tensorflow
+        from tensorflow.core.util import event_pb2
+        from tensorflow.python.util import compat
+
+        self.tf = tf
+        self.event_pb2 = event_pb2
+        self.pywrap_tensorflow = pywrap_tensorflow
+        self.writer = pywrap_tensorflow.EventWriter(compat.as_bytes(path))
+    
+    
