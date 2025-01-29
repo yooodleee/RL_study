@@ -27,4 +27,18 @@ class Dataset(object):
         
         self._next_id = 0
 
+    def next_batch(self, batch_size):
+        if self._next_id >= self.n and self.enable_shuffle:
+            self.shuffle()
+
+        cur_id = self._next_id
+        cur_batch_size = min(batch_size, self.n - self._next_id)
+        self._next_id += cur_batch_size
+
+        data_map = dict()
+        for key in self.data_map:
+            data_map[key] = self.data_map[key][cur_id:cur_id + cur_batch_size]
+        
+        return data_map
+    
     
