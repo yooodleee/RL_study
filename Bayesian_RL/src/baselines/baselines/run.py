@@ -10,7 +10,7 @@ from baselines.common.vec_env.vec_video_recorder import VecVideoRecorder
 from baselines.common.vec_env.vec_frame_stak import VecFramestack
 from baselines.common.cmd_util import common_arg_parser, parse_unknown_args, make_vec_env, make_env
 from baselines.common.tf_util import get_session
-from baselines import logger
+import logger
 from importlib import import_module
 
 from baselines.common.vec_env.cev_normalize import VecNormalize, VecNormalizeRewards
@@ -257,3 +257,49 @@ def parse_cmdline_kwargs(args):
     return {k: parse(v) for k, v in parse_unknown_args(args).items()}
 
 
+def main():
+    # configure logger, disable logging in child MPI processes (with rank > 0)
+
+    arg_parser = common_arg_parser()
+    args, unknown_args = arg_parser.parse_known_args()
+    extra_args = parse_cmdline_kwargs(unknown_args)
+
+    if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
+        rank = 0
+        logger.configure()
+    else:
+        logger.configure(format_strs=[])
+        rank = MPI.COMM_WORLD.Get_rank()
+    
+    model, env = train(args, extra_args)
+    env.close()
+
+    if args.save_path is not None and rank == 0:
+        save_path = osp.expanduser(args.save_path)
+        model.save(save_path)
+    
+    if args.play:
+        logger.log("Running trained model")
+        env = build_env(args)
+        obs = env.reset()
+        
+        def initialize_placeholders(nlstm=128, **kwargs):
+            return np.zeros(
+                (args.num_env or 1, 2 * nlstm)
+            ), np.zeros((1))
+        
+        state, dones = initialize_placeholders(**extra_args)
+        while True:
+            actions, _, state, _ = model.step(obs, S=state, M=dones)
+            obs, _, done, _ = env.step(actions)
+            env.render()
+            done = done.any() if isinstance(done, np.ndarray) else done
+
+            if done:
+                obs = env.reset()
+
+        env.close()
+
+
+if __name__ == '__main__':
+    main()
