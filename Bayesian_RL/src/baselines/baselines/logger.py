@@ -187,3 +187,23 @@ class TensorBoardOutputFormat(KVWriter):
             self.writer = None
 
 
+def make_output_format(
+        format,
+        ev_dir,
+        log_suffix=''):
+    
+    os.makedirs(ev_dir, exist_ok=True)
+    if format == 'stdout':
+        return HumanOutputFormat(sys.stdout)
+    elif format == 'log':
+        return HumanOutputFormat(osp.join(ev_dir, 'log%s.txt' % log_suffix))
+    elif format == 'json':
+        return JSONOutputFormat(osp.join(ev_dir, 'progress%s.json' % log_suffix))
+    elif format == 'csv':
+        return CVSOutputFormat(osp.join(ev_dir, 'progress%s.csv' % log_suffix))
+    elif format == 'tensorboard':
+        return TensorBoardOutputFormat(osp.join(ev_dir, 'tb%s' % log_suffix))
+    else:
+        raise ValueError('Unknown format specified: %s' % (format,))
+
+
