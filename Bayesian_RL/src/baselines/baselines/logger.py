@@ -337,4 +337,29 @@ class Logger(object):
         self.dir = dir
         self.output_formats = output_formats
     
+    # Logging API, forwarded
+    # ---------------------------------------
+    def logkv(self, key, val):
+        self.name2val[key] = val
+
+    def logkv_mean(self, key, val):
+        if val is None:
+            self.name2val[key] = None
+            return
+        oldval, cnt = self.name2val[key], self.name2cnt[key]
+        self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
+        self.name2cnt[key] = cnt + 1
+    
+    def dumpkvs(self):
+        if self.level == DISABLED: return
+        for fmt in self.output_formats:
+            if isinstance(fmt, KVWriter):
+                fmt.writekvs(self.name2val)
+        self.name2val.clear()
+        self.name2cnt.clear()
+    
+    def log(self, *args, level=INFO):
+        if self.level <= level:
+            self._do_log(args)
+    
     
