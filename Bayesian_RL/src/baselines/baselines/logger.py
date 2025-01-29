@@ -207,3 +207,16 @@ def make_output_format(
         raise ValueError('Unknown format specified: %s' % (format,))
 
 
+# ===============================================================
+# API
+# ===============================================================
+
+def logkv(key, val):
+    """
+    Log a value of some diagnostic
+    Call this once for each diagnostics quantity, each iteration
+    If called many times, last value will be used.
+    """
+    Logger.CURRENT.logkv(key, val)
+
+
