@@ -435,3 +435,19 @@ def reset():
         log('Reset logger')
 
 
+class scoped_configure(object):
+
+    def __init__(self, dir=None, format_strs=None):
+        self.dir = dir
+        self.format_strs = format_strs
+        self.prevlogger = None
+
+    def __enter__(self):
+        self.prevlogger = Logger.CURRENT
+        configure(dir=self.dir, format_strs=self.format_strs)
+
+    def __exit__(self, *args):
+        Logger.CURRENT.close()
+        Logger.CURRENT = self.prevlogger
+    
+
