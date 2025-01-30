@@ -64,4 +64,17 @@ class VecEnv(ABC):
         """
         pass
 
+    @abstractmethod
+    def step_async(self, actions):
+        """
+        Tell all the environments to start taking a step with the
+            given actions. Call step_wait() to get the results of
+            the step.
+
+        You should not call this if a step_async run is already 
+            pending.
+
+        """
+        pass
+
     
