@@ -34,3 +34,19 @@ import tensorflow as tf
 STORE_FILENAME_PREFIX = circular_replay_buffer.STORE_FILENAME_PREFIX
 
 
+class OutOfGraphLoggedReplayBuffer(
+    circular_replay_buffer.OutOfGraphReplayBuffer
+):
+    """
+    Logs the replay buffer to disk everytime it's full.
+
+    """
+
+    def __init__(self, log_dir, *args, **kwargs):
+        super(OutOfGraphLoggedReplayBuffer, self).__init__(*args, **kwargs)
+
+        self._log_count = 0
+        self._log_dir = log_dir
+        tf.compat.v1.gfile.MakeDirs(self._log_dir)
+    
+    
