@@ -74,4 +74,14 @@ class OutOfGraphLoggedPrioritizedReplayBuffer(
             self._log_buffer()
             self._log_count += 1
     
+    def load(
+            self,
+            checkpoint_dir,
+            suffix):
+        
+        super(OutOfGraphLoggedPrioritizedReplayBuffer, self).load(
+            checkpoint_dir, suffix
+        )
+        self._log_count = self.add_count // self._replay_capacity
+    
     
