@@ -31,9 +31,30 @@ from dopamine.replay_memory import prioritized_replay_buffer
 
 import gin
 import numpy as np
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 
 SROTE_FILENAME_PREFIX = circular_replay_buffer.STORE_FILENAME_PREFIX
 
 
+class OutOfGraphLoggedPrioritizedReplayBuffer(
+    prioritized_replay_buffer.OutOfGraphPrioritizedReplayBuffer
+):
+    """
+    A logged out-of-graph Replay Buffer for Prioritized Experience Replay.
+
+    """
+
+    def __init__(self, log_dir, *args, **kwargs):
+        """
+        Initializes OutOfGraphLoggedPrioritizedReplayBuffer.
+
+        """
+        super(OutOfGraphLoggedPrioritizedReplayBuffer, self).__init__(
+            *args, **kwargs
+        )
+        self._log_count = 0
+        self._log_dir = log_dir
+        tf.compat.v1.gfile.MakeDirs(self._log_dir)
+    
+    
