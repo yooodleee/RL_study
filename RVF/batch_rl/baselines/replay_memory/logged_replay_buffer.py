@@ -68,4 +68,15 @@ class OutOfGraphLoggedReplayBuffer(
             self._log_buffer()
             self._log_count += 1
     
+    def load(
+            self,
+            checkpoint_dir,
+            suffix):
+        
+        super(OutOfGraphLoggedReplayBuffer, self).load(
+            checkpoint_dir, suffix
+        )
+
+        self._log_count = self.add_count // self._replay_capacity
+    
     
