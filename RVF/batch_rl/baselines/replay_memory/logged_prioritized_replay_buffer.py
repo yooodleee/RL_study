@@ -208,4 +208,28 @@ class WrappedLoggedPrioritizedReplayBuffer(
             reward_dtype=reward_dtype,
         )
     
+    def tf_set_priority(self, indices, priorities):
+        """
+        Sets the priorities for the given indices.
+
+        Args
+        --------
+        indices:
+            tf.Tensor with dtype int32 and shape [n].
+        priorities:
+            tf.Tensor with dtype float and shape [n].
+
+        Returns
+        ---------
+        A tf op setting the priorities for prioritized sampling.
+
+        """
+
+        return tf.py_function(
+            self.memory.set_priority,
+            [indices, priorities],
+            [],
+            name='prioritized_replay_set_priority_py_function',
+        )
+    
     
