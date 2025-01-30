@@ -49,4 +49,23 @@ class OutOfGraphLoggedReplayBuffer(
         self._log_dir = log_dir
         tf.compat.v1.gfile.MakeDirs(self._log_dir)
     
+    def add(
+            self,
+            observation,
+            action,
+            reward,
+            terminal,
+            *args):
+        
+        super(OutOfGraphLoggedReplayBuffer, self).add(
+            observation, action, reward, terminal, *args
+        )
+        
+        # Log the replay buffer to a file in self._log_dir if the replay buffer
+        # is full.
+        cur_size = self.add_count % self._replay_capacity
+        if cur_size == self._replay_capacity - 1:
+            self._log_buffer()
+            self._log_count += 1
+    
     
