@@ -173,4 +173,10 @@ class RunningAvg(object):
         else:
             self._value = self._gamma * self._value + (1.0 - self._gamma) * new_val
     
+    def __float__(self):
+        """
+        Get the current estimate.
+        """
+        return self._value
     
+
