@@ -93,4 +93,9 @@ class VecEnv(ABC):
         """
         pass
 
-    
+    def close_extras(self):
+        """
+        Clean up the extra resources, beyound what's in this base class.
+        Only runs when not self.closed.
+        """
+        pass
