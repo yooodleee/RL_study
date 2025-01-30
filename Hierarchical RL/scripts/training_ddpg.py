@@ -1,9 +1,9 @@
 # import train module
 from lcrl.train import train
 # either create an automate object or import built-in ones
-from lrcl.automata.mars_rover_1_3 import mars_rover_1_3
+from lcrl.automata.mars_rover_1_3 import mars_rover_1_3
 # either create an environment object or import built-in ones
-from lrcl.environments.mars_rover_3_4 import mars_rover
+from lcrl.environments.mars_rover_3_4 import mars_rover
 
 
 if __name__ == "__main__":
