@@ -51,4 +51,17 @@ class VecEnv(ABC):
         self.observation_space = observation_space
         self.action_space = action_space
     
+    @abstractmethod
+    def reset(self):
+        """
+        Reset all the environments and return an array of
+            observations, or a dict of observation arrays.
+
+        If step_async is still doing work, that work will
+            be cancelled and step_wait() should not be called
+            untill step_async() is invoked again.
+
+        """
+        pass
+
     
