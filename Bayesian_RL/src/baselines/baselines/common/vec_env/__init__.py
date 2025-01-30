@@ -77,4 +77,20 @@ class VecEnv(ABC):
         """
         pass
 
+    @abstractmethod
+    def step_wait(self):
+        """
+        Wait for the step taken with step_async().
+
+        Returns
+        -------------
+        obs: an array of observations, or a dict of arrays of 
+            observations.
+        rews: an array or rewards.
+        dones: an array of "episode done" booleans.
+        infos: a sequence of info objects.
+
+        """
+        pass
+
     
