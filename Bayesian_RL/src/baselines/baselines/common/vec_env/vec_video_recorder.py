@@ -182,4 +182,38 @@ class VecVideoRecorderNamed(VecEnvWrapper):
         self.recorded_frames = 1
         self.recording = True
     
+    def _video_enabled(self):
+        return self.record_video_trigger(self.step_id)
     
+    def step_wait(self):
+        obs, rews, dones, infos = self.venv.step_wait()
+
+        self.step_id += 1
+        if self.recording:
+            self.video_recorder.capture_frame()
+            self.recorded_frames += 1
+
+            if self.recorded_frames > self.video_length:
+                logger.info("Saving video to ", self.video_recorder.path)
+                self.close_video_recorder()
+        
+        elif self._video_enabled():
+            self.start_video_recorder()
+        
+        return obs, rews, dones, infos
+    
+    def close_video_recorder(self):
+        # print("!!closing video recorder!!")
+        if self.recording:
+            self.video_recorder.close()
+        
+        self.recording = False
+        self.recorded_frames = 0
+    
+    def close(self):
+
+        VecEnvWrapper.close(self)
+        self.close_video_recorder()
+    
+    def __del__(self):
+        self.close()
