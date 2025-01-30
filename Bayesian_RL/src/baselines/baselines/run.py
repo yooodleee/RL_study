@@ -124,7 +124,7 @@ def build_env(args):
             env = make_vec_env(
                 env_id, env_type, nenv, seed, gamestate=args.gamestate, reward_scale=args.reward_scale
             )
-            env = VecFramestack(env, frame_stack_size)
+            env = VecFrameStack(env, frame_stack_size)
 
     else:
         print("preconfig")
