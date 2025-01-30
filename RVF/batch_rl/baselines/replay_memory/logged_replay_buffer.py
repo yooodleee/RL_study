@@ -122,4 +122,16 @@ class OutOfGraphLoggedReplayBuffer(
             )
         )
 
-    
+    def log_final_buffer(self):
+        """
+        Logs the replay buffer at the end of training.
+        
+        """
+
+        add_count = self.add_count
+        self.add_count = np.array(self.cursor())
+        self._log_buffer()
+        self._log_count += 1
+        self.add_count = add_count
+
+
