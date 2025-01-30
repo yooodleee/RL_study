@@ -112,3 +112,53 @@ class VecVideoRecorder(VecEnvWrapper):
         self.close()
 
 
+class VecVideoRecorderNamed(VecEnvWrapper):
+    """
+    Wrap VecEnv to record rendered image as mp4 video.
+    
+    """
+
+    def __init__(
+            self,
+            venv,
+            directory,
+            video_name,
+            record_video_trigger,
+            video_length=200):
+        
+        """
+        Arguments
+        ---------------
+        venv:
+            VecEnv to wrap.
+        directory:
+            Where to save videos.
+        record_video_trigger:
+            Function that defines when to start recording.
+            The function takes the current number of step.
+        video_length:
+            Length of recorded video.
+
+        """
+
+        # print("initializing vecvideorecordernamed")
+        # print(directory)
+        # print(video_name)
+        VecEnvWrapper.__init__(self, venv)
+        self.record_video_trigger = record_video_trigger
+        self.video_recorder = None
+
+        self.directory = os.path.abspath(directory)
+        if not os.path.exists(self.directory):
+            os.mkdir(self.directory)
+        
+        self.video_name = video_name
+        self.file_prefix = "vecenv"
+        self.file_infix = '{}'.format(os.getpid())
+        self.step_id = 0
+        self.video_length = video_length
+
+        self.recording = False
+        self.recorded_frames = 0
+
+    
