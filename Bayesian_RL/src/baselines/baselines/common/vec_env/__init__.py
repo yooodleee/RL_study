@@ -120,3 +120,17 @@ class VecEnv(ABC):
         self.step_async(actions)
         return self.step_wait()
     
+    def render(self, mode='human'):
+        imgs = self.get_images()
+        bigimg = title_images(imgs)
+        if mode == 'human':
+            self.get_viewer().imshow(bigimg)
+            return self.get_viewer().isopen
+        
+        elif mode == 'rgb_array':
+            return bigimg
+        
+        else:
+            raise NotImplementedError
+    
+    
