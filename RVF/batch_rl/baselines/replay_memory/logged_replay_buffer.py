@@ -135,3 +135,73 @@ class OutOfGraphLoggedReplayBuffer(
         self.add_count = add_count
 
 
+@gin.configurable(
+    denylist=[
+        'observation_shape',
+        'stack_size',
+        'update_horizon',
+        'gamma',
+    ]
+)
+
+class WrappedLoggedReplayBuffer(
+    circular_replay_buffer.WrappedReplayBuffer
+):
+    """
+    Wrapped of OutOfGraphLoggedReplayBuffer with an in Graph sampling mechanism.
+
+    """
+
+    def __init__(
+            self,
+            log_dir,
+            observation_shape,
+            stack_size,
+            use_staging=True,
+            replay_capacity=1000000,
+            batch_size=32,
+            update_horizon=1,
+            gamma=0.99,
+            wrapped_memory=None,
+            max_sample_attempts=1000,
+            extra_storage_types=None,
+            observation_dtype=np.uint8,
+            action_shape=(),
+            action_dtype=np.int32,
+            reward_shape=(),
+            reward_dtype=np.float32,
+    ):
+        """
+        Initializes WrappedLoggedReplayBuffer.
+        """
+
+        memory = OutOfGraphLoggedReplayBuffer(
+            log_dir,
+            observation_shape,
+            stack_size,
+            replay_capacity,
+            batch_size,
+            update_horizon,
+            gamma,
+            max_sample_attempts,
+            extra_storage_types=extra_storage_types,
+            observation_dtype=observation_dtype,
+        )
+
+        super(WrappedLoggedReplayBuffer, self).__init__(
+            observation_shape,
+            stack_size,
+            use_staging=use_staging,
+            replay_capacity=replay_capacity,
+            batch_size=batch_size,
+            update_horizon=update_horizon,
+            gamma=gamma,
+            wrapped_memory=wrapped_memory,
+            max_sample_attempts=max_sample_attempts,
+            extra_storage_types=extra_storage_types,
+            observation_dtype=observation_dtype,
+            action_shape=action_shape,
+            action_dtype=action_dtype,
+            reward_shape=reward_shape,
+            reward_dtype=reward_dtype,
+        )
