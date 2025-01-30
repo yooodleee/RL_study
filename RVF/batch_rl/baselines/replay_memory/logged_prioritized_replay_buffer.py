@@ -139,3 +139,73 @@ class OutOfGraphLoggedPrioritizedReplayBuffer(
         self.add_count = add_count
 
 
+@gin.configurable(
+    denylist=[
+        'observation_shape',
+        'stack_size',
+        'update_horizon',
+        'gamma',
+    ]
+)
+
+class WrappedLoggedPrioritizedReplayBuffer(
+    circular_replay_buffer.WrappedReplayBuffer
+):
+    """
+    Wrapper of OutOfGraphLoggedPrioritizedReplayBuffer with in-graph sampling.
+
+    """
+
+    def __init__(
+            self,
+            log_dir,
+            observation_shape,
+            stack_size,
+            use_staging=True,
+            replay_capacity=1000000,
+            batch_size=32,
+            update_horizon=1,
+            gamma=0.99,
+            max_sample_attempts=1000,
+            extra_storage_types=None,
+            observation_dtype=np.uint8,
+            action_shape=(),
+            action_dtype=np.int32,
+            reward_shape=(),
+            reward_dtype=np.float32):
+        
+        """
+        Initializes WrappedLoggedPrioritizedReplayBuffer.
+        """
+
+        memory = OutOfGraphLoggedPrioritizedReplayBuffer(
+            log_dir,
+            observation_shape,
+            stack_size,
+            replay_capacity,
+            batch_size,
+            update_horizon,
+            gamma,
+            max_sample_attempts,
+            extra_storage_types=extra_storage_types,
+            observation_dtype=observation_dtype,
+        )
+
+        super(WrappedLoggedPrioritizedReplayBuffer, self).__init__(
+            observation_shape,
+            stack_size,
+            use_staging,
+            replay_capacity,
+            batch_size,
+            update_horizon,
+            gamma,
+            wrapped_memory=memory,
+            extra_storage_types=extra_storage_types,
+            observation_dtype=observation_dtype,
+            action_shape=action_shape,
+            action_dtype=action_dtype,
+            reward_shape=reward_shape,
+            reward_dtype=reward_dtype,
+        )
+    
+    
