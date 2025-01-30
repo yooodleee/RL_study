@@ -79,4 +79,47 @@ class OutOfGraphLoggedReplayBuffer(
 
         self._log_count = self.add_count // self._replay_capacity
     
+    def _log_buffer(self):
+        """
+        This method will save all the replay buffer's state in a single file.
+        
+        """
+
+        checkpoint_elements = self._return_checkpointable_elements()
+        for attr in checkpoint_elements:
+            filename = self._generate_filename(
+                self._log_dir, attr, self._log_count
+            )
+            with tf.compat.v1.gfile.Open(filename, 'wb') as f:
+                with gzip.GzipFile(fileobj=f) as outfile:
+                    # Checkpoint the np arrays in self._store with np.save instead of
+                    # picking the directory is critical for file size and performance.
+                    # STORE_FILENAME_PREFIX indicates that the variable is contained in
+                    # self._store.
+                    if attr.startswith(STORE_FILENAME_PREFIX):
+                        array_name = attr[len(STORE_FILENAME_PREFIX):]
+                        np.save(
+                            outfile,
+                            self._store[array_name],
+                            allow_pickle=False,
+                        )
+                    
+                    # Some numpy arrays might not be part of storage
+                    elif isinstance(self.__dict__[attr], np.ndarray):
+                        np.save(
+                            outfile,
+                            self.__dict__[attr],
+                            allow_pickle=False,
+                        )
+                    
+                    else:
+                        pickle.dump(self.__dict__[attr], outfile)
+        
+        tf.compat.v1.logging.info(
+            'Replay buffer logged to ckpt {number} in {dir}'.format(
+                number=self._log_count,
+                dir=self._log_dir,
+            )
+        )
+
     
