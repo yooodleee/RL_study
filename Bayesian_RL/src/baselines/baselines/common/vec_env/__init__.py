@@ -99,3 +99,15 @@ class VecEnv(ABC):
         Only runs when not self.closed.
         """
         pass
+
+    def close(self):
+        if self.closed:
+            return
+        
+        if self.viewer is not None:
+            self.viewer.close()
+        
+        self.close_extras()
+        self.closed = True
+    
+    
