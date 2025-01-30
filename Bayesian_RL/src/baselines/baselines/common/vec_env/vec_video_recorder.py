@@ -97,4 +97,18 @@ class VecVideoRecorder(VecEnvWrapper):
 
         return obs, rews, dones, infos
     
+    def close_video_recorder(self):
+        if self.recording:
+            self.video_recorder.close()
+        
+        self.recording = False
+        self.recorded_frames = 0
     
+    def close(self):
+        VecEnvWrapper.close(self)
+        self.close_video_recorder()
+    
+    def __del__(self):
+        self.close()
+
+
