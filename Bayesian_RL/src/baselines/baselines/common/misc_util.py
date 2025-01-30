@@ -134,7 +134,28 @@ def pretty_eta(seconds_left):
     if minutes_lefts > 0:
         return helper(minutes_lefts, 'minute')
     
-    
+
     return 'less than a minute'
 
 
+class RunningAvg(object):
+
+    def __init__(self, gamma, init_value=None):
+        """
+        Keep a running estimate of a quantity.
+        This is a bit like mean but more sensitive to recent changes.
+
+        Parameters
+        ------------
+        gamma: float
+            Must be between 0 and 1, where 0 is the most sensitive to recent
+                changes.
+        init_value: float or None
+            Initial value of the estimate. If None, it will be set on the first 
+                update.
+
+        """
+        self._value = init_value
+        self._gamma = gamma
+    
+    
