@@ -210,3 +210,34 @@ def boolean_flag(
     )
 
 
+def get_wrapper_by_name(env, classname):
+    """
+    Given an a gym environment possibly wrapped multiple times,
+        returns a wrapper of classes named classname or raises ValueError
+        if no such wrapper was applied.
+
+    Parameters
+    -------------
+    env: gym.Env of gym.Wrapper
+        gym environment
+    classname: str
+        name of the wrapper
+
+    Returns
+    -------------
+    wrapper: gym.wrapper
+        wrapper named classname
+
+    """
+    currentenv = env
+    while True:
+        if classname == currentenv.class_name():
+            return currentenv
+        elif isinstance(currentenv, gym.Wrapper):
+            currentenv = currentenv.env
+        else:
+            raise ValueError(
+                "Couldn't find wrapper named %s" % classname
+            )
+
+
