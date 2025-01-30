@@ -14,3 +14,15 @@ class AlreadySteppingError(Exception):
         Exception.__init__(self, msg)
     
 
+class NotSteppingError(Exception):
+    """
+    Raised when an asynchronous step is not running but
+        step_wait() is called.
+
+    """
+
+    def __init__(self):
+        msg = 'not running an async step'
+        Exception.__init__(self, msg)
+
+
