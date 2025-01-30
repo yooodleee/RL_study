@@ -133,4 +133,10 @@ class VecEnv(ABC):
         else:
             raise NotImplementedError
     
+    def get_images(self):
+        """
+        Return RGB images from each environment.
+        """
+        raise NotImplementedError
+    
     
