@@ -175,5 +175,24 @@ class VecEnvWrapper(VecEnv):
                 action_space=action_space or venv.action_space,
             )
     
+    def step_async(self, actions):
+        self.venv.step_async(actions)
     
+    @abstractmethod
+    def reset(self):
+        pass
+
+    @abstractmethod
+    def step_wait(self):
+        pass
     
+    def close(self):
+        return self.venv.close()
+    
+    def render(self, mode='human'):
+        return self.venv.render(mode=mode)
+    
+    def get_images(self):
+        return self.venv.get_images()
+    
+
