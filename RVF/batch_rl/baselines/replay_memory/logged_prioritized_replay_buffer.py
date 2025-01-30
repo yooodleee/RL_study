@@ -57,4 +57,21 @@ class OutOfGraphLoggedPrioritizedReplayBuffer(
         self._log_dir = log_dir
         tf.compat.v1.gfile.MakeDirs(self._log_dir)
     
+    def add(
+            self,
+            observation,
+            action,
+            reward,
+            terminal,
+            *args):
+        
+        super(OutOfGraphLoggedPrioritizedReplayBuffer, self).add(
+            observation, action, reward, terminal, *args
+        )
+        # Log the replay buffer every time the replay buffer is filled to capacity.
+        cur_size = self.add_count % self._replay_capacity
+        if cur_size == self._replay_capacity - 1:
+            self._log_buffer()
+            self._log_count += 1
+    
     
