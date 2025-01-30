@@ -139,4 +139,11 @@ class VecEnv(ABC):
         """
         raise NotImplementedError
     
+    @property
+    def unwrapped(self):
+        if isinstance(self, VecEnvWrapper):
+            return self.venv.unwrapped        
+        else:
+            return self
+    
     
