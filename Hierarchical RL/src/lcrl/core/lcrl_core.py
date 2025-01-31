@@ -625,4 +625,40 @@ class LCRL:
 
                 self.buffer_counter += 1
             
+            @tf.function
+            def update(
+                    self,
+                    state_batch,
+                    action_batch,
+                    reward_batch,
+                    next_state_batch):
+                
+                # training actor and critic
+                with tf.GradientTape() as tape:
+                    target_actions = target_actor_dict[active_model](next_state_batch, training=True)
+                    y = reward_batch \
+                        + self.gamma \
+                        * target_critic_dict[active_model](
+                            [next_state_batch, target_actions], training=True
+                        )
+                    critic_value = critic_dict[active_model]([state_batch, action_batch], training=True)
+                    critic_loss = tf.math.reduce_mean(tf.math.square(y - critic_value))
+                
+                critic_grad = tape.gradient(
+                    critic_loss, critic_dict[active_model].trainable_variables
+                )
+                critic_optimizer.apply_gradients(
+                    zip(critic_grad, critic_dict[active_model].trainable_variables)
+                )
+
+                with tf.GradientTape() as tape:
+                    actions = actor_dict[active_model](state_batch, training=True)
+                    critic_value = critic_dict[active_model]([state_batch, actions], training=True)
+                    actor_loss = -tf.math.reduce_mean(critic_value)
+                
+                actor_grad = tape.gradient(actor_loss, actor_dict[active_model].trainable_variables)
+                actor_optimizer.apply_gradients(
+                    zip(actor_grad, actor_dict[active_model].trainable_variables)
+                )
+            
             
