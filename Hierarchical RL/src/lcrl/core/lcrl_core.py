@@ -661,4 +661,25 @@ class LCRL:
                     zip(actor_grad, actor_dict[active_model].trainable_variables)
                 )
             
+            # compute the loss and update parameters
+            def learn(self):
+                # sampling
+                record_range = min(self.buffer_counter, self.buffer_capacity)
+                batch_indices = np.random.choice(record_range, self.batch_size)
+
+                state_batch = tf.convert_to_tensor(self.state_buffer[batch_indices])
+                action_batch = tf.convert_to_tensor(self.action_buffer[batch_indices])
+                reward_batch = tf.convert_to_tensor(self.reward_buffer[batch_indices])
+                reward_batch = tf.cast(reward_batch, dtype=tf.float32)
+                next_state_batch = tf.convert_to_tensor(self.next_state_buffer[batch_indices])
+
+                self.update(
+                    state_batch, action_batch, reward_batch, next_state_batch
+                )
+            
+            # soft update
+            @tf.function
+            def update_target(target_weights, weights, tau):
+                for (a, b) in zip(target_weights, weights):
+                    a.assign(b * tau + a * (1 - tau))
             
