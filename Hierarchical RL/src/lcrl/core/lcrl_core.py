@@ -677,52 +677,247 @@ class LCRL:
                     state_batch, action_batch, reward_batch, next_state_batch
                 )
             
-            # soft update
-            @tf.function
-            def update_target(target_weights, weights, tau):
-                for (a, b) in zip(target_weights, weights):
-                    a.assign(b * tau + a * (1 - tau))
+        # soft update
+        @tf.function
+        def update_target(target_weights, weights, tau):
+            for (a, b) in zip(target_weights, weights):
+                a.assign(b * tau + a * (1 - tau))
             
-            def get_actor():
-                last_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
+        def get_actor():
+            last_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
 
-                inputs = keras.layers.Input(shape=(state_dimension,))
-                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(inputs)
-                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(out)
-                outputs = keras.layers.Dense(1, activation='tanh', kernel_initializer=last_init)(out)
+            inputs = keras.layers.Input(shape=(state_dimension,))
+            out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(inputs)
+            out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(out)
+            outputs = keras.layers.Dense(1, activation='tanh', kernel_initializer=last_init)(out)
 
-                model = keras.Model(inputs, outputs)
-                return model
+            model = keras.Model(inputs, outputs)
+            return model
             
-            def get_critic():
-                # state as input
-                state_input = keras.layers.Input(shape=(state_dimension))
-                state_out = keras.layers.Dense(int(num_of_hidden_neurons / 2), activation='relu')(state_input)
-                state_out = keras.layers.Dense(num_of_hidden_neurons, activation='relu')(state_input)
+        def get_critic():
+            # state as input
+            state_input = keras.layers.Input(shape=(state_dimension))
+            state_out = keras.layers.Dense(int(num_of_hidden_neurons / 2), activation='relu')(state_input)
+            state_out = keras.layers.Dense(num_of_hidden_neurons, activation='relu')(state_input)
 
-                # action as input
-                action_input = keras.layers.Input(shape=(action_dimension))
-                action_out = keras.layers.Dense(num_of_hidden_neurons, activation='relu')(action_input)
+            # action as input
+            action_input = keras.layers.Input(shape=(action_dimension))
+            action_out = keras.layers.Dense(num_of_hidden_neurons, activation='relu')(action_input)
 
-                # concatenating
-                concat = keras.layers.Concatenate()([state_out, action_out])
+            # concatenating
+            concat = keras.layers.Concatenate()([state_out, action_out])
 
-                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(concat)
-                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(out)
-                outputs = keras.layers.Dense(1)(out)
+            out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(concat)
+            out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(out)
+            outputs = keras.layers.Dense(1)(out)
 
-                # output
-                model = keras.Model([state_input, action_input], outputs)
-                return model
+            # output
+            model = keras.Model([state_input, action_input], outputs)
+            return model
             
-            def policy(state, noise_object):
-                sampled_actions = tf.squeeze(actor_dict[active_model](state))
-                noise = noise_object()
-                # Adding noise to action
-                sampled_actions = sampled_actions.numpy() + noise
+        def policy(state, noise_object):
+            sampled_actions = tf.squeeze(actor_dict[active_model](state))
+            noise = noise_object()
+            # Adding noise to action
+            sampled_actions = sampled_actions.numpy() + noise
 
-                # make sure action is within bounds
-                legal_action = np.clip(sampled_actions, lower_bound, upper_bound)
-                return [np.squeeze(legal_action)]
+            # make sure action is within bounds
+            legal_action = np.clip(sampled_actions, lower_bound, upper_bound)
+            return [np.squeeze(legal_action)]
             
             
+        exploration_parameter = self.epsilon * 3
+        ou_noise = OUActionNoise(
+            mean=np.zeros(1), std_deviation=float(exploration_parameter) * np.ones(1)
+        )
+
+        # initiate a DDPG module
+        actor_model_0 = get_actor()
+        actor_dict = {0: actor_model_0}
+        critic_model_0 = get_critic()
+        critic_dict = {0: critic_model_0}
+
+        target_actor_0 = get_actor()
+        target_actor_dict = {0: target_actor_0}
+        target_critic_0 = get_critic()
+        target_critic_dict = {0: target_critic_0}
+
+        target_actor_dict[0].set_weights(actor_dict[0].get_weights())
+        target_critic_dict[0].set_weights(critic_dict[0].get_weights())
+
+        # learning rates
+        critic_rl = self.alpha * 0.04
+        actor_rl = self.alpha * 0.02
+
+        critic_optimizer = keras.optimizers.Adam(critic_rl)
+        actor_optimizer = keras.optimizers.Adam(actor_rl)
+
+        # soft update parameter
+        tau = 0.005
+
+        buffer_0 = Buffer(ddpg_replay_buffer_size, 128)
+        buffer_dict = {0: buffer_0}
+
+        epsilon_transition_taken = 0
+        ep_reward_list = []
+
+        # training loop
+        try:
+            for episode in range(number_of_episodes):
+
+                self.MDP.reset()
+                self.LDBA.reset()
+                prev_state = self.MDP.current_state
+                episodic_reward = 0
+
+                # check for epsilon-transitions at the current automaton state
+                if self.epsilon_transition_exists:
+                    product_MDP_action_space = self.action_space_augmentation()
+                
+                if self.decay_lr:
+                    try:
+                        input(
+                            'Decaying learning rate has to be set to False in "ddpg". '
+                            'Would you like me to set it to False and continue? '
+                            'If so, type in "y", otherwise, interrupt with CTRL+C. '
+                        )
+                    except KeyboardInterrupt:
+                        print('\nExiting...')
+                
+                # each episode loop
+                while True:
+
+                    # get an action from the actor
+                    active_model = self.LDBA.automaton_state
+
+                    tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
+
+                    action = policy(tf_prev_state, ou_noise)
+
+                    if self.epsilon_transition_exists and \
+                            self.LDBA.automaton_state in self.LDBA.epsilon_transitions.keys() and \
+                            random.random() > 0.5:
+                        epsilon_action = random.choice(product_MDP_action_space[2:])
+                        action = [
+                            np.squeeze(
+                                int(epsilon_action[-1]) + upper_bound
+                            )
+                        ]
+                        epsilon_transition_taken = 1
+                    
+                    # product MDP modification (for more details refer to the tool paper)
+                    if epsilon_transition_taken:
+                        next_automaton_state = self.LDBA.step(epsilon_action)
+                        state = prev_state
+                    else:
+                        state = self.MDP.step(action)
+                        next_automaton_state = self.LDBA.step(self.MDP.state_label(state))
+                    
+                    # product MDP: synchronise the automaton with MDP
+                    next_MDP_state = self.MDP.current_state.tolist()
+                    next_state = next_MDP_state + [next_automaton_state]
+
+                    if self.test:
+                        print(
+                            str(action) + ' | ' + str(next_state) + ' | ' + self.MDP.state_label(next_MDP_state)
+                        )
+                    
+                    # check for epsilon-transitions at the next automaton state
+                    if self.epsilon_transition_exists:
+                        product_MDP_action_space = self.action_space_augmentation()
+                    
+                    # update the accepting frontier set
+                    if not epsilon_transition_taken:
+                        reward_flag = self.LDBA.accepting_frontier_function(next_automaton_state)
+                    else:
+                        reward_flag = 0
+                        epsilon_transition_taken = 0
+                    
+                    if reward_flag > 0.5:
+                        state_dep_gamma = self.gamma
+                    else:
+                        state_dep_gamma = 1
+                    
+                    # create a DDPG module if needed
+                    if next_automaton_state not in actor_dict.keys() and self.LDBA.accepting_frontier_set:
+                        # initiate a DDPG module
+                        actor_dict[next_automaton_state] = get_actor()
+                        critic_dict[next_automaton_state] = get_critic()
+                        target_actor_dict[next_automaton_state] = get_actor()
+                        target_critic_dict[next_automaton_state] = get_critic()
+
+                        buffer_dict[next_automaton_state] = Buffer(ddpg_replay_buffer_size, 128)
+
+                        # making the weights equal initially
+                        target_actor_dict[next_automaton_state].set_weights(
+                            actor_dict[next_automaton_state].get_weights()
+                        )
+                        target_critic_dict[next_automaton_state].set_weights(
+                            critic_dict[next_automaton_state].get_weights()
+                        )
+                    
+                    reward = reward_flag \
+                            - (np.cos(
+                                (np.pi / 2) * reward_flag) * 0.3 + 0.02 * random.random()
+                            )   # to break symmetry
+                    buffer_dict[active_model].record((prev_state, action, reward, state))
+                    episodic_reward += reward
+
+                    buffer_dict[active_model].learn()
+                    update_target(
+                        target_actor_dict[active_model].variables,
+                        actor_dict[active_model].variables,
+                        tau
+                    )
+                    update_target(
+                        target_critic_dict[active_model].variables,
+                        critic_dict[active_model].variables,
+                        tau
+                    )
+
+                    if next_automaton_state == -1:
+                        break
+                    if reward_flag > 0.5:
+                        # print('reward reached!')
+                        self.LDBA.reset()
+                    
+                    prev_state = state
+                
+                ep_reward_list.append(episodic_reward)
+
+                avg_reward = np.mean(ep_reward_list[-40:])
+                print("episode: {}, average episode reward={}".format(episode, avg_reward))
+                self.q_at_initial_state.append(avg_reward)
+            
+            self.Q = actor_dict
+        
+
+        except KeyboardInterrupt:
+            print('\nTraining exited early.')
+            try:
+                is_save = input(
+                    'Would you like to save the training data? '
+                    'If so, type in "y", otherwise, interrupt with CTRL+C. '
+                )
+            except KeyboardInterrupt:
+                print('\nExiting...')
+            
+            if is_save == 'y' or is_save == 'Y':
+                print('Saving...')
+                self.Q = actor_dict
+                self.early_interruption = 1
+    
+    def reward(self, reward_flag):
+        if reward_flag > 0:
+            return 1
+        else:
+            return 0
+    
+    def action_space_augmentation(self):
+        if self.LDBA.automaton_state in self.LDBA.epsilon_transitions.keys():
+            product_MDP_action_space = self.MDP.action_space \
+                                        + self.LDBA.epsilon_transitions[self.LDBA.automaton_state]
+        else:
+            product_MDP_action_space = self.MDP.action_space
+        
+        return product_MDP_action_space
