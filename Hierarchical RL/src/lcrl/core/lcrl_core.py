@@ -253,4 +253,279 @@ class LCRL:
                 print('Saving...')
                 self.early_interruption = 1
     
+    def train_nfq(
+            self,
+            number_of_episodes,
+            iteration_threshold,
+            nfq_replay_buffer_size,
+            num_of_hidden_neurons=256):
+        
+        import tensorflow as tf
+        import keras
+        # from tensorflow import keras
+        tf.get_logger().setLevel('ERROR')
+        self.MDP.reset()
+        self.LDBA.reset()
+
+        if self.LDBA.accepting_sets is None:
+            raise Exception('LDBA object is not defined properly. Please specify the "accepting_set". ')
+        
+        # ## exploration phase ## #
+        # nfq_modules
+        self.Q = {}
+        self.replay_buffers = {}
+        state_dimension = len(self.MDP.current_state)
+        action_dimension = 1
+        nfq_input_dim = state_dimension + action_dimension
+        product_MDP_action_space = self.MDP.action_space
+        epsilon_transition_taken = 0
+
+        # initiate an NFQ module
+        model_0 = keras.Sequential(
+            [
+                keras.layers.Dense(
+                    num_of_hidden_neurons,
+                    input_dim=nfq_input_dim,
+                    activation=tf.nn.relu,
+                ),
+                keras.layers.Dense(
+                    1, activation=tf.nn.leaky_relu
+                )
+            ]
+        )
+        model_0.compile(
+            loss='mean_squared_error',
+            metrics=['mean_squared_error'],
+            optimizer='Adam',
+        )
+        self.Q[self.LDBA.automaton_state] = model_0
+        self.replay_buffers[self.LDBA.automaton_state] = []
+
+        # check for epsilon-transitions at the current automaton state
+        if self.epsilon_transition_exists:
+            product_MDP_action_space = self.action_space_augmentation()
+        
+        try:
+            # exploration loop
+            episode = 0
+            print("sampling...")
+            rewarding_paths = []    
+            while episode < number_of_episodes:
+                episode_path = []
+                episode += 1
+                self.MDP.reset()
+                self.LDBA.reset()
+                current_state = self.MDP.current_state.tolist() + [self.LDBA.automaton_state]
+
+                # check for epsilon-transitions at the current automaton state
+                if self.epsilon_transition_exists:
+                    product_MDP_action_space = self.action_space_augmentation()
+                
+                iteration = 0
+
+                if self.decay_lr:
+                    try:
+                        input(
+                            'Decaying learning rate has to be set to False in "nfq". '
+                            'Would you like me to set it to False and continue? '
+                            'If so, type in "y", otherwise, interrupt with CTRL+C. '
+                        )
+                    except KeyboardInterrupt:
+                        print('\nExiting...')
+                
+                # each episode loop
+                while self.LDBA.accepting_frontier_set and \
+                        iteration < iteration_threshold and \
+                        self.LDBA.automaton_state != -1:
+                    iteration += 1
+                
+                    # find the action with Q at the current state
+                    active_model = self.LDBA.automaton_state
+
+                    action_index = random.randint(0, len(product_MDP_action_space) - 1)
+                    maxQ_action = product_MDP_action_space[action_index]
+
+                    # check if an epsilon-transition is taken
+                    if self.epsilon_transition_exists and \
+                            action_index > len(self.MDP.action_space) - 1:
+                        epsilon_transition_taken = 1
+                    
+                    # product MDP modification (for more details refer to the tool paper)
+                    if epsilon_transition_taken:
+                        next_MDP_state = self.MDP.current_state.tolist()
+                        next_automaton_state = self.LDBA.step(maxQ_action)
+                    else:
+                        next_MDP_state = self.MDP.step(maxQ_action).tolist()
+                        next_automaton_state = self.LDBA.step(self.MDP.state_label(next_MDP_state))
+                    
+                    # product MDP: synchronise the automaton with MDP
+                    next_state = next_MDP_state + [next_automaton_state]
+
+                    if next_automaton_state == -1:
+                        break
+
+                    if self.test:
+                        print(
+                            str(maxQ_action) + ' | ' + str(next_state) + ' | ' + self.MDP.state_label(next_MDP_state)
+                        )
+                    
+                    # check for epsilon-transitions at the next automaton state
+                    if self.epsilon_transition_exists:
+                        product_MDP_action_space = self.action_space_augmentation()
+                    
+                    # update the accepting frontier set
+                    if not epsilon_transition_taken:
+                        reward_flag = self.LDBA.accepting_frontier_function(next_automaton_state)
+                        reward_flag = reward_flag + (np.cos(np.pi * reward_flag)) * 0.1 * random.random()   # to be symmetry
+                    else:
+                        reward_flag = 0 + 0.1 * random.random() # to break symmetry
+                        epsilon_transition_taken = 0
+                    
+                    if reward_flag > 0.5:
+                        state_dep_gamma = self.gamma
+                        # print('reward reached!')
+                    else:
+                        state_dep_gamma = self.gamma
+                    
+                    # create an NFQ module if needed
+                    if next_automaton_state not in self.Q.keys() and self.LDBA.accepting_frontier_set:
+                        # initiate an NFQ module
+                        self.Q[next_automaton_state] = \
+                            keras.Sequential(
+                                [
+                                    keras.layers.Dense(
+                                        num_of_hidden_neurons,
+                                        input_dim=nfq_input_dim,
+                                        activation=tf.nn.relu,
+                                    ),
+                                    keras.layers.Dense(
+                                        1, activation=tf.nn.leaky_relu,
+                                    )
+                                ]
+                            )
+                        self.Q[next_automaton_state].compile(
+                            loss='mean_squared_error',
+                            metrics=['mean_squared_error'],
+                            optimizer='Adam'
+                        )
+                        self.replay_buffers[next_automaton_state] = []
+                    
+                    # save the experience
+                    # (state, action, state, rewrd, state_dependent_gamma, epsilon_transition_taken)
+                    # to the replay buffer
+                    self.replay_buffers[active_model].append(
+                        current_state[0: -1]
+                        + [action_index]
+                        + next_state[0: -1]
+                        + [reward_flag]
+                        + [state_dep_gamma]
+                        + [epsilon_transition_taken]
+                        + [current_state[-1]]
+                    )
+                    episode_path.append(self.replay_buffers[active_model][-1])
+                    if reward_flag > 0.5:
+                        rewarding_paths.extend(episode_path)
+                    
+                    # update the state
+                    current_state = next_state
+            
+            # exploitation loop
+            exp_size = nfq_replay_buffer_size
+            high_reward_total = np.array(rewarding_paths)
+            sars = {}
+            high_reward_sars = {}
+            for model_key in self.Q.keys():
+                high_reward_sars[model_key] = high_reward_total[high_reward_total[:, -1] == model_key]
+                if len(high_reward_sars[model_key]) < exp_size:
+                    sars[model_key] = np.array(self.replay_buffers[model_key])
+                    uniform_sampled_sars = sars[model_key][
+                        np.random.choice(
+                            sars[model_key].shape[0],
+                            exp_size - len(high_reward_sars[model_key]),
+                            replace=False
+                        )
+                    ]
+                    sars[model_key] = np.vstack((high_reward_sars[model_key], uniform_sampled_sars))
+                    np.random.shuffle(sars[model_key])
+                else:
+                    sars[model_key] = high_reward_sars[model_key]
+            
+            for model_key in self.Q.keys():
+                self.Q[model_key].fit(
+                    sars[model_key][:, 0: state_dimension + 1], # stat - action
+                    sars[model_key][:, nfq_input_dim + state_dimension],    # reward
+                    epoch=3,
+                    verbose=0
+                )
+            
+            episode = 0
+            self.MDP.reset()
+            self.LDBA.reset()
+            init_state = self.MDP.current_state.tolist().copy()
+            while episode < number_of_episodes:
+                # Q value at the initial state
+                Q_at_initial_state = []
+                for action_index in range(len(product_MDP_action_space)):
+                    Q_at_initial_state.append(
+                        list(
+                            self.Q[0].predict(np.array(init_state + [action_index]).reshape(1, nfq_input_dim))[0]
+                        )[0]
+                    )
+                
+                self.q_at_initial_state.append(max(Q_at_initial_state))
+                print(
+                    'episode: '
+                    + str(episode)
+                    + ', value function at s_0= ' + str(self.q_at_initial_state[episode])
+                    # + ', trace length= ' + str(self.path_length[len(self.path_length) - 1])
+                    # + ', learning rate= ' + str(self.alpha)
+                    # + ', current state= ' + str(self.MDP.current_state)
+                )
+            
+                for model_key in self.Q.keys():
+                    target = np.zeros(len(sars[model_key]))
+                    for k in random(len(sars[model_key])):
+                        neigh = []
+                        if sars[model_key][k, -1] == 1: # meaning that an epsilon transition was active
+                            action_space = list(range(len(self.MDP.action_space)))
+                            action_space = action_space + [action_space[-1] + 1]    # for the epsilon transition
+                        else:
+                            action_space = self.MDP.action_space
+                        neigh_input = []
+                        for a in range(len(action_space)):
+                            neigh_input = np.append(
+                                sars[model_key][k, nfq_input_dim: nfq_input_dim + state_dimension],
+                                a
+                            ).reshape(1, nfq_input_dim)
+                            neigh.append(self.Q[model_key].predict(neigh_input))
+                        # target = reward + gamma * max Q(s', a')
+                        target[k] = sars[model_key][k, nfq_input_dim + state_dimension] \
+                                    + sars[model_key][k, nfq_input_dim + state_dimension + 1] * max(neigh)
+                        
+                        # terminal state check
+                        if sars[model_key][k, nfq_input_dim + state_dimension] > 0.5:
+                            target[k] = sars[model_key][k, nfq_input_dim + state_dimension]
+                    self.Q[model_key].fit(
+                        sars[model_key][:, 0: state_dimension + 1],
+                        target.reshape(len(sars[model_key]), 1),
+                        epochs=3,
+                        verbose=0
+                    )
+                
+                episode += 1
+        
+        except KeyboardInterrupt:
+            print('\nTraining exited early.')
+            try:
+                is_save = input(
+                    'Would you like to save the training data? '
+                    'If so, type in "y", otherwise, interrupt with CTRL+C. '
+                )
+            except KeyboardInterrupt:
+                print('\nExiting...')
+            
+            if is_save == 'y' or is_save == 'Y':
+                print('Saving...')
+                self.early_interruption = 1
+    
     
