@@ -613,4 +613,16 @@ class LCRL:
                 self.reward_buffer = np.zeros((self.buffer_capacity, 1))
                 self.next_state_buffer = np.zeros((self.buffer_capacity, state_dimension))
 
+            # (s, a, r, s') tuple as input
+            def record(self, obs_tuple):
+                # buffer capacity index
+                index = self.buffer_counter % self.buffer_capacity
+
+                self.state_buffer[index] = obs_tuple[0]
+                self.action_buffer[index] = obs_tuple[1]
+                self.reward_buffer[index] = obs_tuple[2]
+                self.next_state_buffer[index] = obs_tuple[3]
+
+                self.buffer_counter += 1
+            
             
