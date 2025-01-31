@@ -592,4 +592,25 @@ class LCRL:
                     self.x_prev = np.zeros_like(self.mean)
         
 
-        
+        class Buffer:
+
+            def __init__(
+                    self,
+                    buffer_capacity=ddpg_replay_buffer_size,
+                    batch_size=64,
+                    gamma=self.gamma):
+                
+                # maximum number of experience samples
+                self.buffer_capacity = buffer_capacity
+                self.batch_size = batch_size
+                self.gamma = gamma
+
+                # numb of times record() was called.
+                self.buffer_counter = 0
+
+                self.state_buffer = np.zeros((self.buffer_capacity, state_dimension))
+                self.action_buffer = np.zeros((self.buffer_capacity, action_dimension))
+                self.reward_buffer = np.zeros((self.buffer_capacity, 1))
+                self.next_state_buffer = np.zeros((self.buffer_capacity, state_dimension))
+
+            
