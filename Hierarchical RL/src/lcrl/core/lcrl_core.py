@@ -83,6 +83,8 @@ class LCRL:
         self.test = False
         # ########################### #
 
+
+
     def train_ql(
             self,
             number_of_episodes,
@@ -253,6 +255,8 @@ class LCRL:
                 print('Saving...')
                 self.early_interruption = 1
     
+
+
     def train_nfq(
             self,
             number_of_episodes,
@@ -527,5 +531,45 @@ class LCRL:
             if is_save == 'y' or is_save == 'Y':
                 print('Saving...')
                 self.early_interruption = 1
-    
-    
+
+
+
+    def train_ddpg(
+            self,
+            number_of_episodes,
+            iteration_threshold,
+            ddpg_replay_buffer_size,
+            num_of_hidden_neurons=32):
+        
+        import tensorflow as tf
+        tf.get_logger().setLevel('ERROR')
+        import keras
+
+        state_dimension = len(self.MDP.current_state)
+        action_dimension = 1
+        lower_bound = -1.0
+        upper_bound = 1.0
+
+        if self.LDBA.accepting_sets is None:
+            raise Exception(
+                'LDBA object is not defined properly. Please specify the "accepting_set". '
+            )
+        
+        class OUActionNoise:
+            
+            def __init__(
+                    self,
+                    mean,
+                    std_deviation,
+                    theta=0.15,
+                    dt=1e-2,
+                    x_initial=None):
+                
+                self.theta = theta
+                self.mean = mean
+                self.std_dev = std_deviation
+                self.dt = dt
+                self.x_initial = x_initial
+                self.reset()
+            
+            
