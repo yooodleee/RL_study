@@ -694,4 +694,25 @@ class LCRL:
                 model = keras.Model(inputs, outputs)
                 return model
             
+            def get_critic():
+                # state as input
+                state_input = keras.layers.Input(shape=(state_dimension))
+                state_out = keras.layers.Dense(int(num_of_hidden_neurons / 2), activation='relu')(state_input)
+                state_out = keras.layers.Dense(num_of_hidden_neurons, activation='relu')(state_input)
+
+                # action as input
+                action_input = keras.layers.Input(shape=(action_dimension))
+                action_out = keras.layers.Dense(num_of_hidden_neurons, activation='relu')(action_input)
+
+                # concatenating
+                concat = keras.layers.Concatenate()([state_out, action_out])
+
+                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(concat)
+                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(out)
+                outputs = keras.layers.Dense(1)(out)
+
+                # output
+                model = keras.Model([state_input, action_input], outputs)
+                return model
+            
             
