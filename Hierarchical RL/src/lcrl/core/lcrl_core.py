@@ -683,3 +683,15 @@ class LCRL:
                 for (a, b) in zip(target_weights, weights):
                     a.assign(b * tau + a * (1 - tau))
             
+            def get_actor():
+                last_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
+
+                inputs = keras.layers.Input(shape=(state_dimension,))
+                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(inputs)
+                out = keras.layers.Dense(num_of_hidden_neurons * 8, activation='relu')(out)
+                outputs = keras.layers.Dense(1, activation='tanh', kernel_initializer=last_init)(out)
+
+                model = keras.Model(inputs, outputs)
+                return model
+            
+            
