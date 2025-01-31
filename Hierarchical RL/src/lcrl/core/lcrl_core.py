@@ -585,4 +585,11 @@ class LCRL:
                 self.x_prev = x
                 return x
             
-            
+            def reset(self):
+                if self.x_initial is not None:
+                    self.x_prev = self.x_initial
+                else:
+                    self.x_prev = np.zeros_like(self.mean)
+        
+
+        
