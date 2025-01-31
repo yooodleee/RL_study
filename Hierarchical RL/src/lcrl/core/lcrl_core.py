@@ -715,4 +715,14 @@ class LCRL:
                 model = keras.Model([state_input, action_input], outputs)
                 return model
             
+            def policy(state, noise_object):
+                sampled_actions = tf.squeeze(actor_dict[active_model](state))
+                noise = noise_object()
+                # Adding noise to action
+                sampled_actions = sampled_actions.numpy() + noise
+
+                # make sure action is within bounds
+                legal_action = np.clip(sampled_actions, lower_bound, upper_bound)
+                return [np.squeeze(legal_action)]
+            
             
