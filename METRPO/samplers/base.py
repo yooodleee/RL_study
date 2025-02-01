@@ -39,4 +39,10 @@ class Sampler(object):
         """
         raise NotImplementedError
     
-    
+    def shutdown_worker(self):
+        """
+        Terminate workers if necessary.
+        """
+        raise NotImplementedError
+
+
