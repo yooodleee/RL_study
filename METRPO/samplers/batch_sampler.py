@@ -9,3 +9,9 @@ def worker_init_tf(G):
     G.sess.__enter__()
 
 
+def worker_init_tf_vars(G):
+    G.sess.run(
+        tf.compat.v1.global_variables_initializer()
+    )
+
+
