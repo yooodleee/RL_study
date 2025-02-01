@@ -16,4 +16,13 @@ class MyHalfCheetahEnv(gym.Wrapper):
         """
         super.__init__(HalfCheetahEnv(exclude_current_positions_from_observation=False))
     
+    def step(self, action):
+        """
+        Executing the action in the env.
+        """
+        next_obs, original_reward, env_done, info = self.env.step(action)
+        self.info = info
+
+        return next_obs, original_reward, env_done, info
+    
     
