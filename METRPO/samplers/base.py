@@ -13,4 +13,12 @@ class Sampler(object):
         """
         raise NotImplementedError
     
+    def obtain_samples(self, itr):
+        """
+        Collect samples for the given iteration number.
+        : param itr: Iteration number.
+        : return: A list of paths.
+        """
+        raise NotImplementedError
+    
     
