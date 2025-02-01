@@ -46,3 +46,15 @@ class Sampler(object):
         raise NotImplementedError
 
 
+class BaseSampler(Sampler):
+
+    def __init__(self, algo):
+        """
+        param
+        --------
+        algo:
+            batchPolopt
+        """
+        self.algo = algo
+    
+    
