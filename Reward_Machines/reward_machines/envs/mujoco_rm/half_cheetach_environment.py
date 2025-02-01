@@ -59,3 +59,9 @@ class MyHalfCheetahEnvRM1(RewardMachineEnv):
         super().__init__(env, rm_files)
 
 
+class MyHalfCheetahEnvRM2(RewardMachineEnv):
+
+    def __init__(self):
+        env = MyHalfCheetahEnv()
+        rm_files = ["./envs/mujoco_rm/reward_machines/t2.txt"]
+        super().__init__(env, rm_files)
