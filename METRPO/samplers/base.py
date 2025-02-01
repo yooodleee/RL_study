@@ -21,4 +21,22 @@ class Sampler(object):
         """
         raise NotImplementedError
     
+    def process_samples(self, itr, paths):
+        """
+        Return processed sample data (typically a dictionary of concatenated
+            tensors) based on the collected paths.
+        
+        params
+        ---------
+        itr:
+            Iteration number.
+        paths:
+            A list of collected paths.
+
+        return
+        ----------
+        Processed sample data.
+        """
+        raise NotImplementedError
+    
     
