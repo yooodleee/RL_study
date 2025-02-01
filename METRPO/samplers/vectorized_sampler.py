@@ -42,4 +42,7 @@ class VectorizedSampler(BaseSampler):
             )
         self.env_spec = self.algo.env.spec
     
+    def shutdown_worker(self):
+        self.vec_env.terminate()
+    
     
