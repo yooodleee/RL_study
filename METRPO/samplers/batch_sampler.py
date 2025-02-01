@@ -15,3 +15,15 @@ def worker_init_tf_vars(G):
     )
 
 
+class BatchSampler(BaseSampler):
+
+    def start_worker(self):
+        if singleton_pool.n_parallel > 1:
+            singleton_pool.run_each(worker_init_tf)
+        
+        parallel_sampler.populate_task(self.algo.env, self.algo.policy)
+
+        if singleton_pool.n_parallel > 1:
+            singleton_pool.run_each(worker_init_tf_vars)
+    
+    
