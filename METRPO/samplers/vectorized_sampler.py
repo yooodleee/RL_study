@@ -17,4 +17,7 @@ class VectorizedSampler(BaseSampler):
         super(VectorizedSampler, self).__init__(algo)
         self.n_envs = n_envs
     
+    def set_init_sampler(self, init_sampler):
+        self.vec_env.vec_env.set_init_sampler(init_sampler)
+    
     
