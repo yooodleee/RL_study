@@ -25,4 +25,29 @@ class MyHalfCheetahEnv(gym.Wrapper):
 
         return next_obs, original_reward, env_done, info
     
-    
+    def get_events(self):
+        events = ''
+        if self.info["x_position"] < -10:
+            events += 'b'
+        
+        if self.info["x_position"] > 10:
+            events += 'a'
+        
+        if self.info["x_position"] < -2:
+            events += 'd'
+        
+        if self.info["x_position"] > 2:
+            events += 'c'
+        
+        if self.info["x_position"] > 4:
+            events += 'e'
+        
+        if self.info["x_position"] > 6:
+            events += 'f'
+        
+        if self.info["x_position"] > 8:
+            events += 'g'
+        
+        return events
+
+
