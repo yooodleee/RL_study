@@ -51,3 +51,11 @@ class MyHalfCheetahEnv(gym.Wrapper):
         return events
 
 
+class MyHalfCheetahEnvRM1(RewardMachineEnv):
+
+    def __init__(self):
+        env = MyHalfCheetahEnv()
+        rm_files = ["./envs/mujoco_rm/reward_machines/t1.txt"]
+        super().__init__(env, rm_files)
+
+
