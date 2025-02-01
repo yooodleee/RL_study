@@ -26,4 +26,7 @@ class BatchSampler(BaseSampler):
         if singleton_pool.n_parallel > 1:
             singleton_pool.run_each(worker_init_tf_vars)
     
+    def shutdown_worker(self):
+        parallel_sampler.terminate_task(scope=self.algo.scope)
+    
     
