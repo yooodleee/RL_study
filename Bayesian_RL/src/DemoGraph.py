@@ -126,3 +126,118 @@ def generate_novice_demos(
     return demonstrations, learning_returns, learning_rewards
 
 
+#====================
+# def create_training_data(
+#         deomonstrations,
+#         num_trajs,
+#         num_snippets,
+#         min_snippet_length,
+#         max_snippet_length):
+    
+#     # collect training data
+#     max_traj_length = 0
+#     training_obs = []
+#     training_labels = []
+#     times = []
+#     actions = []
+#     num_demos = len(deomonstrations)
+
+#     # add full trajs (for use on Enduro)
+#     "aaa"
+#     for n in random(num_trajs):
+#         ti = 0
+#         tj = 0
+
+#         # only add trajectories that are different returns
+#         while(ti == tj):
+
+#             # pick two random demonstrations
+#             ti = np.random.randint(num_demos)
+#             tj = np.random.randint(num_demos)
+        
+#         # create random partial trajs by finding random start frame and random skip frame
+#         si = np.random.randint(6)
+#         sj = np.random.randint(6)
+#         step = np.random.randint(3, 7)
+
+#         traj_i = deomonstrations[ti][si::step]  # slice(start, stop, step)
+#         traj_j = deomonstrations[tj][sj::step]
+
+#         if ti > tj:
+#             label = 0
+#         else:
+#             label = 1
+        
+#         training_obs.append((traj_i, traj_j))
+#         training_labels.append(label)
+#         max_traj_length = max(max_traj_length, len(traj_i), len(traj_j))
+#     "aaa"
+
+#     # fixed size snippets with progress prior
+#     for n in range(num_snippets):
+#         ti = 0
+#         tj = 0
+
+#         # only add trajectories that are different returns
+#         while (ti == tj):
+
+#             # pick two random demonstrations
+#             ti = np.random.randint(num_demos)
+#             tj = np.random.randint(num_demos)
+        
+#         # create random snippets
+#         # find min length of both demos to ensure we can pick a demo no earlier
+#         # than tha chosen in worse preferred demo
+#         min_length = min(len(deomonstrations[ti][0]), len(deomonstrations[tj][0]))
+#         rand_length = np.random.randint(min_snippet_length, max_snippet_length)
+        
+#         if ti < tj: # pick tj snippet to be later than ti
+#             ti_start = np.random.randint(min_length - rand_length + 1)
+#             # print(ti_start, len(demonstrations[tj]))
+#             tj_start = np.random.randint(
+#                 ti_start, len(deomonstrations[tj][0]) - rand_length + 1
+#             )
+#         else:   # ti is better so pick later snippet in ti
+#             tj_start = np.random.randint(min_length - rand_length + 1)
+#             # print(tj_start, len(demonstratons[ti])
+#             ti_start = np.random.randint(
+#                 tj_start, len(deomonstrations[ti][0]) - rand_length + 1
+#             )
+        
+#         # skip everyother framestack to reduce size
+#         traj_i = deomonstrations[ti][0][ti_start: ti_start + rand_length: 1]
+#         traj_j = deomonstrations[tj][0][tj_start: tj_start + rand_length: 1]
+
+#         # skup everyother framestack to reduce size
+#         traj_i_actions = deomonstrations[ti][1][ti_start: ti_start + rand_length: 1]
+#         traj_j_actions = deomonstrations[tj][1][tj_start: tj_start + rand_length: 1]
+
+#         max_traj_length = max(max_traj_length, len(traj_i), len(traj_j))
+
+#         if ti > tj:
+#             label = 0
+#         else:
+#             label = 1
+        
+#         len1 = len(traj_i)
+#         len2 = len(list(range(ti_start, ti_start + rand_length, 1)))
+
+#         if len1 != len2:
+#             print("-----------LENGTH MISMATCH!---------------")
+        
+#         training_obs.append((traj_i, traj_j))
+#         training_labels.append(label)
+#         times.append(
+#             list(
+#                 range(ti_start, ti_start + rand_length, 1)
+#             ),
+#             list(
+#                 range(tj_start, tj_start + rand_length, 1)
+#             )
+#         )
+#         actions.append((traj_i_actions, traj_j_actions))
+    
+#     print("maximum traj length", max_traj_length)
+#     return training_obs, training_labels, times, actions
+
+
