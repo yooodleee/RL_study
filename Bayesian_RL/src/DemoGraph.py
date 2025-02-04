@@ -743,3 +743,7 @@ def predict_reward_sequence(net, traj):
     return rewards_from_obs
 
 
+def predict_traj_return(net, traj):
+    return sum(predict_reward_sequence(net, traj))
+
+
