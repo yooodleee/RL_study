@@ -446,3 +446,255 @@ def reconstruction_loss(decoded, target, mu, logvar):
     return bce + kld
 
 
+# Train the network
+def learn_reward(
+        reward_network,
+        optimizer,
+        training_inputs,
+        training_outputs,
+        training_times,
+        training_actions,
+        num_iter,
+        l1_reg,
+        checkpoint_dir):
+    
+    # check if gpu available
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # Assume CUDA machine, then this should print a CUDA device:
+    print(device)
+
+    loss_criterion = nn.CrossEntropyLoss()
+    temporal_difference_loss = nn.MSELoss()
+    inverse_dynamics_loss = nn.CrossEntropyLoss()
+    forward_dynamics_loss = nn.MSELoss()
+
+    cum_loss = 0.0
+    training_data = list(
+        zip(
+            training_inputs,
+            training_outputs,
+            training_times,
+            training_actions,
+        )
+    )
+    for epoch in range(num_iter):
+        np.random.shuffle(training_data)
+        training_obs, training_labels, training_times_sub, training_actions_sub = \
+            zip(*training_data)
+        validation_split = 0.9
+
+        for i in range(len(training_labels)):
+            traj_i, traj_j = training_obs[i]
+            labels = np.array([training_labels[i]])
+
+            times_i, times_j = training_times_sub[i]
+            actions_i, actions_j = training_actions_sub[i]
+
+            traj_i = np.array(traj_i)
+            traj_j = np.array(traj_j)
+
+            traj_i = torch.from_numpy(traj_i).float().to(device)
+            traj_j = torch.from_numpy(traj_j).float().to(device)
+            labels = torch.from_numpy(labels).to(device)
+
+            num_frames = len(traj_i)
+
+            # zero out gradient
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            outputs, abs_rewards, z1, z2, mu1, mu2, logvar1, logvar2 = \
+                reward_network.forward(traj_i, traj_j)
+            outputs = outputs.unsqueeze(0)
+
+            decoded1 = reward_network.decode(z1)
+            # print("DECODE SHAPE: ")
+            # print(decoded1.shape)
+            # print(decoded1.type())
+            # print("TRAJ_I SHAPE: ")
+            # print(traj_i.shape)
+            # print(traj_i.type())
+            
+            decoded2 = reward_network.decode(z2)
+            reconstruction_loss_1 = 10 * reconstruction_loss(decoded1, traj_i, mu1, logvar1)
+            reconstruction_loss_2 = 10 * reconstruction_loss(decoded2, traj_j, mu2, logvar2)
+
+            t1_i = np.random.randint(0, len(times_i))
+            t2_i = np.random.randint(0, len(times_i))
+            t1_j = np.random.randint(0, len(times_j))
+            t2_j = np.random.randint(0, len(times_j))
+
+            est_dt_i = reward_network.estimate_temporal_difference(
+                mu1[t1_i].unsqueeze(0),
+                mu1[t2_i].unsqueeze(0),
+            )
+            est_dt_j = reward_network.estimate_temporal_difference(
+                mu2[t1_j].unsqueeze(0),
+                mu2[t2_j].unsqueeze(0),
+            )
+            real_dt_i = (times_i[t2_i] - times_i[t1_i]) / 100.0
+            real_dt_j = (times_j[t2_j] - times_i[t1_j]) / 100.0
+
+            actions_1 = reward_network.estimate_inverse_dynamics(mu1[0:-1], mu1[1:])
+            actions_2 = reward_network.estimate_inverse_dynamics(mu2[0:-1], mu2[1:])
+            
+            target_actions_1 = torch.LongTensor(actions_i[1:]).to(device)
+            target_actions_2 = torch.LongTensor(actions_j[1:]).to(device)
+
+            # print((actions_1, target_actions_1))
+            # print((actions_2, target_actions_2))
+
+            inverse_dynamics_loss_1 = inverse_dynamics_loss(actions_1, target_actions_1) / 1.9
+            inverse_dynamics_loss_2 = inverse_dynamics_loss(actions_2, target_actions_2) / 1.9
+
+            # if epoch <= 1 else np.random.randint(1, min(1, max(epoch, 4)))
+            forward_dynamics_distance = 5
+            forward_dynamics_actions1 = target_actions_1
+            forward_dynamics_actions2 = target_actions_2
+
+            forward_dynamics_onehot_actions1 = torch.zeros(
+                (num_frames - 1, ACTION_SPACE_SIZE), dtype=torch.float32, device=device
+            )
+            forward_dynamics_onehot_actions2 = torch.zeros(
+                (num_frames - 1, ACTION_SPACE_SIZE), dtype=torch.float32, device=device
+            )
+            forward_dynamics_onehot_actions1.scatter_(
+                1, forward_dynamics_actions1.unsqueeze(1), 1.0
+            )
+            forward_dynamics_onehot_actions2.scatter_(
+                1, forward_dynamics_actions2.unsqueeze(1), 1.0
+            )
+
+            forward_dynamics_1 = reward_network.forward_dynamics(
+                mu1[:-forward_dynamics_distance],
+                forward_dynamics_onehot_actions1[:(num_frames - forward_dynamics_distance)]
+            )
+            forward_dynamics_2 = reward_network.forward_dynamics(
+                mu2[:-forward_dynamics_distance],
+                forward_dynamics_onehot_actions2[:(num_frames - forward_dynamics_distance)]
+            )
+
+            for fd_i in range(forward_dynamics_distance - 1):
+                forward_dynamics_1 = reward_network.forward_dynamics(
+                    forward_dynamics_1,
+                    forward_dynamics_onehot_actions1[
+                        fd_i + 1 : (num_frames - forward_dynamics_distance + fd_i + 1)
+                    ]
+                )
+                forward_dynamics_2 = reward_network.forward_dynamics(
+                    forward_dynamics_2,
+                    forward_dynamics_onehot_actions2[
+                        fd_i + 1 : (num_frames - forward_dynamics_distance + fd_i + 1)
+                    ]
+                )
+            
+            forward_dynamics_loss_1 = 100 * forward_dynamics_loss(
+                forward_dynamics_1, mu1[forward_dynamics_distance:]
+            )
+            forward_dynamics_loss_2 = 100 * forward_dynamics_loss(
+                forward_dynamics_2, mu2[forward_dynamics_distance:]
+            )
+
+            # print("est_dt: " + str(est_dt_i) + ", real_dt: " + str(real_dt_i))
+            # print("est_dt: " + str(est_dt_j) + ", real_dt: " + str(real_dt_j))
+            
+            dt_loss_i = 4 * temporal_difference_loss(
+                est_dt_i, torch.tensor(((real_dt_i,),), dtype=torch.float32, device=device)
+            )
+            dt_loss_j = 4 * temporal_difference_loss(
+                est_dt_j, torch.tensor(((real_dt_j,),), dtype=torch.float32, device=device)
+            )
+
+            # l1_loss = 0.5 * (torch.norm(z1, 1) + torch.norm(z2, 1))
+            # trex_loss = loss_criterion(outputs, labels)
+
+            # loss = trex_loss \
+            #       + l1_reg \
+            #       * abs_rewards \
+            #       + reconstruction_loss_1 \
+            #       + reconstruction_loss_2 \
+            #       + dt_loss_i + dt_loss_j \
+            #       + inverse_dynamics_loss_1 \
+            #       + inverse_dynamics_loss_2
+            # reconstruction_loss_1 + reconstruction_loss_2
+
+            loss = dt_loss_i \
+                    + dt_loss_j \
+                    + (inverse_dynamics_loss_1 + inverse_dynamics_loss_2) \
+                    + forward_dynamics_loss_1 \
+                    + forward_dynamics_loss_2 \
+                    + reconstruction_loss_1 \
+                    + reconstruction_loss_2
+            
+            if i < len(training_labels) * validation_split:
+                print("TRAINING LOSS", end=" ")
+            else:
+                print("VALIDATION LOSS", end=" ")
+            
+            print(
+                "dt_loss", dt_loss_i.item(), dt_loss_j.item(),
+                "inverse_dynamics", inverse_dynamics_loss_1.item(), inverse_dynamics_loss_2.item(),
+                "forward_dynamics", forward_dynamics_loss_1.item(), forward_dynamics_loss_2.item(),
+                "reconstruction", reconstruction_loss_1.item(), reconstruction_loss_2.item(),
+                end=" ",
+            )
+            # loss = dt_loss_i \
+            #       + dt_los_j \
+            #       + inverse_dynamics_loss_1 \
+            #       + inverse_dynamics_loss_2 \
+            #       + forward_dynamics_loss_1 \
+            #       + forward_dynamics_loss_2 \
+            #       + l1_loss
+            # loss = forward_dynamics_loss_1 + forward_dynamics_loss_2
+            # loss = inverse_dynamics_loss_1 + inverse_dynamics_loss_2
+            # TODO add 12 reg
+
+            #print(
+            #   "!LOSSDATA " \
+            #   + str(reconstruction_loss_1.data.numpy()) \
+            #   + " " + str(reconstruction_loss_2.data.numpy()) \
+            #   + " " + str(dt_loss_i.data.numpy()) \
+            #   + " " + str(dt_loss_j.data.numpy()) \
+            #   + " " + str(trex_loss.data.numpy()) \
+            #   + " " + str(loss.data.numpy()) \
+            #   + " " + str(inverse_dynamics_loss_1.data.numpy()) \
+            #   + " " + str(inverse_dynamics_loss_2.data.numpy())
+            # )
+            #print(
+            #   "!LOSSDATA " \
+            #   + str(reconstruction_loss_1.data.numpy()) \
+            #   + " " + str(reconstruction_loss_2.data.numpy()) \
+            #   + " " + str(dt_loss_i.data.numpy()) \
+            #   + " " + str(dt_loss_j.data.numpy()) \
+            #   + " " + str(loss.data.numpy()) \
+            #   + " " + str(inverse_dynamics_loss_1.data.numpy()) \
+            #   + " " + str(inverse_dynamics_loss_2.data.numpy()) \
+            #   + " " + str(forward_dynamics_loss_1.data.numpy()) \
+            #   + " " + str(forward_dynamics_loss_2.data.numpy())
+            # )
+
+            #loss = inverse_dynamics_loss_1 + inverse_dynamics_loss_2
+            #print(loss.data.numpy())
+            #sys.stdout.flush()
+
+            if i < len(training_labels) * validation_split:
+                loss.backward()
+                optimizer.step()
+            
+            # print stats to see if learning
+            item_loss = loss.item()
+            print("total", item_loss)
+            cum_loss += item_loss
+
+            if i % 100 == 99:
+                # print(i)
+                print("epoch {}".format(epoch, i, cum_loss))
+                print(abs_rewards)
+                cum_loss = 0.0
+                print("check pointing")
+                torch.save(reward_net.state_dict(), checkpoint_dir)
+        
+        print("finished training")
+
+
