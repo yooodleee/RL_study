@@ -349,4 +349,13 @@ class Net(nn.Module):
         return sum_rewards, sum_abs_rewards, mu, var, z
     
 
+    def estimate_temporal_difference(self, z1, z2):
+        x = self.temporal_difference1(
+            torch.cat((z1, z2), 1)
+        )
+        # x = self.temporal_difference2(x)
+        
+        return x
+    
+
     
