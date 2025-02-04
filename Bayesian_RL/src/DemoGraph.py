@@ -375,4 +375,40 @@ class Net(nn.Module):
         return x
     
 
+    def decode(self, encoding):
+
+        # print("before: ", encoding.shape)
+
+        x = F.leaky_relu(self.reconstruct1(encoding))
+        # print("after reconstruct1: ", x.shape)
+
+        x = F.leaky_relu(self.reconstruct2(x))
+        # print("after reconstruct2: ", x.shape)
+
+        x = x.view(-1, 2, 28, 28)
+        # print("-------decoding---------")
+        # print(x.shape)
+
+        x = F.leaky_relu(self.reconstruct_conv1(x))
+        # print("after reconstruct_conv1: ", x.shape)
+        # print(x.shape)
+
+        x = F.leaky_relu(self.reconstruct_conv2(x))
+        # print("after reconstruct_conv2: ", x.shape)
+        # print(x.shape)
+        # print(x.shape)
+
+        x = F.leaky_relu(self.reconstruct_conv3(x))
+        # print("after reconstruct_conv3: ", x.shape)
+        # print(x.shape)
+        # print(x.shape)
+
+        x = self.sigmoid(self.reconstruct_conv4(x))
+        # print("after reconstruct_conv4: ", x.shape)
+        # print(x.shape)
+        # print("-----------end decoding -------------")
+
+        return x.permute(0, 2, 3, 1)
+
+
     
