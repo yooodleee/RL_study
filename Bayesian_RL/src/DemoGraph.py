@@ -428,322 +428,920 @@ class Net(nn.Module):
 
 
 
-# ================
-def reconstruction_loss(decoded, target, mu, logvar):
-    num_elements = decoded.numel()
-    target_num_elements = decoded.numel()
 
-    if num_elements != target_num_elements:
-        print("ELEMENT SiZE MISMATCH IN RECONSTRUCTION")
-        sys.exit()
+# def reconstruction_loss(decoded, target, mu, logvar):
+#     num_elements = decoded.numel()
+#     target_num_elements = decoded.numel()
+
+#     if num_elements != target_num_elements:
+#         print("ELEMENT SiZE MISMATCH IN RECONSTRUCTION")
+#         sys.exit()
     
-    bce = F.binary_cross_entropy(decoded, target)
-    kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    kld /= num_elements
+#     bce = F.binary_cross_entropy(decoded, target)
+#     kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+#     kld /= num_elements
 
-    # print("bce: " + str(bce) + " kld: " + str(kld))
+#     # print("bce: " + str(bce) + " kld: " + str(kld))
 
-    return bce + kld
+#     return bce + kld
 
 
-# Train the network
-def learn_reward(
-        reward_network,
-        optimizer,
-        training_inputs,
-        training_outputs,
-        training_times,
-        training_actions,
-        num_iter,
-        l1_reg,
-        checkpoint_dir):
+# # Train the network
+# def learn_reward(
+#         reward_network,
+#         optimizer,
+#         training_inputs,
+#         training_outputs,
+#         training_times,
+#         training_actions,
+#         num_iter,
+#         l1_reg,
+#         checkpoint_dir):
     
-    # check if gpu available
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#     # check if gpu available
+#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Assume CUDA machine, then this should print a CUDA device:
-    print(device)
+#     # Assume CUDA machine, then this should print a CUDA device:
+#     print(device)
 
-    loss_criterion = nn.CrossEntropyLoss()
-    temporal_difference_loss = nn.MSELoss()
-    inverse_dynamics_loss = nn.CrossEntropyLoss()
-    forward_dynamics_loss = nn.MSELoss()
+#     loss_criterion = nn.CrossEntropyLoss()
+#     temporal_difference_loss = nn.MSELoss()
+#     inverse_dynamics_loss = nn.CrossEntropyLoss()
+#     forward_dynamics_loss = nn.MSELoss()
 
-    cum_loss = 0.0
-    training_data = list(
-        zip(
-            training_inputs,
-            training_outputs,
-            training_times,
-            training_actions,
-        )
-    )
-    for epoch in range(num_iter):
-        np.random.shuffle(training_data)
-        training_obs, training_labels, training_times_sub, training_actions_sub = \
-            zip(*training_data)
-        validation_split = 0.9
+#     cum_loss = 0.0
+#     training_data = list(
+#         zip(
+#             training_inputs,
+#             training_outputs,
+#             training_times,
+#             training_actions,
+#         )
+#     )
+#     for epoch in range(num_iter):
+#         np.random.shuffle(training_data)
+#         training_obs, training_labels, training_times_sub, training_actions_sub = \
+#             zip(*training_data)
+#         validation_split = 0.9
 
-        for i in range(len(training_labels)):
-            traj_i, traj_j = training_obs[i]
-            labels = np.array([training_labels[i]])
+#         for i in range(len(training_labels)):
+#             traj_i, traj_j = training_obs[i]
+#             labels = np.array([training_labels[i]])
 
-            times_i, times_j = training_times_sub[i]
-            actions_i, actions_j = training_actions_sub[i]
+#             times_i, times_j = training_times_sub[i]
+#             actions_i, actions_j = training_actions_sub[i]
 
-            traj_i = np.array(traj_i)
-            traj_j = np.array(traj_j)
+#             traj_i = np.array(traj_i)
+#             traj_j = np.array(traj_j)
 
-            traj_i = torch.from_numpy(traj_i).float().to(device)
-            traj_j = torch.from_numpy(traj_j).float().to(device)
-            labels = torch.from_numpy(labels).to(device)
+#             traj_i = torch.from_numpy(traj_i).float().to(device)
+#             traj_j = torch.from_numpy(traj_j).float().to(device)
+#             labels = torch.from_numpy(labels).to(device)
 
-            num_frames = len(traj_i)
+#             num_frames = len(traj_i)
 
-            # zero out gradient
-            optimizer.zero_grad()
+#             # zero out gradient
+#             optimizer.zero_grad()
 
-            # forward + backward + optimize
-            outputs, abs_rewards, z1, z2, mu1, mu2, logvar1, logvar2 = \
-                reward_network.forward(traj_i, traj_j)
-            outputs = outputs.unsqueeze(0)
+#             # forward + backward + optimize
+#             outputs, abs_rewards, z1, z2, mu1, mu2, logvar1, logvar2 = \
+#                 reward_network.forward(traj_i, traj_j)
+#             outputs = outputs.unsqueeze(0)
 
-            decoded1 = reward_network.decode(z1)
-            # print("DECODE SHAPE: ")
-            # print(decoded1.shape)
-            # print(decoded1.type())
-            # print("TRAJ_I SHAPE: ")
-            # print(traj_i.shape)
-            # print(traj_i.type())
+#             decoded1 = reward_network.decode(z1)
+#             # print("DECODE SHAPE: ")
+#             # print(decoded1.shape)
+#             # print(decoded1.type())
+#             # print("TRAJ_I SHAPE: ")
+#             # print(traj_i.shape)
+#             # print(traj_i.type())
             
-            decoded2 = reward_network.decode(z2)
-            reconstruction_loss_1 = 10 * reconstruction_loss(decoded1, traj_i, mu1, logvar1)
-            reconstruction_loss_2 = 10 * reconstruction_loss(decoded2, traj_j, mu2, logvar2)
+#             decoded2 = reward_network.decode(z2)
+#             reconstruction_loss_1 = 10 * reconstruction_loss(decoded1, traj_i, mu1, logvar1)
+#             reconstruction_loss_2 = 10 * reconstruction_loss(decoded2, traj_j, mu2, logvar2)
 
-            t1_i = np.random.randint(0, len(times_i))
-            t2_i = np.random.randint(0, len(times_i))
-            t1_j = np.random.randint(0, len(times_j))
-            t2_j = np.random.randint(0, len(times_j))
+#             t1_i = np.random.randint(0, len(times_i))
+#             t2_i = np.random.randint(0, len(times_i))
+#             t1_j = np.random.randint(0, len(times_j))
+#             t2_j = np.random.randint(0, len(times_j))
 
-            est_dt_i = reward_network.estimate_temporal_difference(
-                mu1[t1_i].unsqueeze(0),
-                mu1[t2_i].unsqueeze(0),
-            )
-            est_dt_j = reward_network.estimate_temporal_difference(
-                mu2[t1_j].unsqueeze(0),
-                mu2[t2_j].unsqueeze(0),
-            )
-            real_dt_i = (times_i[t2_i] - times_i[t1_i]) / 100.0
-            real_dt_j = (times_j[t2_j] - times_i[t1_j]) / 100.0
+#             est_dt_i = reward_network.estimate_temporal_difference(
+#                 mu1[t1_i].unsqueeze(0),
+#                 mu1[t2_i].unsqueeze(0),
+#             )
+#             est_dt_j = reward_network.estimate_temporal_difference(
+#                 mu2[t1_j].unsqueeze(0),
+#                 mu2[t2_j].unsqueeze(0),
+#             )
+#             real_dt_i = (times_i[t2_i] - times_i[t1_i]) / 100.0
+#             real_dt_j = (times_j[t2_j] - times_i[t1_j]) / 100.0
 
-            actions_1 = reward_network.estimate_inverse_dynamics(mu1[0:-1], mu1[1:])
-            actions_2 = reward_network.estimate_inverse_dynamics(mu2[0:-1], mu2[1:])
+#             actions_1 = reward_network.estimate_inverse_dynamics(mu1[0:-1], mu1[1:])
+#             actions_2 = reward_network.estimate_inverse_dynamics(mu2[0:-1], mu2[1:])
             
-            target_actions_1 = torch.LongTensor(actions_i[1:]).to(device)
-            target_actions_2 = torch.LongTensor(actions_j[1:]).to(device)
+#             target_actions_1 = torch.LongTensor(actions_i[1:]).to(device)
+#             target_actions_2 = torch.LongTensor(actions_j[1:]).to(device)
 
-            # print((actions_1, target_actions_1))
-            # print((actions_2, target_actions_2))
+#             # print((actions_1, target_actions_1))
+#             # print((actions_2, target_actions_2))
 
-            inverse_dynamics_loss_1 = inverse_dynamics_loss(actions_1, target_actions_1) / 1.9
-            inverse_dynamics_loss_2 = inverse_dynamics_loss(actions_2, target_actions_2) / 1.9
+#             inverse_dynamics_loss_1 = inverse_dynamics_loss(actions_1, target_actions_1) / 1.9
+#             inverse_dynamics_loss_2 = inverse_dynamics_loss(actions_2, target_actions_2) / 1.9
 
-            # if epoch <= 1 else np.random.randint(1, min(1, max(epoch, 4)))
-            forward_dynamics_distance = 5
-            forward_dynamics_actions1 = target_actions_1
-            forward_dynamics_actions2 = target_actions_2
+#             # if epoch <= 1 else np.random.randint(1, min(1, max(epoch, 4)))
+#             forward_dynamics_distance = 5
+#             forward_dynamics_actions1 = target_actions_1
+#             forward_dynamics_actions2 = target_actions_2
 
-            forward_dynamics_onehot_actions1 = torch.zeros(
-                (num_frames - 1, ACTION_SPACE_SIZE), dtype=torch.float32, device=device
-            )
-            forward_dynamics_onehot_actions2 = torch.zeros(
-                (num_frames - 1, ACTION_SPACE_SIZE), dtype=torch.float32, device=device
-            )
-            forward_dynamics_onehot_actions1.scatter_(
-                1, forward_dynamics_actions1.unsqueeze(1), 1.0
-            )
-            forward_dynamics_onehot_actions2.scatter_(
-                1, forward_dynamics_actions2.unsqueeze(1), 1.0
-            )
+#             forward_dynamics_onehot_actions1 = torch.zeros(
+#                 (num_frames - 1, ACTION_SPACE_SIZE), dtype=torch.float32, device=device
+#             )
+#             forward_dynamics_onehot_actions2 = torch.zeros(
+#                 (num_frames - 1, ACTION_SPACE_SIZE), dtype=torch.float32, device=device
+#             )
+#             forward_dynamics_onehot_actions1.scatter_(
+#                 1, forward_dynamics_actions1.unsqueeze(1), 1.0
+#             )
+#             forward_dynamics_onehot_actions2.scatter_(
+#                 1, forward_dynamics_actions2.unsqueeze(1), 1.0
+#             )
 
-            forward_dynamics_1 = reward_network.forward_dynamics(
-                mu1[:-forward_dynamics_distance],
-                forward_dynamics_onehot_actions1[:(num_frames - forward_dynamics_distance)]
-            )
-            forward_dynamics_2 = reward_network.forward_dynamics(
-                mu2[:-forward_dynamics_distance],
-                forward_dynamics_onehot_actions2[:(num_frames - forward_dynamics_distance)]
-            )
+#             forward_dynamics_1 = reward_network.forward_dynamics(
+#                 mu1[:-forward_dynamics_distance],
+#                 forward_dynamics_onehot_actions1[:(num_frames - forward_dynamics_distance)]
+#             )
+#             forward_dynamics_2 = reward_network.forward_dynamics(
+#                 mu2[:-forward_dynamics_distance],
+#                 forward_dynamics_onehot_actions2[:(num_frames - forward_dynamics_distance)]
+#             )
 
-            for fd_i in range(forward_dynamics_distance - 1):
-                forward_dynamics_1 = reward_network.forward_dynamics(
-                    forward_dynamics_1,
-                    forward_dynamics_onehot_actions1[
-                        fd_i + 1 : (num_frames - forward_dynamics_distance + fd_i + 1)
-                    ]
-                )
-                forward_dynamics_2 = reward_network.forward_dynamics(
-                    forward_dynamics_2,
-                    forward_dynamics_onehot_actions2[
-                        fd_i + 1 : (num_frames - forward_dynamics_distance + fd_i + 1)
-                    ]
-                )
+#             for fd_i in range(forward_dynamics_distance - 1):
+#                 forward_dynamics_1 = reward_network.forward_dynamics(
+#                     forward_dynamics_1,
+#                     forward_dynamics_onehot_actions1[
+#                         fd_i + 1 : (num_frames - forward_dynamics_distance + fd_i + 1)
+#                     ]
+#                 )
+#                 forward_dynamics_2 = reward_network.forward_dynamics(
+#                     forward_dynamics_2,
+#                     forward_dynamics_onehot_actions2[
+#                         fd_i + 1 : (num_frames - forward_dynamics_distance + fd_i + 1)
+#                     ]
+#                 )
             
-            forward_dynamics_loss_1 = 100 * forward_dynamics_loss(
-                forward_dynamics_1, mu1[forward_dynamics_distance:]
-            )
-            forward_dynamics_loss_2 = 100 * forward_dynamics_loss(
-                forward_dynamics_2, mu2[forward_dynamics_distance:]
-            )
+#             forward_dynamics_loss_1 = 100 * forward_dynamics_loss(
+#                 forward_dynamics_1, mu1[forward_dynamics_distance:]
+#             )
+#             forward_dynamics_loss_2 = 100 * forward_dynamics_loss(
+#                 forward_dynamics_2, mu2[forward_dynamics_distance:]
+#             )
 
-            # print("est_dt: " + str(est_dt_i) + ", real_dt: " + str(real_dt_i))
-            # print("est_dt: " + str(est_dt_j) + ", real_dt: " + str(real_dt_j))
+#             # print("est_dt: " + str(est_dt_i) + ", real_dt: " + str(real_dt_i))
+#             # print("est_dt: " + str(est_dt_j) + ", real_dt: " + str(real_dt_j))
             
-            dt_loss_i = 4 * temporal_difference_loss(
-                est_dt_i, torch.tensor(((real_dt_i,),), dtype=torch.float32, device=device)
-            )
-            dt_loss_j = 4 * temporal_difference_loss(
-                est_dt_j, torch.tensor(((real_dt_j,),), dtype=torch.float32, device=device)
-            )
+#             dt_loss_i = 4 * temporal_difference_loss(
+#                 est_dt_i, torch.tensor(((real_dt_i,),), dtype=torch.float32, device=device)
+#             )
+#             dt_loss_j = 4 * temporal_difference_loss(
+#                 est_dt_j, torch.tensor(((real_dt_j,),), dtype=torch.float32, device=device)
+#             )
 
-            # l1_loss = 0.5 * (torch.norm(z1, 1) + torch.norm(z2, 1))
-            # trex_loss = loss_criterion(outputs, labels)
+#             # l1_loss = 0.5 * (torch.norm(z1, 1) + torch.norm(z2, 1))
+#             # trex_loss = loss_criterion(outputs, labels)
 
-            # loss = trex_loss \
-            #       + l1_reg \
-            #       * abs_rewards \
-            #       + reconstruction_loss_1 \
-            #       + reconstruction_loss_2 \
-            #       + dt_loss_i + dt_loss_j \
-            #       + inverse_dynamics_loss_1 \
-            #       + inverse_dynamics_loss_2
-            # reconstruction_loss_1 + reconstruction_loss_2
+#             # loss = trex_loss \
+#             #       + l1_reg \
+#             #       * abs_rewards \
+#             #       + reconstruction_loss_1 \
+#             #       + reconstruction_loss_2 \
+#             #       + dt_loss_i + dt_loss_j \
+#             #       + inverse_dynamics_loss_1 \
+#             #       + inverse_dynamics_loss_2
+#             # reconstruction_loss_1 + reconstruction_loss_2
 
-            loss = dt_loss_i \
-                    + dt_loss_j \
-                    + (inverse_dynamics_loss_1 + inverse_dynamics_loss_2) \
-                    + forward_dynamics_loss_1 \
-                    + forward_dynamics_loss_2 \
-                    + reconstruction_loss_1 \
-                    + reconstruction_loss_2
+#             loss = dt_loss_i \
+#                     + dt_loss_j \
+#                     + (inverse_dynamics_loss_1 + inverse_dynamics_loss_2) \
+#                     + forward_dynamics_loss_1 \
+#                     + forward_dynamics_loss_2 \
+#                     + reconstruction_loss_1 \
+#                     + reconstruction_loss_2
             
-            if i < len(training_labels) * validation_split:
-                print("TRAINING LOSS", end=" ")
-            else:
-                print("VALIDATION LOSS", end=" ")
+#             if i < len(training_labels) * validation_split:
+#                 print("TRAINING LOSS", end=" ")
+#             else:
+#                 print("VALIDATION LOSS", end=" ")
             
-            print(
-                "dt_loss", dt_loss_i.item(), dt_loss_j.item(),
-                "inverse_dynamics", inverse_dynamics_loss_1.item(), inverse_dynamics_loss_2.item(),
-                "forward_dynamics", forward_dynamics_loss_1.item(), forward_dynamics_loss_2.item(),
-                "reconstruction", reconstruction_loss_1.item(), reconstruction_loss_2.item(),
-                end=" ",
-            )
-            # loss = dt_loss_i \
-            #       + dt_los_j \
-            #       + inverse_dynamics_loss_1 \
-            #       + inverse_dynamics_loss_2 \
-            #       + forward_dynamics_loss_1 \
-            #       + forward_dynamics_loss_2 \
-            #       + l1_loss
-            # loss = forward_dynamics_loss_1 + forward_dynamics_loss_2
-            # loss = inverse_dynamics_loss_1 + inverse_dynamics_loss_2
-            # TODO add 12 reg
+#             print(
+#                 "dt_loss", dt_loss_i.item(), dt_loss_j.item(),
+#                 "inverse_dynamics", inverse_dynamics_loss_1.item(), inverse_dynamics_loss_2.item(),
+#                 "forward_dynamics", forward_dynamics_loss_1.item(), forward_dynamics_loss_2.item(),
+#                 "reconstruction", reconstruction_loss_1.item(), reconstruction_loss_2.item(),
+#                 end=" ",
+#             )
+#             # loss = dt_loss_i \
+#             #       + dt_los_j \
+#             #       + inverse_dynamics_loss_1 \
+#             #       + inverse_dynamics_loss_2 \
+#             #       + forward_dynamics_loss_1 \
+#             #       + forward_dynamics_loss_2 \
+#             #       + l1_loss
+#             # loss = forward_dynamics_loss_1 + forward_dynamics_loss_2
+#             # loss = inverse_dynamics_loss_1 + inverse_dynamics_loss_2
+#             # TODO add 12 reg
 
-            #print(
-            #   "!LOSSDATA " \
-            #   + str(reconstruction_loss_1.data.numpy()) \
-            #   + " " + str(reconstruction_loss_2.data.numpy()) \
-            #   + " " + str(dt_loss_i.data.numpy()) \
-            #   + " " + str(dt_loss_j.data.numpy()) \
-            #   + " " + str(trex_loss.data.numpy()) \
-            #   + " " + str(loss.data.numpy()) \
-            #   + " " + str(inverse_dynamics_loss_1.data.numpy()) \
-            #   + " " + str(inverse_dynamics_loss_2.data.numpy())
-            # )
-            #print(
-            #   "!LOSSDATA " \
-            #   + str(reconstruction_loss_1.data.numpy()) \
-            #   + " " + str(reconstruction_loss_2.data.numpy()) \
-            #   + " " + str(dt_loss_i.data.numpy()) \
-            #   + " " + str(dt_loss_j.data.numpy()) \
-            #   + " " + str(loss.data.numpy()) \
-            #   + " " + str(inverse_dynamics_loss_1.data.numpy()) \
-            #   + " " + str(inverse_dynamics_loss_2.data.numpy()) \
-            #   + " " + str(forward_dynamics_loss_1.data.numpy()) \
-            #   + " " + str(forward_dynamics_loss_2.data.numpy())
-            # )
+#             #print(
+#             #   "!LOSSDATA " \
+#             #   + str(reconstruction_loss_1.data.numpy()) \
+#             #   + " " + str(reconstruction_loss_2.data.numpy()) \
+#             #   + " " + str(dt_loss_i.data.numpy()) \
+#             #   + " " + str(dt_loss_j.data.numpy()) \
+#             #   + " " + str(trex_loss.data.numpy()) \
+#             #   + " " + str(loss.data.numpy()) \
+#             #   + " " + str(inverse_dynamics_loss_1.data.numpy()) \
+#             #   + " " + str(inverse_dynamics_loss_2.data.numpy())
+#             # )
+#             #print(
+#             #   "!LOSSDATA " \
+#             #   + str(reconstruction_loss_1.data.numpy()) \
+#             #   + " " + str(reconstruction_loss_2.data.numpy()) \
+#             #   + " " + str(dt_loss_i.data.numpy()) \
+#             #   + " " + str(dt_loss_j.data.numpy()) \
+#             #   + " " + str(loss.data.numpy()) \
+#             #   + " " + str(inverse_dynamics_loss_1.data.numpy()) \
+#             #   + " " + str(inverse_dynamics_loss_2.data.numpy()) \
+#             #   + " " + str(forward_dynamics_loss_1.data.numpy()) \
+#             #   + " " + str(forward_dynamics_loss_2.data.numpy())
+#             # )
 
-            #loss = inverse_dynamics_loss_1 + inverse_dynamics_loss_2
-            #print(loss.data.numpy())
-            #sys.stdout.flush()
+#             #loss = inverse_dynamics_loss_1 + inverse_dynamics_loss_2
+#             #print(loss.data.numpy())
+#             #sys.stdout.flush()
 
-            if i < len(training_labels) * validation_split:
-                loss.backward()
-                optimizer.step()
+#             if i < len(training_labels) * validation_split:
+#                 loss.backward()
+#                 optimizer.step()
             
-            # print stats to see if learning
-            item_loss = loss.item()
-            print("total", item_loss)
-            cum_loss += item_loss
+#             # print stats to see if learning
+#             item_loss = loss.item()
+#             print("total", item_loss)
+#             cum_loss += item_loss
 
-            if i % 100 == 99:
-                # print(i)
-                print("epoch {}".format(epoch, i, cum_loss))
-                print(abs_rewards)
-                cum_loss = 0.0
-                print("check pointing")
-                torch.save(reward_net.state_dict(), checkpoint_dir)
+#             if i % 100 == 99:
+#                 # print(i)
+#                 print("epoch {}".format(epoch, i, cum_loss))
+#                 print(abs_rewards)
+#                 cum_loss = 0.0
+#                 print("check pointing")
+#                 torch.save(reward_net.state_dict(), checkpoint_dir)
         
-        print("finished training")
+#         print("finished training")
 
 
-def calc_accuracy(
-        reward_network,
-        training_inputs,
-        training_outputs):
+# def calc_accuracy(
+#         reward_network,
+#         training_inputs,
+#         training_outputs):
     
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    loss_criterion = nn.CrossEntropyLoss()
-    num_correct = 0.
+#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#     loss_criterion = nn.CrossEntropyLoss()
+#     num_correct = 0.
 
+#     with torch.no_grad():
+#         for i in range(len(training_inputs)):
+
+#             label = training_outputs[i]
+#             traj_i, traj_j = training_inputs[i]
+#             traj_i = np.array(traj_i)
+#             traj_j = np.array(traj_j)
+
+#             traj_i = torch.from_numpy(traj_i).float().to(device)
+#             traj_j = torch.from_numpy(traj_j).float().to(device)
+
+#             # forward to get logits
+#             outputs, abs_return, z1, z2, _, _, _, _ = reward_network.forward(traj_i, traj_j)
+#             _, pred_label = torch.max(outputs, 0)
+
+#             if pred_label.item() == label:
+#                 num_correct += 1.
+    
+#     return num_correct / len(training_inputs)
+
+
+# def predict_reward_sequence(net, traj):
+#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#     rewards_from_obs = []
+
+#     with torch.no_grad():
+#         for s in traj:
+
+#             r = net.cum_return(
+#                 torch.from_numpy(np.array([s])).float().to(device)
+#             )[0].item()
+#             rewards_from_obs.append(r)
+    
+#     return rewards_from_obs
+
+
+# def predict_traj_return(net, traj):
+#     return sum(predict_reward_sequence(net, traj))
+
+
+# from tkinter import *
+# # from tkinter import
+# # Tk, 
+# # Text, 
+# # TOP, 
+# # BOTH, 
+# # X, Y, N, 
+# # LEFT, RIGHT, 
+# # Frame, 
+# # Label, 
+# # Entry, 
+# # Scalem HORIZONTAL, 
+# # Listbox, 
+# # END, 
+# # Button, 
+# # Canvas
+
+
+from PIL import Image, ImageTk
+# from tkinter.ttk import Frame, Label, Entry, Style
+
+import os
+import sys
+
+if len(sys.argv) < 2:
+    print("Usage: " + sys.argv[0] + " <folder>")
+    sys.exit()
+
+
+ENCODING_DIMS = 64
+
+seed = 0
+folder_name = sys.argv[1]
+nname = sys.argv[2]
+print(nname)
+
+if not nname.endswith(".params"):
+    sys.exit()
+
+print("     letsgo")
+
+file_name = folder_name + "/" + nname
+data_name = file_name + "_demos/"
+
+if os.path.exists(data_name):
+    print("     Already exists: " + data_name)
+    sys.exit()
+
+os.mkdir(data_name)
+
+state_dict = torch.load(file_name)
+action_space_size, encoding_dims_times_two = state_dict['inverse_dynamics1.weight'].shape
+
+if encoding_dims_times_two % 2 != 0:
+    print("uh ohhhhhh")
+
+encoding_dims = encoding_dims_times_two // 2
+net = Net(encoding_dims, action_space_size)
+# net.cum_return(torch.zeros((1, 84, 84, 4)))
+net.load_state_dict(state_dict)
+
+env_name = nname.split("_")[0]
+if env_name == "spaceinvaders":
+    env_id = "SpaceInvadersNoFrameskip-v4"
+
+elif env_name == "mspacman":
+    env_id = "MsPacmanNoFrameskip-v4"
+
+elif env_name == "videopinball":
+    env_id = "VideoPinballNoFrameskip-v4"
+
+elif env_name == "beamrider":
+    env_id = "BeamRiderNoFrameskip-v4"
+
+else:
+    env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+
+env = make_vec_env(
+    env_id,
+    'atari',
+    1,
+    seed,
+    wrapper_kwargs={
+        'clip_rewards': False,
+        'episode_life': False,
+    }
+)
+
+stochastic = True
+
+import colorsys
+def hsv2rgb(h, s, v):
+    return tuple(
+        round(i * 255) for i in colorsys.hsv_to_rgb(h, s, v)
+    )
+
+env = VecFrameStack(env, 4)
+agent = PPO2Agent(env, "atari", stochastic)
+print("     Generating demo")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+demos, _, _ = generate_novice_demos(env, env_name, agent, ".")
+ndemo = 0
+
+for demo_and_actions in demos:
+    os.mkdir(data_name + str(ndemo))
+    
     with torch.no_grad():
-        for i in range(len(training_inputs)):
+        demo, _ = demo_and_actions
+        print("     Done demo")
+        
+        demo = torch.FloatTensor(demo)
+        print("     Made tensor")
 
-            label = training_outputs[i]
-            traj_i, traj_j = training_inputs[i]
-            traj_i = np.array(traj_i)
-            traj_j = np.array(traj_j)
+        _, _, encoding, _, _ = net.cum_return(demo)
+        print("     Encoded")
+        print(demo.device)
+        print("     ", demo.shape)
 
-            traj_i = torch.from_numpy(traj_i).float().to(device)
-            traj_j = torch.from_numpy(traj_j).float().to(device)
+        decoded = (
+            net.decode(encoding).permute(0, 3, 1, 2).reshape(-1, 84 * 4, 84).numpy() * 255
+        ).astype(np.uint8)
+        dc_s = decoded.shape[0]
+        print("     Number of images in decoded: ", dc_s)
 
-            # forward to get logits
-            outputs, abs_return, z1, z2, _, _, _, _ = reward_network.forward(traj_i, traj_j)
-            _, pred_label = torch.max(outputs, 0)
+        im_demo = (
+            demo.permute(0, 3, 1, 2).reshape(-1, 84 * 4, 84).numpy() * 255
+        ).astype(np.uint8)
+        dm_s = im_demo.shape[0]
+        print("     Number of images in demo: ", dc_s)
 
-            if pred_label.item() == label:
-                num_correct += 1.
+        if dc_s != dm_s:
+            print("Image size mismatch")
+            sys.exit()
+        
+        zeros = np.zeros((84 * 4, dc_s, 3), dtype=np.uint8)
+        
+        for i in range(dc_s):
+            for k in range(encoding_dims):
+                val = 84 * 2 + int(encoding[i][k] / 1.8 * 84 * 2)
+
+                if val >= 0 and val < 84 * 4:
+                    zeros[val][i] = hsv2rgb(k / encoding_dims, 1, 1)
+            
+            color_dec = np.repeat(np.expand_dims(decoded[i], 2), 3, axis=2)
+            color_dem = np.repeat(np.expand_dims(im_demo[i], 2), 3, axis=2)
+            cat = np.concatenate(
+                (color_dem, color_dec, zeros), 1
+            )
+            Image.fromarray(cat).save(data_name + str(ndemo) + "/" + str(i) + ".png")
+        
+        ndemo += 1
+
+
+"""
+
+with torch.no_grad():
+    x = [0] * ENCODING_DIMS
+    tarray = torch.FloatTensor(x).unsqueeze(dim=0)
+    decoded = (net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255).astype(np.uint8)
+    img = Image.fromarray(decoded)
+    img.save(data_name + "zero.png")
+
+    for k in range(4):
+        for i in range(ENCODING_DIMS):
+            x[i] = np.random.randn() * 2
+
+        tarray = torch.FloatTensor(x).unsqueeze(dim=0)
+        decoded = (net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255).astype(np.uint8)
+        img = Image.fromarray(decoded)
+        img.save(data_name + "sample_" + str(k) + ".png")
+
+    os.mkdir(data_name + "forward_dynamics")
+    for k in range(action_space_size):
+        for i in range(ENCODING_DIMS):
+            x[i] = np.random.randn() * 2
+
+        fwd_name = data_name + "forward_dynamics/action_" + str(k) + "/"
+        os.mkdir(fwd_name)
+        tarray = torch.FloatTensor(x).unsqueeze(dim=0)
+        actions = [0] * action_space_size
+        actions[k] = 1
+        taction = torch.FloatTensor(actions).unsqueeze(dim=0)
+
+        for l in range(11):
+            decoded = (net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255).astype(np.uint8)
+            img = Image.fromarray(decoded)
+            img.save(fwd_name + "index_" + str(l) + ".png")
+            tarray = net.forward_dynamics(tarray, taction)
+
+    tarray = torch.FloatTensor(x).unsqueeze(dim=0)
+    zero_out = (net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255).astype(np.uint8)
+    best_dims = []
+
+    for dim in range(ENCODING_DIMS):
+        for i in range(ENCODING_DIMS):
+            x[i] = 0
+        total_diff = 0
+
+        for v in np.linspace(-12, 12, 4):
+            x[dim] = v
+            tarray = torch.FloatTensor(x).unsqueeze(dim=0)
+            decoded = (net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255).astype(np.uint8)
+            total_diff += np.sum(np.absolute(zero_out - decoded))
+
+        best_dims.append((dim, total_diff))
+
+    best_dims.sort(key=lambda k: -k[1])
+    with open(data_name + "best_dims.txt", "w") as f:
+        f.write(str(best_dims))
+
+    os.mkdir(data_name + "special_dims")
+    special = []
+    if "spaceinvaders" in data_name:
+        special = [53, 1]
+
+    for m in range(5):
+        if best_dims[m][0] not in special:
+            special.append(best_dims[m][0])
+
+    for sp in special:
+        spdir = data_name + "special_dims/" + str(sp) + "/"
+        os.mkdir(spdir)
+        for i in range(ENCODING_DIMS):
+            x[i] = 0
+        index = 0
+
+        for v in np.linspace(-12, 12, 400):
+            x[sp] = v
+            tarray = torch.FloatTensor(x).unsqueeze(dim=0)
+            decoded = (net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255).astype(np.uint8)
+            img = Image.fromarray(decoded)
+            img.save(spdir + str(index) + ".png")
+            index += 1
+"""
+
+"""
+#s = Style()
+#s.configure('My.Red', background='red')
+#s.configure('My.Blue', background='blue')
+
+class Example(Frame):
+
+    def __init__(self):
+        super().__init__()
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        self.initUI()
+
+    def set_boxes(self):
+        raw = [x.strip() for x in self.entry.get().split(",")]
+        ones_to_add = []
+
+        if len(raw[0]) > 0:
+            for x in raw:
+                if "-" in x:
+                    start, end = [int(y) for y in x.split("-")]
+                    for k in range(start, end+1):
+                        if k not in ones_to_add:
+                            ones_to_add.append(k)
+                else:
+                    if int(x) not in ones_to_add:
+                        ones_to_add.append(int(x))
+
+        for slider in self.sliders:
+            if slider[2] and slider[3] not in ones_to_add:
+                slider[0].pack_forget()
+                slider[2] = False
+
+            elif slider[2] == False and slider[3] in ones_to_add:
+                slider[0].pack()
+                slider[2] = True
+
+    def update_img(self):
+        with torch.no_grad():
+            tarray = torch.FloatTensor(self.slider_data).unsqueeze(dim=0)
+            decoded = net.decode(tarray).permute(0, 3, 1, 2).reshape(84*4, 84).numpy() * 255
+            img = ImageTk.PhotoImage(image=Image.fromarray(decoded))
+
+            self.canvas.itemconfig(self.image_on_canvas, image=img)
+            self.canvas.image = img
+
+    def make_array_setter(self, array, index):
+        def ret(value):
+            array[index] = float(value)
+            self.update_img()
+        return ret
+
+    def make_set_to_zero(self):
+        def set_to_zero():
+
+            for x in range(0, len(self.slider_data)):
+                if self.sliders[x][2]:
+                    self.slider_data[x] = 0
+                    self.sliders[x][1].set(0)
+
+            self.update_img()
+        return set_to_zero
+
+    def make_set_to_random(self):
+        def set_to_random():
+
+            for x in range(0, len(self.slider_data)):
+                if self.sliders[x][2]:
+                    self.slider_data[x] = np.random.randn() * 3.5
+                    self.sliders[x][1].set(self.slider_data[x])
+
+            self.update_img()
+        return set_to_random
+
+    def initUI(self):
+        self.master.title("Latent space visualizer")
+        self.pack(fill=BOTH, expand=True)
+
+        #frame1 = Frame(self, bg="red")
+        #frame1.pack(fill=Y, side=LEFT)
+
+        array = np.ones((84*4,84))*200
+        img = ImageTk.PhotoImage(image=Image.fromarray(array))
+
+        #img.pack(fill=Y, side=LEFT, expand=TRUE)
+        self.canvas = Canvas(self,width=84,height=84*4)
+        self.canvas.pack(side=LEFT)
+        self.image_on_canvas = self.canvas.create_image(0, 0, anchor="nw", image=img)
+        self.canvas.image = img
+
+        #lbl1 = Label(frame1, text="Title", width=6)
+        #lbl1.pack(padx=5, pady=5, expand=True)
+
+        frame2 = Frame(self)
+        frame2.pack(fill=BOTH, expand=True)
+
+        list_container = Frame(frame2)
+        list_container.pack()
+
+        Label(
+            list_container, 
+            text="Which dims to explore"
+        ).pack(side=LEFT)
+        Button(
+            list_container, 
+            text="Clear", 
+            command=self.make_set_to_zero()
+        ).pack(side=RIGHT)
+        Button(
+            list_container, 
+            text="Randomize", 
+            command=self.make_set_to_random()
+        ).pack(side=RIGHT)
+        Label(
+            list_container, 
+            text="|"
+        ).pack(side=RIGHT)
+        Button(
+            list_container, 
+            text="Set", 
+            command=lambda: self.set_boxes()
+        ).pack(side=RIGHT)
+        self.entry = Entry(list_container)
+        self.entry.insert(0, "4, 2, 0-" + str(ENCODING_DIMS-1))
+        self.entry.pack()
+
+        slider_container = Frame(frame2)
+        slider_container.pack()
+
+        self.sliders = []
+        self.slider_data = []
+
+        for x in range(0, ENCODING_DIMS):
+            scale_frame = Frame(slider_container)
+            Label(scale_frame, text="Dim " + str(x)).pack(side=LEFT)
+            scale_frame.pack()
+
+            self.slider_data.append(0)
+            scale = Scale(
+                scale_frame, 
+                from_=-12.0, 
+                to=12.0, 
+                length=600, 
+                resolution=0.01, 
+                orient=HORIZONTAL, 
+                command=self.make_array_setter(self.slider_data, x)
+            )
+            self.sliders.append([scale_frame, scale, True, x])
+            scale.pack()
+
+        self.update_img()
+
+        " ""
+        entry1 = Entry(frame1)
+        entry1.pack(fill=X, padx=5, expand=True)
+
+        frame2 = Frame(self)
+        frame2.pack(fill=X)
+
+        lbl2 = Label(frame2, text="Author", width=6)
+        lbl2.pack(side=LEFT, padx=5, pady=5)
+
+        entry2 = Entry(frame2)
+        entry2.pack(fill=X, padx=5, expand=True)
+
+        frame3 = Frame(self)
+        frame3.pack(fill=BOTH, expand=True)
+
+        lbl3 = Label(frame3, text="Review", width=6)
+        lbl3.pack(side=LEFT, anchor=N, padx=5, pady=5)
+
+        txt = Text(frame3)
+        txt.pack(fill=BOTH, pady=5, padx=5, expand=True)
+        " ""
+
+
+def main():
+
+    root = Tk()
+    root.geometry("800x600+300+100")
+    app = Example()
+    root.mainloop()
+
+
+if __name__ == '__main__':
+    main()
+"""
+
+"""
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(description=None)
+    parser.add_argument(
+        '--env_name', 
+        default='', 
+        help='Select the environment name to run, i.e. pong'
+    )
+    parser.add_argument(
+        '--reward_model_path', 
+        default='', 
+        help="name and location for learned model params, e.g. ./learned_models/breakout.params"
+    )
+    parser.add_argument(
+        '--seed', 
+        default=0, 
+        help="random seed for experiments"
+    )
+    parser.add_argument(
+        '--models_dir', 
+        default = ".", 
+        help="path to directory that contains a models directory in which the checkpoint models for demos are stored"
+    )
+    parser.add_argument(
+        '--num_trajs', 
+        default = 0, 
+        type=int, 
+        help="number of downsampled full trajectories"
+    )
+    parser.add_argument(
+        '--num_snippets', 
+        default = 6000, 
+        type = int, 
+        help = "number of short subtrajectories to sample"
+    )
+    parser.add_argument(
+        '--encoding_dims', 
+        default = 200, 
+        type = int, 
+        help = "number of dimensions in the latent space"
+    )
+
+    args = parser.parse_args()
+    env_name = args.env_name
+    if env_name == "spaceinvaders":
+        env_id = "SpaceInvadersNoFrameskip-v4"
+    elif env_name == "mspacman":
+        env_id = "MsPacmanNoFrameskip-v4"
+    elif env_name == "videopinball":
+        env_id = "VideoPinballNoFrameskip-v4"
+    elif env_name == "beamrider":
+        env_id = "BeamRiderNoFrameskip-v4"
+    else:
+        env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+
+    env_type = "atari"
+    print(env_type)
+
+    #set seeds
+    seed = int(args.seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
+
+    print("Training reward for", env_id)
+
+    num_trajs =  args.num_trajs
+    num_snippets = args.num_snippets
+    encoding_dims = args.encoding_dims
+
+    min_snippet_length = 50 #min length of trajectory for training comparison
+    maximum_snippet_length = 100
+
+    lr = 0.00005
+    weight_decay = 0.0
+    num_iter = 5 #num times through training data
+    l1_reg=0.0
+    stochastic = True
+
+    env = make_vec_env(env_id, 'atari', 1, seed,
+                       wrapper_kwargs={
+                           'clip_rewards':False,
+                           'episode_life':False,
+                       })
+
+    if env.action_space != spaces.Discrete(ACTION_SPACE_SIZE):
+        print(
+            "Wrong size of action space! Should be discrete of size " \
+                + str(ACTION_SPACE_SIZE) \
+                + " but is " \
+                + str(env.action_space)
+        )
+        sys.exit()
+
+
+    env = VecFrameStack(env, 4)
+    agent = PPO2Agent(env, env_type, stochastic)
+
+    demonstrations, learning_returns, learning_rewards = generate_novice_demos(
+        env, env_name, agent, args.models_dir
+    )
+
+    # sort the demonstrations according to ground truth reward to simulate ranked demos
+
+    demo_lengths = [len(d[0]) for d in demonstrations]
+    demo_action_lengths = [len(d[1]) for d in demonstrations]
+
+    for i in range(len(demo_lengths)):
+        assert(demo_lengths[i] == demo_action_lengths[i])
+
+    print("demo lengths", demo_lengths)
+    max_snippet_length = min(np.min(demo_lengths), maximum_snippet_length)
+    print("max snippet length", max_snippet_length)
+
+    print(len(learning_returns))
+    print(len(demonstrations))
+    print([a[0] for a in zip(learning_returns, demonstrations)])
+
+    demonstrations = [
+        x for _, x in sorted(zip(learning_returns,demonstrations), 
+        key=lambda pair: pair[0])
+    ]
+
+    sorted_returns = sorted(learning_returns)
+    print(sorted_returns)
     
-    return num_correct / len(training_inputs)
+    training_obs, training_labels, training_times, training_actions = create_training_data(
+        demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length
+    )
 
-
-def predict_reward_sequence(net, traj):
+    print("num training_obs", len(training_obs))
+    print("num_labels", len(training_labels))
+    print("num_times", len(training_times))
+    print("num_actions", len(training_actions))
+   
+    # Now create a reward network and optimize it using the training data.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    rewards_from_obs = []
+    reward_net = Net(encoding_dims)
+    reward_net.to(device)
 
-    with torch.no_grad():
-        for s in traj:
-
-            r = net.cum_return(
-                torch.from_numpy(np.array([s])).float().to(device)
-            )[0].item()
-            rewards_from_obs.append(r)
+    import torch.optim as optim
+    optimizer = optim.Adam(
+        reward_net.parameters(),  
+        lr=lr, 
+        weight_decay=weight_decay
+    )
+    learn_reward(
+        reward_net, 
+        optimizer, 
+        training_obs, 
+        training_labels, 
+        training_times, 
+        training_actions, 
+        num_iter, 
+        l1_reg, 
+        args.reward_model_path
+    )
+    #save reward network
+    torch.save(reward_net.state_dict(), args.reward_model_path)
     
-    return rewards_from_obs
+    #print out predicted cumulative returns and actual returns
+    with torch.no_grad():
+        pred_returns = [
+            predict_traj_return(reward_net, traj[0]) 
+            for traj in demonstrations
+        ]
 
+    for i, p in enumerate(pred_returns):
+        print(i,p,sorted_returns[i])
 
-def predict_traj_return(net, traj):
-    return sum(predict_reward_sequence(net, traj))
-
-
+    print(
+        "accuracy", 
+        calc_accuracy(reward_net, training_obs, training_labels)
+    )
+"""
