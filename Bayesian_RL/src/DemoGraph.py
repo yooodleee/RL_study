@@ -358,4 +358,13 @@ class Net(nn.Module):
         return x
     
 
+    def forward_dynamics(self, z2, actions):
+        x = torch.cat((z1, actions), dim=1)
+        x = self.forward_dynamics1(x)
+        # x= F.leaky_relu(self.forward_dynamics2(x))
+        # x = self.forward_dynamics3(x)
+
+        return x
+
+    
     
