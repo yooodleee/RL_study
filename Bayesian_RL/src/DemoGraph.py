@@ -288,4 +288,21 @@ class Net(nn.Module):
         # print("Intermediate dimension calculated to be: " + str(intermediate_dimension))
     
 
+    def reparameterize(self, mu, var):
+        """
+        param
+        -----------
+        var:
+            is actually the log variance.
+        """
+        if self.training:
+            device = torch.device('cpu')
+            std = var.mul(0.5).exp()
+            eps = self.normal.sample(mu.shape).to(device)
+
+            return eps.mul(std).add(mu)        
+        else:
+            return mu
+    
+
     
