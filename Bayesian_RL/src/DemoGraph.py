@@ -411,4 +411,18 @@ class Net(nn.Module):
         return x.permute(0, 2, 3, 1)
 
 
-    
+    def forward(self, traj_i, traj_j):
+        """
+        Compute cumulative return for each trajectory and return logits.
+        """
+        cum_r_i, abs_r_i, mu1, var1, z1 = self.cum_return(traj_i)
+        cum_r_j, abs_r_j, mu2, var2, z2 = self.cum_return(traj_j)
+
+        return torch.cat(
+            (
+                cum_r_i.unsqueeze(0),
+                cum_r_j.unsqueeze(0),
+            ),
+            0
+        ), abs_r_i + abs_r_j, z1, z2, mu1, mu2, var1, var2
+
