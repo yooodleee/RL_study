@@ -728,3 +728,18 @@ def calc_accuracy(
     return num_correct / len(training_inputs)
 
 
+def predict_reward_sequence(net, traj):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    rewards_from_obs = []
+
+    with torch.no_grad():
+        for s in traj:
+
+            r = net.cum_return(
+                torch.from_numpy(np.array([s])).float().to(device)
+            )[0].item()
+            rewards_from_obs.append(r)
+    
+    return rewards_from_obs
+
+
