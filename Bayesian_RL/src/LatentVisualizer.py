@@ -361,4 +361,12 @@ class Net(nn.Module):
         return x
     
 
+    def estimate_inverse_dynamics(self, z1, z2):
+        concatenation = torch.cat((z1, z2), 1)
+        x = self.inverse_dynamics1(concatenation)
+        # x = F.leaky_relu(self.inverse_dynamics2(x))
+
+        return x
+    
+
     
