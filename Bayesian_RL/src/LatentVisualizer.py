@@ -833,4 +833,32 @@ class Example(Frame):
         self.initUI()
 
     
+    def set_boxed(self):
+        raw = [x.strip() for x in self.entry.get().split(",")]
+        ones_to_add = []
+
+        if len(raw[0]) > 0:
+            for x in raw:
+                if "-" in x:
+                    start, end = [
+                        int(y) for y in x.split("-")
+                    ]
+
+                    for k in range(start, end + 1):
+                        if k not in ones_to_add:
+                            ones_to_add.append(k)
+                else:
+                    if int(x) not in ones_to_add:
+                        ones_to_add.append(int(x))
+            
+            for slider in self.sliders:
+                if slider[2] and slider[3] not in ones_to_add:
+                    slider[0].pack_forget()
+                    slider[2] = False
+                
+                elif slider[2] == False and slider[3] in ones_to_add:
+                    slider[0].pack
+                    slider[2] = True
+    
+
     
