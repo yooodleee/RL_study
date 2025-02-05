@@ -861,4 +861,14 @@ class Example(Frame):
                     slider[2] = True
     
 
+    def update_img(self):
+        with torch.no_grad():
+            tarray = torch.FloatTensor(self.slider_data).unsqueeze(dim=0)
+            decoded = net.decode(tarray).permute(0, 3, 1, 2).reshape(84 * 4, 84).numpy()
+
+            img = ImageTk.PhotoImage(image=Image.fromarray(decoded))
+            self.canvas.itemconfig(self.image_on_canvas, image=img)
+            self.canvas.image = img
+
+
     
