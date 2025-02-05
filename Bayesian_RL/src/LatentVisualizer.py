@@ -891,4 +891,16 @@ class Example(Frame):
         return set_to_zero
     
 
+    def make_set_to_random(self):
+        def set_to_random():
+            for x in range(0, len(self.slider_data)):
+                if self.sliders[x][2]:
+                    self.slider_data[x] = np.random.randn() * 3.5
+                    self.sliders[x][1].set(self.slider_data[x])
+            
+            self.update_img()
+
+        return set_to_random
+    
+
     
