@@ -304,4 +304,45 @@ class Net(nn.Module):
             return mu
     
 
+    def cum_return(self, traj):
+        # print("input shape of trajectory: ")
+        # print(traj.shape)
+        """
+        calculate cumulative return of trajectory.
+        """
+        sum_rewards = 0
+        sum_abs_rewards = 0
+        
+        x = traj.permute(0, 3, 1, 2)    # get into NCHW format
+        # compute forward pass of reward network
+        # parallelize across frames so batch size is length of partial trajecotry
+        
+        print("pre any: ", x.shape)
+        x = F.leaky_relu(self.conv(x))
+        print("after conv1: ", x.shape)
+
+        x = F.leaky_relu(self.conv2(x))
+        print("after conv2: ", x.shape)
+
+        x = F.leaky_relu(self.conv3(x))
+        print("after conv3: ", x.shape)
+
+        x = F.leaky_relu(self.conv4(x))
+        print("after conv4: ", x.shape)
+
+        x = x.view(-1, 784)
+        x = F.leaky_relu(self.fc1(x))
+        mu = self.fc_mu(x)
+        var = self.fc_var(x)
+        
+        z = self.reparameterize(mu, var)
+        # print("after fc_mu: ", x.shape)
+
+        r = self.fc2(z)
+        sum_rewards += torch.sum(r)
+        sum_abs_rewards += torch.sum(torch.abs(r))
+
+        return sum_rewards, sum_abs_rewards, mu, var, z
+    
+
     
