@@ -738,13 +738,47 @@ def learn_reward(
             if i % 100 == 99:
                 # print(i)
                 # print("epoch {}:{} loss {}".format(epoch, i, cum_loss))
-                
+
                 print(abs_rewards)
                 cum_loss = 0.0
                 print("check pointing")
                 torch.save(reward_net.state_dict(), checkpoint_dir)
 
     print("finished training")
+
+
+
+def calc_accuracy(
+        reward_network,
+        training_inputs,
+        training_outputs):
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    loss_criterion = nn.CrossEntropyLoss()
+    num_correct = 0
+
+    with torch.no_grad():
+        for i in range(len(training_inputs)):
+            label = training_outputs[i]
+
+            traj_i, traj_j = training_inputs[i]
+            traj_i = np.array(traj_i)
+            traj_j = np.array(traj_j)
+            traj_i = torch.from_numpy(traj_i).float().to(device)
+            traj_j = torch.from_numpy(traj_j).float().to(device)
+
+            # forward to geet logits
+            outputs, \
+            abs_return, \
+            z1, z2, _, _, _, _ = reward_network.forward(
+                traj_i, traj_j
+            )
+            _, pred_label = torch.max(outputs, 0)
+
+            if pred_label.item() == label:
+                num_correct += 1.
+    
+    return num_correct / len(training_inputs)
 
 
 
