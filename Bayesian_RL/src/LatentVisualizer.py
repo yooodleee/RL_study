@@ -797,4 +797,8 @@ def predict_reward_sequence(net, traj):
 
 
 
+def predict_traj_return(net, traj):
+    return sum(predict_reward_sequence(net, traj))
 """
+
+
