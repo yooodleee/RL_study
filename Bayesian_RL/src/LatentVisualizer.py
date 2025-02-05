@@ -879,3 +879,16 @@ class Example(Frame):
         return ret
     
     
+    def make_set_to_zero(self):
+        def set_to_zero():
+            for x in range(0, len(self.slider_data)):
+                if self.sliders[x][2]:
+                    self.slider_data[x] = 0
+                    self.sliders[x][1].set(0)
+
+            self.update_img()
+
+        return set_to_zero
+    
+
+    
