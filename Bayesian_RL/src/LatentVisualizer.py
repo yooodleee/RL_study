@@ -802,3 +802,35 @@ def predict_traj_return(net, traj):
 """
 
 
+from _tkinter import *
+from PIL import Image, ImageTk
+# from tkinter.ttk import Frame, Label, Entry, Style
+
+
+ENCODING_DIMS = 64
+
+
+net = Net(ENCODING_DIMS)
+# net.cum_return(torch.zeros((1, 84, 84, 4)))
+net.load_state_dict(
+    torch.load("reappendix/spaceinvaders_64_all.params")
+)
+
+
+# s = Style()
+# s.configure('My.Red', background='red')
+# s.configure('My.Blue', background='blue')
+
+
+class Example(Frame):
+
+    def __init__(self):
+        super().__init__()
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu"
+        )
+
+        self.initUI()
+
+    
+    
