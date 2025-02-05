@@ -420,3 +420,25 @@ class Net(nn.Module):
     
 
 
+"""
+def reconstruction_loss(decoded, target, mu, logvar):
+    num_elements = decoded.numel()
+    target_num_elements = decoded.numel()
+
+    if num_elements != target_num_elements:
+        print(
+            "ELEMENT SIZE MISMATCH IN RECONSTRUCTION"
+        )
+        sys.exit()
+
+    bce = F.binary_cross_entropy(decoded, target)
+    kld = -.05 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    kld /= num_elements
+
+    # print("bce: " + str(bce) + " kld: " + str(kld))
+
+    return bce + kld
+
+
+
+"""
