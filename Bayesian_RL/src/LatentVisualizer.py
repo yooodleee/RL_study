@@ -289,4 +289,19 @@ class Net(nn.Module):
         )
 
 
+    def reparameterize(self, mu, var):
+        """
+        var is actually the log variance
+        """
+
+        if self.training:
+            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            std = var.mul(0.5).exp()
+            eps = self.normal.sample(mu.shape).to(device)
+
+            return eps.mul(std).add(mu)
+        else:
+            return mu
+    
+
     
