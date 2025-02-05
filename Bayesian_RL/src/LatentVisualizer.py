@@ -802,7 +802,7 @@ def predict_traj_return(net, traj):
 """
 
 
-from _tkinter import *
+from tkinter import Tk, Text, TOP, BOTH, X, Y, N, LEFT, RIGHT, Frame, Label, Entry, Scale, HORIZONTAL, Listbox, END, Button, Canvas
 from PIL import Image, ImageTk
 # from tkinter.ttk import Frame, Label, Entry, Style
 
@@ -934,7 +934,7 @@ class Example(Frame):
         Button(
             list_container, text="Clear", command=self.make_set_to_zero()
         ).pack(side=RIGHT)
-        BUtton(
+        Button(
             list_container, text="Randomize", command=self.make_set_to_random()
         ).pack(side=RIGHT)
         Label(
@@ -998,3 +998,211 @@ class Example(Frame):
         """
 
 
+def main():
+
+    root = Tk()
+    root.geometry("800x600+300+100")
+    app = Example()
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+"""
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(description=None)
+    parser.add_argument(
+        '--env_name', 
+        default='', 
+        help='Select the environment name to run, i.e. pong'
+    )
+    parser.add_argument(
+        '--reward_model_path', 
+        default='', 
+        help="name and location for learned model params, e.g. ./learned_models/breakout.params"
+    )
+    parser.add_argument(
+        '--seed', 
+        default=0, 
+        help="random seed for experiments"
+    )
+    parser.add_argument(
+        '--models_dir', 
+        default=".", 
+        help="path to directory that contains a models directory in which the checkpoint models for demos are stored"
+    )
+    parser.add_argument(
+        '--num_trajs', 
+        default=0, 
+        type=int, 
+        help="number of downsampled full trajectories"
+    )
+    parser.add_argument(
+        '--num_snippets', 
+        default = 6000, 
+        type=int, 
+        help="number of short subtrajectories to sample"
+    )
+    parser.add_argument(
+        '--encoding_dims', 
+        default=200, 
+        type=int, 
+        help="number of dimensions in the latent space"
+    )
+
+    args = parser.parse_args()
+    env_name = args.env_name
+
+    if env_name == "spaceinvaders":
+        env_id = "SpaceInvadersNoFrameskip-v4"
+
+    elif env_name == "mspacman":
+        env_id = "MsPacmanNoFrameskip-v4"
+
+    elif env_name == "videopinball":
+        env_id = "VideoPinballNoFrameskip-v4"
+
+    elif env_name == "beamrider":
+        env_id = "BeamRiderNoFrameskip-v4"
+
+    else:
+        env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+
+    env_type = "atari"
+    print(env_type)
+
+    #set seeds
+    seed = int(args.seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
+
+    print("Training reward for", env_id)
+
+    num_trajs =  args.num_trajs
+    num_snippets = args.num_snippets
+    encoding_dims = args.encoding_dims
+
+    min_snippet_length = 50 #min length of trajectory for training comparison
+    maximum_snippet_length = 100
+
+    lr = 0.00005
+    weight_decay = 0.0
+    num_iter = 5 #num times through training data
+    l1_reg=0.0
+    stochastic = True
+
+    env = make_vec_env(env_id, 'atari', 1, seed,
+                       wrapper_kwargs={
+                           'clip_rewards':False,
+                           'episode_life':False,
+                       })
+
+    if env.action_space != spaces.Discrete(ACTION_SPACE_SIZE):
+        print(
+            "Wrong size of action space! Should be discrete of size " \
+            + str(ACTION_SPACE_SIZE) \
+            + " but is " \
+            + str(env.action_space)
+        )
+        sys.exit()
+
+
+    env = VecFrameStack(env, 4)
+    agent = PPO2Agent(env, env_type, stochastic)
+
+    demonstrations, \
+    learning_returns, \
+    learning_rewards = generate_novice_demos(
+        env, 
+        env_name, 
+        agent, 
+        args.models_dir
+    )
+
+    #sort the demonstrations according to ground truth reward to simulate ranked demos
+
+    demo_lengths = [len(d[0]) for d in demonstrations]
+    demo_action_lengths = [len(d[1]) for d in demonstrations]
+
+    for i in range(len(demo_lengths)):
+        assert(demo_lengths[i] == demo_action_lengths[i])
+
+    print("demo lengths", demo_lengths)
+    max_snippet_length = min(np.min(demo_lengths), maximum_snippet_length)
+    print("max snippet length", max_snippet_length)
+
+    print(len(learning_returns))
+    print(len(demonstrations))
+    print([a[0] for a in zip(learning_returns, demonstrations)])
+
+    demonstrations = [
+        x for _, x in sorted(zip(learning_returns,demonstrations), 
+        key=lambda pair: pair[0])
+    ]
+
+    sorted_returns = sorted(learning_returns)
+    print(sorted_returns)
+    
+    training_obs, \
+    training_labels, \
+    training_times, \
+    training_actions = create_training_data(
+        demonstrations, 
+        num_trajs, 
+        num_snippets, 
+        min_snippet_length, 
+        max_snippet_length
+    )
+
+    print("num training_obs", len(training_obs))
+    print("num_labels", len(training_labels))
+    print("num_times", len(training_times))
+    print("num_actions", len(training_actions))
+   
+    # create a reward network and optimize it using the training data.
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() else "cpu"
+    )
+    reward_net = Net(encoding_dims)
+    reward_net.to(device)
+
+    import torch.optim as optim
+    optimizer = optim.Adam(
+        reward_net.parameters(),  
+        lr=lr, 
+        weight_decay=weight_decay
+    )
+    learn_reward(
+        reward_net, 
+        optimizer, 
+        training_obs, 
+        training_labels, 
+        training_times, 
+        training_actions, 
+        num_iter, 
+        l1_reg, 
+        args.reward_model_path
+    )
+
+    #save reward network
+    torch.save(reward_net.state_dict(), args.reward_model_path)
+    
+    #print out predicted cumulative returns and actual returns
+    with torch.no_grad():
+        pred_returns = [
+            predict_traj_return(reward_net, traj[0]) 
+            for traj in demonstrations
+        ]
+
+    for i, p in enumerate(pred_returns):
+        print(i,p,sorted_returns[i])
+
+    print(
+        "accuracy", 
+        calc_accuracy(reward_net, training_obs, training_labels)
+    )
+"""
