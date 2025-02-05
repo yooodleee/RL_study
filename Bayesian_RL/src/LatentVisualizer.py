@@ -871,4 +871,11 @@ class Example(Frame):
             self.canvas.image = img
 
 
+    def make_array_setter(self, array, index):
+        def ret(value):
+            array[index] = float(value)
+            self.update_img()
+        
+        return ret
+    
     
