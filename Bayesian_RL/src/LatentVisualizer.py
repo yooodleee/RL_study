@@ -242,4 +242,51 @@ def create_training_data(
 
 
 """
-# %%
+
+
+class Net(nn.Module):
+
+    def __init__(self, ENCODING_DIMS):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(4, 16, 7, stride=3)
+        self.conv2 = nn.Conv2d(16, 32, 5, stride=2)
+        self.conv3 = nn.Conv2d(32, 32, 3, stride=1)
+        self.conv4 = nn.Conv2d(32, 16, 3, stride=1)
+
+        # min(784, max(64, ENCODING_DIMS * 2))
+        intermediate_dimension = 128
+
+        self.fc1 = nn.Linear(784, intermediate_dimension)
+        self.fc_mu = nn.Linear(intermediate_dimension, ENCODING_DIMS)
+        self.fc_var = nn.Linear(intermediate_dimension, ENCODING_DIMS)
+        self.fc2 = nn.Linear(ENCODING_DIMS, 1)
+
+        self.reconstruct1 = nn.Linear(ENCODING_DIMS, intermediate_dimension)
+        self.reconstruct2 = nn.Linear(intermediate_dimension, 1568)
+        
+        self.reconstruct_conv1 = nn.ConvTranspose2d(2, 4, 3, stride=1)
+        self.reconstruct_conv2 = nn.ConvTranspose2d(4, 16, 6, stride=1)
+        self.reconstruct_conv3 = nn.ConvTranspose2d(16, 16, 7, stride=2)
+        self.reconstruct_conv4 = nn.ConvTranspose2d(16, 4, 10, stride=1)
+
+        self.temporal_difference1 = nn.Linear(ENCODING_DIMS * 2, 1, bias=False)#ENCODING_DIMS)
+        # self.temporal_difference2 = nn.Linear(ENCODING_DIMS, 1)
+        
+        self.inverse_dynamics1 = nn.Linear(ENCODING_DIMS * 2, ACTION_SPACE_SIZE, bias=False)#ENCODING_DIMS)
+        # self.inverse_dynamics2 = nn.Linear(ENCODING_DIMS, ACTION_SPACE_SIZE)
+
+        self.forward_dynamics1 = nn.Linear(ENCODING_DIMS + ACTION_SPACE_SIZE, ENCODING_DIMS, bias=False)# (ENCODING_DIMS + ACTION_SPACE_SIZE) * 2)
+        # self.forward_dynamics2 = nn.Linear((ENCODING_DIMS + ACTION_SPACE_SIZE) * 2, (ENCODING_DIMS + ACTION_SPACE_SIZE) * 2)
+        # self.forward_dynamics3 = nn.Linear((ENCODIG_DIMS + ACTION_SPACE_SIZE) * 2, ENCODING_DIMS)
+
+        self.normal = tdist.Normal(0, 1)
+        self.softmax = nn.Softmax(dim=1)
+        self.sigmoid = nn.Sigmoid()
+
+        print(
+            "Intermediate dimension calculated to be: " + str(intermediate_dimension)
+        )
+
+
+    
