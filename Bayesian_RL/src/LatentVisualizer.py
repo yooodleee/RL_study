@@ -833,7 +833,7 @@ class Example(Frame):
         self.initUI()
 
     
-    def set_boxed(self):
+    def set_boxes(self):
         raw = [x.strip() for x in self.entry.get().split(",")]
         ones_to_add = []
 
@@ -903,4 +903,98 @@ class Example(Frame):
         return set_to_random
     
 
-    
+    def initUI(self):
+        self.master.title("Latent space visualizer")
+        self.pack(fill=BOTH, expand=True)
+
+        # frame1 = Frame(self, bg="red")
+        # frame1.pack(fill=Y, side=LEFT)
+
+        array = np.ones((84 * 4, 84)) * 200
+        img = ImageTk.PhotoImage(image=Image.fromarray(array))
+        # img.pack(fill=Y, side=LEFT, expands=TRUE)
+
+        self.canvas = Canvas(self, width=84, height=84 * 4)
+        self.canvas.pack(side=LEFT)
+        self.image_on_canvas = self.canvas.create_image(0, 0, anchor="nw", image=img)
+        self.canvas.image = img
+
+        # lbl1 = Label(frame1, text="Title", width=6)
+        # lbl1.pack(pad=5, pady=5, expand=True)
+
+        frame2 = Frame(self)
+        frame2.pack(fill=BOTH, expand=True)
+
+        list_container = Frame(frame2)
+        list_container.pack()
+
+        Label(
+            list_container, text="Which dims to explore"
+        ).pack(side=LEFT)
+        Button(
+            list_container, text="Clear", command=self.make_set_to_zero()
+        ).pack(side=RIGHT)
+        BUtton(
+            list_container, text="Randomize", command=self.make_set_to_random()
+        ).pack(side=RIGHT)
+        Label(
+            list_container, text="|"
+        ).pack(side=RIGHT)
+        Button(
+            list_container, text="Set", command=lambda: self.set_boxes()
+        ).pack(side=RIGHT)
+
+        self.entry = Entry(list_container)
+        self.entry.insert(0, "4, 2, 0-" + str(ENCODING_DIMS - 1))
+        self.entry.pack()
+
+        slider_container = Frame(frame2)
+        slider_container.pack()
+
+        self.sliders = []
+        self.slider_data = []
+
+        for x in range(0, ENCODING_DIMS):
+            scale_frame = Frame(slider_container)
+            Label(scale_frame, text="Dim " + str(x)).pack(side=LEFT)
+            scale_frame.pack()
+            self.slider_data.append(0)
+
+            scale = Scale(
+                scale_frame,
+                from_=-12.0,
+                to=12.0,
+                length=600,
+                resoultion=0.01,
+                orient=HORIZONTAL,
+                command=self.make_array_setter(self.slider_data, x)
+            )
+            self.sliders.append([scale_frame, scale, True, x])
+            scale.pack()
+        
+        self.update_img()
+
+        """
+        entry1 = Entry(frame1)
+        entry1.pack(fill=X, padx=5, expand=True)
+
+        frame2 = Frame(self)
+        frame2.pack(fill=X)
+
+        lbl2 = Label(frame2, text="Author", width=6)
+        lbl2.pack(side=LEFT, padx=5, pady=5)
+
+        entry2 = Entry(frame2)
+        entry2.pack(fill=X, padx=5, expand=True)
+
+        frame3 = Frame(self)
+        frame3.pack(fill=BOTH, expand=True)
+
+        lbl3 = Label(frame3, tex"Review", width=6)
+        lbl3.pack(side=LEFT, anchor=N, padx=5, pady=5)
+
+        txt = Text(frame3)
+        txt.pack(fill=BOTH, pady=5, padx=5, expand=True)
+        """
+
+
