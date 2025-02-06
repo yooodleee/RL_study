@@ -229,4 +229,22 @@ class FixedReplayBuffer(object):
                 self._loaded_buffers = True
     
 
+    def get_transition_elements(self):
+        return self._replay_buffers[0].get_transition_elements()
+    
+
+    def sample_transition_batch(
+            self,
+            batch_size=None,
+            indices=None):
+        
+        buffer_index = np.random.randint(
+            self._num_replay_buffers
+        )
+
+        return self._replay_buffers[buffer_index].sample_transition_batch(
+            batch_size=batch_size, indices=indices
+        )
+    
+
     
