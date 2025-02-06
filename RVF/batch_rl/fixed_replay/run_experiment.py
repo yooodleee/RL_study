@@ -96,4 +96,41 @@ class FixedReplayRunner(run_experiment.Runner):
         )
     
 
+
+    def _run_one_iteration(self, iteration):
+        """
+        Runs one iter of agent/env iteraction.
+        """
+
+        statistics = iteration_statistics.IterationStatistics()
+
+        tf.compat.v1.logging.info(
+            'Starting iteration %d',
+            iteration,
+        )
+
+        if not self._agent._replay_suffix:
+            # reload the replay buffer
+            self._agent._replay.memory.reload_buffer(
+                num_buffers=5
+            )
+        
+        self._run_train_phase()
+
+        
+        num_episode_eval, \
+        average_reward_eval = self._run_eval_phase(
+            statistics
+        )
+
+        self._save_tensorboard_summaries(
+            iteration,
+            num_episode_eval,
+            average_reward_eval,
+        )
+
+        return statistics.data_lists
+    
+
+
     
