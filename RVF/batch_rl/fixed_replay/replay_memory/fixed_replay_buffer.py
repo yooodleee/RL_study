@@ -247,4 +247,93 @@ class FixedReplayBuffer(object):
         )
     
 
+    def load(self, *args, **kwargs):
+        pass
+
+
+    def reload_buffer(self, num_buffers):
+
+        if not self._replay_suffix:
+            self._loaded_buffers = False
+            self._load_replay_buffers(num_buffers)
     
+
+    def save(self, *args, **kwargs):
+        pass
+
+
+    def add(self, *args, **kwargs):
+        pass
+
+
+
+@gin.configurable(
+    denylist=[
+        'observation_shape',
+        'stack_size',
+        'update_horizon',
+        'gamma',
+    ]
+)
+class WrappedFixedReplayBuffer(
+    circular_replay_buffer.WrappedReplayBuffer):
+
+    """
+    Wrapper of OutOfGraphReplayBuffer with an in graph sampling mechanism.
+    """
+
+    def __init__(
+            self,
+            data_dir,
+            replay_suffix,
+            observation_shape,
+            stack_size,
+            use_staging=True,
+            replay_capacity=1000000,
+            batch_size=32,
+            update_horizon=1,
+            gamma=0.99,
+            wrapped_memory=None,
+            max_sample_attempts=1000,
+            extra_storate_types=None,
+            observation_dtype=np.uint8,
+            action_shape=(),
+            action_dtype=np.int32,
+            reward_shape=(),
+            reward_dtype=np.float32):
+        
+        """
+        Initializes WrappedFixedReplayBuffer.
+        """
+
+        memory = FixedReplayBuffer(
+            data_dir,
+            replay_suffix,
+            observation_shape,
+            stack_size,
+            replay_capacity,
+            batch_size,
+            update_horizon,
+            gamma,
+            max_sample_attempts,
+            extra_storate_types=extra_storate_types,
+            observation_dtype=observation_dtype
+        )
+
+        super(WrappedFixedReplayBuffer, self).__init__(
+            observation_shape,
+            stack_size,
+            use_staging=use_staging,
+            replay_capacity=replay_capacity,
+            batch_size=batch_size,
+            update_horizon=update_horizon,
+            gamma=gamma,
+            wrapped_memory=memory,
+            max_sample_attempts=max_sample_attempts,
+            extra_storate_types=extra_storate_types,
+            observation_dtype=observation_dtype,
+            action_shape=action_shape,
+            action_dtype=action_dtype,
+            reward_shape=reward_shape,
+            reward_dtype=reward_dtype,
+        )
