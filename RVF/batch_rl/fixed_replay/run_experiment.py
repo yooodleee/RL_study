@@ -77,4 +77,23 @@ class FixedReplayRunner(run_experiment.Runner):
                         )
     
 
+    def _run_train_phase(self):
+        """
+        Run training phase.
+        """
+
+        self._agent.eval_mode = False
+        start_time = time.time()
+
+        for _ in range(self._training_steps):
+            self._agent._train_step()
+        
+        time_delta = time.time() - start_time
+
+        tf.compat.v1.logging.info(
+            'Average training steps per second: %.2f',
+            self._training_steps / time_delta,
+        )
+    
+
     
