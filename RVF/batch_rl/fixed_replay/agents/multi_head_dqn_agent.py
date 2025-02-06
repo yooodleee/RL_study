@@ -72,4 +72,29 @@ class FixedReplayMultiHeadDQNAgent(multi_head_dqn_agent.MultiHeadDQNAgent):
         )
 
 
+    def step(self, reward, observation):
+        """
+        Records the most recent transition and returns the agent's
+            next action.
+
+
+        Args:
+        -------------
+            reward: (float)
+                the reward received from the agent's most recent action.
+            observation: (np.array)
+                the most recent observation.
+
+
+        Returns: (int)
+        -------------
+            the selected action.
+        """
+
+        self._record_observation(observation)
+        self.action = self._select_action()
+
+        return self.action
+    
+
     
