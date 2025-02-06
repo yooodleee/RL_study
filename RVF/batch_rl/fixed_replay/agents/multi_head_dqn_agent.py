@@ -97,4 +97,12 @@ class FixedReplayMultiHeadDQNAgent(multi_head_dqn_agent.MultiHeadDQNAgent):
         return self.action
     
 
+    def end_episode(self, reward):
+        assert self.eval_mode, 'Eval mode is not set to be True.'
+
+        super(
+            FixedReplayMultiHeadDQNAgent, self
+        ).end_episode(reward)
+
+
     
