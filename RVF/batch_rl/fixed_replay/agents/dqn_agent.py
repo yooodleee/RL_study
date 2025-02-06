@@ -113,4 +113,10 @@ class FixedreplayDQNAgent(dqn_agent.DQNAgent):
         return self.action
     
 
+    def end_episode(self, reward):
+        assert self.eval_mode, 'Eval mode is not set to be True.'
+
+        super(FixedreplayDQNAgent, self).end_episode(reward)
+    
+
     
