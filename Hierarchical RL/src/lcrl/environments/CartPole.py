@@ -59,4 +59,39 @@ class CartPole:
         self.action_space = [-1, 1]
     
 
+    def step(self, action):
+        x, x_dot, theta, theta_dot = self.currenst_state
+
+        force = self.force_mag if action[0] > 0 else -self.force_mag
+
+        costheta = math.cos(theta)
+        sintheta = math.sin(theta)
+
+        temp = (force + self.polemass_length * theta_dot ** 2 * sintheta) / self.total_mass
+
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass))
+
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+        
+
+        if self.kinematics_integrator == 'euler':
+            x = x + self.tau * x_dot
+            x_dot = x_dot + self.tau * xacc
+            
+            theta = theta + self.tau * theta_dot
+            theta_dot = theta_dot + self.tau * thetaacc
+        
+        else:   # semi implicit euler
+            x_dot = x_dot + self.tau * xacc
+            x = x + self.tau * x_dot
+
+            theta_dot = theta_dot + self.tau * thetaacc
+            theta = theta + self.tau * theta_dot
+        
+        self.currenst_state = np.array(
+            (x, x_dot, theta, theta_dot)
+        )
+
+        return self.currenst_state
     
+
