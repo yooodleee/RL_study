@@ -141,4 +141,52 @@ class FixedReplayBuffer(object):
             return None
     
 
+    def _get_checkpoint_suffixes(
+            self,
+            replay_file_start_index,
+            replay_file_end_index):
+        
+        """
+        Get replay buffer indices to be sampled among all replay buffers.
+        """
+
+        ckpts = gfile.ListDirectory(self._data_dir)
+
+        # assumes saved in a format CKPT_NAME.{SUFFIX}.gz
+        ckpt_counters = collections.Counter(
+            [
+                name.split('.')[-2]
+                for name in ckpts
+                if name.endswith('gz')
+            ]
+        )
+
+        # should contain the files for add_count, act, obs, reward,
+        # terminal and invalid_range
+        ckpt_suffixes = [
+            int(x) for x in ckpt_counters
+            if ckpt_counters[x] in [6, 7]
+        ]
+
+        # sort the replay buffer indices. would correspond to list of
+        # indices ranging from [0, 1, 2, ...]
+        ckpt_suffixes = sorted(ckpt_suffixes)
+
+        if replay_file_end_index is None:
+            replay_file_end_index = len(ckpt_suffixes)
+        
+        replay_indices = ckpt_suffixes[
+            replay_file_start_index:replay_file_end_index
+        ]
+
+        logging.info(
+            'Replay indices: %s', str(replay_indices)
+        )
+
+        if len(replay_indices) == 1:
+            self._replay_suffix = replay_indices[0]
+        
+        return replay_indices
+    
+
     
