@@ -133,4 +133,36 @@ class FixedReplayRunner(run_experiment.Runner):
     
 
 
-    
+    def _save_tensorboard_summaries(
+            self,
+            iteration,
+            num_episodes_eval,
+            average_reward_eval):
+        
+        """
+        Save statistics as tensorboard summaries.
+
+
+        Args
+        -----------
+            iteration: (int)
+                the current iter number.
+            num_episodes_eval: (int)
+                number of eval episodes run.
+            average_reward_eval: (float)
+                the average eval reward.
+        """
+
+        summary = tf.compat.v1.Summary(
+            value=[
+                tf.compat.v1.Summary.Value(
+                    tag='Eval/NumEpisodes',
+                    simple_value=num_episodes_eval
+                ),
+                tf.compat.v1.Summary.Value(
+                    tag='Eval/AverageReturns',
+                    simple_value=average_reward_eval
+                ),
+            ]
+        )
+        self._summary_writer.add_summary(summary, iteration)
