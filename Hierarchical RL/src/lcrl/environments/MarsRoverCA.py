@@ -100,4 +100,77 @@ class MarsRover:
         return next_state
     
 
-    
+    def state_label(self, state):
+        """
+        NOTE: labels are inevitably discrete when reading an image file.
+            thus in the following look where the continuous state lies
+            within the image rgb matrix.
+        """
+
+        low_bound = [
+            abs(state[i] - int(state[i]))
+            for i in range(len(state))
+        ]
+        high_bound = [
+            1 - low_bound[i]
+            for i in range(len(state))
+        ]
+        state_rgb_index = []
+
+        for i in range(len(state)):
+            if low_bound[i] <= high_bound[i]:
+
+                # check for boundary
+                if int(state[i]) > self.background.shape[i] - 1:
+                    state_rgb_index.append(
+                        self.background.shape[i] - 1
+                    )
+                else:
+                    state_rgb_index.append(int(state[i]))
+            else:
+
+                # check for boundary
+                if int(state[i]) + 1 > self.background.shape[i] - 1:
+                    state_rgb_index.append(
+                        self.background.shape[i] - 1
+                    )
+                else:
+                    state_rgb_index.append(int(state[i]) + 1)
+        
+
+        if list(
+            self.labels[
+                state_rgb_index[0],
+                state_rgb_index[1]
+            ]
+        ) == list(self.labels[0, 199]) \
+        or list(
+            self.labels[
+                state_rgb_index[0],
+                state_rgb_index[1]
+            ]
+        ) == list(self.labels[144, 199]):
+
+            return 'unsafe'
+        
+        elif list(
+            self.labels[
+                state_rgb_index[0],
+                state_rgb_index[1]
+            ]
+        ) == list(self.labels[45, 152]):
+            
+            return 'goal1'
+        
+        elif list(
+            self.labels[
+                state_rgb_index[0],
+                state_rgb_index[1]
+            ]
+        ) == list(self.labels[62, 16]):
+            
+            return 'goal2'
+        
+        else:
+
+            return 'safe'
