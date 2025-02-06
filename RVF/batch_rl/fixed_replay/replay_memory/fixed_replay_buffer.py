@@ -86,4 +86,18 @@ class FixedReplayBuffer(object):
                 self._load_replay_buffers(num_buffers=1)
     
 
+    def load_single_buffer(self, suffix):
+        """
+        Load a single replay buffer.
+        """
+
+        replay_buffer = self._loaded_buffers(suffix)
+        if replay_buffer is not None:
+            
+            self._replay_buffers = [replay_buffer]
+            self.add_count = replay_buffer.add_count
+            self._num_replay_buffers = 1
+            self._loaded_buffers = True
+    
+
     
