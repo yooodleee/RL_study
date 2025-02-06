@@ -88,7 +88,7 @@ class FixedReplayQuantileAgent(quantile_agent.QuantileAgent):
             self._init_checkpoint_dir = None
         
         super(
-            FixedreplayQuantileAgent, self
+            FixedReplayQuantileAgent, self
         ).__init__(
             sess, num_actions, **kwargs
         )
