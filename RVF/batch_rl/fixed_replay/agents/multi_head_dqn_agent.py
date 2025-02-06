@@ -105,4 +105,18 @@ class FixedReplayMultiHeadDQNAgent(multi_head_dqn_agent.MultiHeadDQNAgent):
         ).end_episode(reward)
 
 
-    
+    def _build_replay_buffer(self, use_staging):
+        """
+        Creates the replay buffer used by the agent.
+        """
+
+        return fixed_replay_buffer.WrappedFixedReplayBuffer(
+            data_dir=self._replay_data_dir,
+            replay_suffix=self._replay_suffix,
+            observation_shape=self.observation_shape,
+            stack_size=self.stack_size,
+            use_staging=use_staging,
+            update_horizon=self.update_horizon,
+            gamma=self.gamma,
+            observation_dtype=self.observation_dtype.as_numpy_dtype
+        )
