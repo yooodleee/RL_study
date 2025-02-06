@@ -117,4 +117,12 @@ class FixedReplayQuantileAgent(quantile_agent.QuantileAgent):
         return self.action
     
 
+    def end_episode(self, reward):
+        assert self.eval_mode, 'Eval mode is not set to be True.'
+
+        super(
+            FixedReplayQuantileAgent, self
+        ).end_episode(reward)
+    
+
     
