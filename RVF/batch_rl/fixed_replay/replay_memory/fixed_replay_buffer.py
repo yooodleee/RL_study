@@ -100,4 +100,45 @@ class FixedReplayBuffer(object):
             self._loaded_buffers = True
     
 
+    def _load_buffer(self, suffix):
+        """
+        Loads a OutOfGraphReplayBuffer replay buffer.
+        """
+        try:
+            logging.info(
+                'Starting to load from ckpt %s',
+                suffix,
+                self._data_dir
+            )
+            replay_buffer = circular_replay_buffer.OutOfGraphReplayBuffer(
+                *self._args, **self._kwargs
+            )
+            replay_buffer.load(self._data_dir, suffix)
+
+            replay_capacity = replay_buffer._replay_capacity
+            logging.info(
+                'Capacity: %d',
+                replay_buffer._replay_capacity
+            )
+
+            for name, array in replay_buffer._store.items():
+                # this frees unused RAM if replay_capacity is smaller than 1M
+
+                replay_buffer._store[name] = array[:replay_capacity + 4].copy()
+                logging.info(
+                    '%s: %s', name, array.shape
+                )
+            
+            logging.info(
+                'Loaded replay buffer ckpt %s from %s',
+                suffix, self._data_dir
+            )
+
+            return replay_buffer
+        
+
+        except tf.errors.NotFoundError:
+            return None
+    
+
     
