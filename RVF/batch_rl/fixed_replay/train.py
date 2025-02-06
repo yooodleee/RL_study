@@ -104,3 +104,31 @@ def create_agent(
 
 
 
+def main(unused_argv):
+    tf.compat.v1.logging.set_verbosity(
+        tf.compat.v1.logging.INFO
+    )
+    base_run_experiment.load_gin_configs(
+        FLAGS.gin_files,
+        FLAGS.gin_bindings,
+    )
+
+    replay_data_dir = os.path.join(FLAGS.replay_dir, 'replay_logs')
+    
+    create_agent_fn = functools.partial(
+        create_agent,
+        replay_data_dir=replay_data_dir,
+    )
+
+    runner = run_experiment.FixedReplayRunner(
+        FLAGS.base_dir,
+        create_agent_fn,
+    )
+    runner.run_experiment()
+
+
+    if __name__ == "__main__":
+        flags.mark_flag_as_required('replay_dir')
+        flags.mark_flags_as_required('base_dir')
+
+        app.run(main)
