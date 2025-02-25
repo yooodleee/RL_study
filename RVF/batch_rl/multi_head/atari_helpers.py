@@ -173,7 +173,7 @@ class MultiHeadQNetwork(keras.Model):
             32,
             [8, 8],
             strides=4,
-            padding='same'
+            padding='same',
             activation=activation_fn,
             kernel_initializer=self._kernel_initializer,
             name='Conv',
@@ -440,4 +440,45 @@ class MultiNetworkQNetwork(keras.Model):
             self._q_networks.append(q_net)
     
 
-    
+    def call(self, state):
+        """Creates the output tensor/op given the input state tensor.
+        
+        See https://www.tensorflow.org/api_docs/python/tf/keras/Model for more
+        info on this. Note that tf.keras.Model implements `call` which is
+        wrapped by `__call__` function by tf.keras.Model.
+        
+        
+        Args
+        ---------------
+            state: (Tensor) input tensor.
+            
+            
+        Returns
+        ----------------
+            (collections.namedtuple) output ops (graph mode) or output tensors (eager).
+        """
+        unordered_q_networks = [
+            network(state).q_values for network in self._q_networks
+        ]
+        unordered_q_networks = tf.stack(unordered_q_networks, axis=-1)
+        q_networks, q_values = combine_q_functions(
+            unordered_q_networks,
+            self._transform_strategy,
+            **self._kwargs,
+        )
+
+        return MultiNetworkNetworkType(q_networks, unordered_q_networks, q_values)
+
+
+
+def random_stochastic_matrix(
+        dim,
+        num_cols=None,
+        dtype=tf.float32,
+):
+    """Generates a random left stochastic matrix."""
+    mat_shape = (dim, dim) if num_cols is None else (dim, num_cols)
+    mat = tf.random.uniform(shape=mat_shape, dtype=dtype)
+    mat /= tf.random(mat, ord=1, axis=0, keepdims=True)
+
+    return mat
