@@ -261,3 +261,126 @@ class WaterWorld:
                 b.vel = np.array([0.0, 0.0], dtype=np.float)
 
 
+def normalize_angle(alpha):
+    while not(0 <= alpha < 360):
+        if alpha < 0: alpha + 360
+        if alpha >= 360: alpha -= 360
+    
+    return alpha
+
+
+def add_contact_point(contact_points, angle, new_point):
+    if angle not in contact_points:
+        contact_points[angle] = new_point
+    elif new_point[0] < contact_points[angle][0]:
+        contact_points[angle] = new_point
+
+
+def get_eye_features(
+        dd, obj, num_classes, range_max, vel_max
+):
+    # range, type, v_x, v_y
+    n_features = 1 + 2 + num_classes
+    ret = np.zeros(n_features, dtype=np.float)
+    ret[0] = dd / range_max
+    ret[1:3] = [0.0, 0.0] if obj == "W" else obj.vel / vel_max
+    type_id = -1 if obj == "W" else ord(obj.color) - ord("a") + 3
+    ret[type_id] = 1
+
+    return ret
+
+
+def dist(p1, p2):
+    ret = np.linalg.norm(p1 - p2, ord=2)
+    if type(ret) != np.float64:
+        print("Error, the distance is not a float")
+        print("p1", p1)
+        print("p2", p2)
+        print("ret", ret)
+    
+    return ret
+
+
+"""Enum with the actions that the agent can execute."""
+class Actions(Enum):
+    none = 0    # none
+    up = 1      # move up
+    right = 2   # move right
+    down = 3    # move donw
+    left = 4    # move left
+
+
+class Ball:
+
+    def __init__(
+            self,
+            color,
+            radius,
+            pos,
+            vel,
+    ):  # row and column
+        self.color = color
+        self.radius = radius
+        self.update(pos, vel)
+    
+
+    def __str__(self):
+        return "\t".join([self.color, str(self.pos[0]), str(self.pos[1]), 
+                          str(self.vel[0]), str(self.vel[1])])
+    
+
+    def update_position(self, elapsedTime):
+        self.pos = self.pos + elapsedTime * self.vel
+    
+
+    def update(self, pos, vel):
+        self.pos = np.array(pos, dtype=np.float)
+        self.vel = np.array(vel, dtype=np.float)
+    
+    
+    def is_colliding(self, ball):
+        d = np.linalg.norm(self.pos - ball.pos, ord=2)
+        return d <= self.radius + ball.radius
+    
+
+    def get_info(self):
+        return self.pos, self.vel
+
+
+
+class BallAgent(Ball):
+
+    def __init__(
+            self,
+            color,
+            radius,
+            pos,
+            vel,
+            actions,
+            vel_delta,
+            vel_max,
+    ):
+        super().__init__(color, radius, pos, vel)
+        self.reward = 0
+        self.actions = actions
+        self.vel_delta = float(vel_delta)
+        self.vel_max = float(vel_max)
+    
+
+    def execute_action(self, action):
+        # updating velocity
+        if action == Actions.up:    delta = np.array([0.0, +1.0])
+        if action == Actions.down:  delta = np.array([0.0, -1.0])
+        if action == Actions.left:  delta = np.array([-1.0, 0.0])
+        if action == Actions.right: delta = np.array([+1.0, 0.0])
+        self.vel += self.vel_delta * delta
+
+        # checking limits
+        self.vel = np.clip(self.vel, -self.vel_max, self.vel_max)
+    
+
+    def get_actions(self):
+        return self.actions
+
+
+
