@@ -212,7 +212,7 @@ class WaterWorld:
         """Contains all the actions that the agent can perform"""
         actions = [
             Actions.up.value,
-            Actions.left,value,
+            Actions.left.value,
             Actions.right.value,
             Actions.down.value,
             Actions.none.value
@@ -384,3 +384,144 @@ class BallAgent(Ball):
 
 
 
+def get_position(b, max_y):
+    return int(round(b.pos[0])), int(max_y) - int(round(b.pos[1]))
+
+
+def draw_ball(
+        b, colors, thickness, gameDisplay, pygame, max_y
+):
+    pygame.draw.circle(gameDisplay, colors[b.color], get_position(b, max_y), 
+                       b.radius, thickness)
+
+
+def draw_point(a_pos, pos, gameDisplay, pygame, max_y):
+    a_pos_real = int(round(a_pos[0]), int(max_y) - int(round(a_pos[1])))
+    pos_real = int(round(pos[0])), int(max_y) - int(round(pos[1]))
+    pygame.draw.line(gameDisplay, (0, 0, 0), a_pos_real, pos_real)
+    pygame.draw.circle(gameDisplay, (255, 0, 0), pos_real, 4)
+
+
+def get_colors():
+    colors = {}
+    colors["A"] = (0, 0, 0)
+    colors["a"] = (255, 0, 0)
+    colors["b"] = (0, 255, 0)
+    colors["c"] = (0, 0, 255)
+    colors["d"] = (255, 255, 0)     # yellow
+    colors["e"] = (0, 255, 255)     # cyan
+    colors["f"] = (255, 0, 255)     # magenta
+    colors["g"] = (192, 192, 192)
+    colors["h"] = (128, 128, 128)
+    colors["i"] = (128, 0, 0)
+    colors["j"] = (128, 128, 0)
+    colors["k"] = (0, 128, 0)
+    colors["l"] = (128, 0, 128)
+    colors["m"] = (0, 128, 128)
+    colors["n"] = (0, 0, 128)
+
+    return colors
+
+
+def play(RMenv):
+    import pygame
+
+    water_env = RMenv.env
+    water_world = water_env.env
+
+    max_x, max_y = water_env.params.max_x, water_env.params.max_y
+    RMenv.reset()
+    print("Current task: ", RMenv.rm_files[RMenv.current_rm_id])
+    print("RM state: ", RMenv.current_u_id)
+    current_u = RMenv.current_u_id
+
+    pygame.init()
+
+    black = (0, 0, 0)
+    white = (255, 255, 255)
+    colors = get_colors()
+
+    gameDisplay = pygame.display.set_mode((max_x, max_y))
+    pygame.display.set_caption('Water world: )')
+    clock = pygame.time.Clock()
+    crashed = False
+
+    actions = set()
+    while not crashed:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                crashed = True
+            
+            if event.type == pygame.KEYUP:
+                if Actions.left in actions and event.key == pygame.K_LEFT:
+                    actions.remove(Actions.left)
+                if Actions.right in actions and event.key == pygame.K_RIGHT:
+                    actions.remove(Actions.right)
+                if Actions.up in actions and event.key == pygame.K_UP:
+                    actions.remove(Actions.up)
+                if Actions.down in actions and event.key == pygame.K_DOWN:
+                    actions.remove(Actions.down)
+            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    actions.add(Actions.left)
+                if event.key == pygame.K_RIGHT:
+                    actions.add(Actions.right)
+                if event.key == pygame.K_UP:
+                    actions.add(Actions.up)
+                if actions.key == pygame.K_DOWN:
+                    actions.add(Actions.down)
+        
+        # Getting the action
+        if len(actions) == 0: a = Actions.none
+        else: a = random.choice(list(actions))
+
+        # Executing the action
+        # game.execute_action(a.value, t_delta)
+
+        obs, rew, done, _ = RMenv.step(a.value)
+        events = water_env.get_events()
+
+        # printing image
+        gameDisplay.fill(white)
+        for b in water_world.balls:
+            draw_ball(b, colors, 0, gameDisplay, pygame, max_y)
+        draw_ball(water_world.agent, colors, 3, gameDisplay, pygame, max_y)
+        pygame.display.update()
+        clock.tick(20)
+
+        # print info related to the task
+        if done:
+            print("Reward: ", rew)
+            RMenv.reset()
+            print("Current task: ", RMenv.rm_files[RMenv.current_rm_id])
+            print("RM state: ", RMenv.current_u_id)
+            current_u = RMenv.current_u_id
+        
+        if RMenv.current_u_id != current_u:
+            print("RM state: ", RMenv.current_u_id)
+            current_u = RMenv.current_u_id
+    
+    pygame.quit()
+
+
+
+def save_random_world(num_worlds, folder_out="maps"):
+    max_x = 400
+    max_y = 400
+    b_num_per_color = 2
+    b_radius = 15
+    use_velocities = True
+    params = WaterWorldParams(
+        None, 
+        b_radius=b_radius,
+        max_x=max_x,
+        max_y=max_y,
+        b_num_per_color=b_num_per_color,
+        use_velocities=use_velocities,
+    )
+
+    for i in range(num_worlds):
+        random.seed(i)
+        game = WaterWorld(params)
+        game.save_state("%sworld_%d.pkl" % (folder_out, i))
