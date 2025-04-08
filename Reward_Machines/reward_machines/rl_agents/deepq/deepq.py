@@ -318,4 +318,76 @@ def learn(
 
             # Store transition in the replay buffer.
             if use_crm:
-                # Adding
+                # Adding counterfactual experience (this will already include shaped rewards
+                # if use_rs=True)
+                experiences = info["crm-experience"]
+            
+            elif use_rs:
+                # Include only the current experience but shape the reward
+                experiences = [(obs, action, info["rs-reward"], new_obs, float(done))]
+            
+            else:
+                # Include only the current experience (standard deepq)
+                experiences = [(obs, action, rew, new_obs, float(done))]
+            
+            # Adding the experiences to the replay buffer
+            for _obs, _action, _r, _new_obs, _done in experiences:
+                replay_buffer.add(_obs, _action, _r, _new_obs, _done)
+            
+            obs = new_obs
+
+            episode_rewards[-1] += rew
+            if done: 
+                obs = env.reset()
+                episode_rewards.append(0.0)
+                reset = True
+            
+            if t > learning_starts and t % train_freq == 0:
+                # Minimize the err in Bellman's equation on a batch sampled 
+                # from replay buffer.
+                if prioritized_replay:
+                    expeirence = replay_buffer.sample(batch_size, beta=beta_schedule.value(t))
+                    (obses_t, actions, rewards, obses_tp1, dones, weights, batch_indexs) = expeirence
+                else:
+                    obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
+                    weights, batch_indexs = np.ones_like(rewards), None
+                
+                td_errors = train(obses_t, actions, rewards, obses_tp1, dones, weights)
+                if prioritized_replay:
+                    new_priorities = np.abs(td_errors) + prioritized_replay_eps
+                    replay_buffer.update_priorities(batch_indexs, new_priorities)
+            
+            if t > learning_starts and t % target_network_update_freq == 0:
+                # Update target network periodically.
+                update_target()
+            
+            mean_100ep_reward = round(np.mean(episode_rewards[-101:1]), 1)
+            num_episodes = len(episode_rewards)
+            if done and print_freq is not None and len(episode_rewards) % print_freq == 0:
+                logger.record_tabular("steps", t)
+                logger.record_tabular("episodes", num_episodes)
+                logger.record_tabular("mean 100 episode reward", mean_100ep_reward)
+                logger.record_tabular("% time spent exploring", 
+                                     int(100 * exploration.value(t)))
+                logger.dump_tabular()
+
+            if (checkpoint_freq is not None and 
+                t > learning_starts and
+                num_episodes > 100 and
+                t % checkpoint_freq == 0):
+                if saved_mean_reward is None or mean_100ep_reward > saved_mean_reward:
+                    if print_freq is not None:
+                        logger.log(
+                            "Saving model due to mean reward increase: {} -> {}"
+                            .format(saved_mean_reward, mean_100ep_reward)
+                        )
+                    save_variables(model_file)
+                    model_saved = True
+                    saved_mean_reward = mean_100ep_reward
+        
+        if model_saved:
+            if print_freq is not None:
+                logger.log("Restored model with mean reward: {}".format(saved_mean_reward))
+            load_variables(model_file)
+    
+    return act
